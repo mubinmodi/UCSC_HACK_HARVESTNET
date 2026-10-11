@@ -79,6 +79,7 @@ class DeploymentTests(unittest.TestCase):
             self.assertNotIn('CORE_API_TOKEN:', text)
             self.assertNotIn('ORGANIZATION_ID: donor', text)
             self.assertNotIn('--organization, donor', text)
+        self.assertIn('--organization, market', (root / 'compose.platform.yaml').read_text())
 
     def test_platform_ci_is_read_only_runs_pushes_on_main_and_uses_in_repo_agents(self):
         workflow = (Path(__file__).parents[1] / '.github' / 'workflows' / 'platform.yml').read_text()

@@ -157,12 +157,17 @@ class ContractTests(unittest.TestCase):
             stop()
 
     def test_core_credentials_come_from_a_per_organization_map(self):
-        with patch.dict(os.environ, {'CORE_API_URL': 'https://core.example', 'CORE_API_TOKENS': ''}), self.assertRaises(ValueError):
-            CoreAPI.from_env()
-        with patch.dict(os.environ, {'CORE_API_URL': 'https://core.example', 'CORE_API_TOKENS': '{"market":"m","city":"c"}'}):
+        clear = {'CORE_API_URL': 'https://core.example', 'CORE_API_TOKENS': '', 'HARVESTNET_STAFF_TOKENS': '', 'CORE_API_TOKEN': ''}
+        with patch.dict(os.environ, {**clear, 'CORE_API_TOKENS': '{"market":"m","city":"c"}'}):
             core = CoreAPI.from_env()
             self.assertEqual((core.token_for('market'), core.token_for('city')), ('m', 'c'))
-        with patch.dict(os.environ, {'CORE_API_URL': '', 'CORE_API_TOKENS': ''}):
+        with patch.dict(os.environ, {**clear, 'HARVESTNET_STAFF_TOKENS': '{"market":"m2","rural":"r2"}'}):
+            self.assertEqual(CoreAPI.from_env().token_for('rural'), 'r2')  # the core's own map works too
+        with patch.dict(os.environ, {**clear, 'CORE_API_TOKENS': '["m"]'}), self.assertRaises(ValueError):
+            CoreAPI.from_env()
+        with patch.dict(os.environ, {**clear, 'CORE_API_TOKEN': 'one'}):
+            self.assertEqual(CoreAPI.from_env().token_for('city'), 'one')  # legacy single token still starts
+        with patch.dict(os.environ, {**clear, 'CORE_API_URL': ''}):
             self.assertIsNone(CoreAPI.from_env().base_url)
 
     def test_core_rejections_pass_through_with_their_own_status(self):

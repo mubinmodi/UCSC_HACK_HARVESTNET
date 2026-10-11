@@ -33,8 +33,10 @@ the core must independently recheck the current version and resource holds.
 
 Set `CORE_API_URL` and `CORE_API_TOKENS` for the live core. `CORE_API_TOKENS` is a
 JSON map of each organization to its own core staff token, the same shape as the
-core's `HARVESTNET_STAFF_TOKENS`; each decision is sent with its own organization's
-token. Human decisions POST to `/approvals` as the contract's `record_approval`:
+core's `HARVESTNET_STAFF_TOKENS` (which is also read if `CORE_API_TOKENS` is unset);
+each decision is sent with its own organization's token. A single legacy
+`CORE_API_TOKEN` still starts, with a warning, but only commits that one
+organization's decisions. Human decisions POST to `/approvals` as the contract's `record_approval`:
 `lot_id`, `version`, `organization_id`, `terms_hash` (`sha256:...`), `decision`,
 and the idempotent `receipt_id`. With no core, the labeled local fallback records
 a human decision but **does not commit**. A core rejection (401, 409, and so on)

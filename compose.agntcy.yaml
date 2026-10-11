@@ -7,7 +7,7 @@ x-native: &native
   command: [python, -m, harvestnet_platform.agntcy_server]
   networks: [platform, egress]
 services:
-  market:
+  donor:  # container name; it hosts the organization `market`
     <<: *native
     environment:
       ORGANIZATION_ID: market
@@ -19,7 +19,7 @@ services:
       CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
       CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-    volumes: [market-data:/app/runtime, budget-data:/app/budget]
+    volumes: [donor-data:/app/runtime, budget-data:/app/budget]
   city:
     <<: *native
     environment:

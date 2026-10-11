@@ -230,10 +230,22 @@ class CoreAPI:
 
     @classmethod
     def from_env(cls):
-        raw = os.getenv('CORE_API_TOKENS', '')
-        tokens = json.loads(raw) if raw else None
-        if os.getenv('CORE_API_URL') and not isinstance(tokens, dict):
-            raise ValueError('Set CORE_API_TOKENS to a JSON map of each organization to its own core staff token')
+        """Per-organization tokens from ``CORE_API_TOKENS``, else the core's own
+        ``HARVESTNET_STAFF_TOKENS`` (same JSON shape). A single legacy ``CORE_API_TOKEN``
+        still works but only commits that one organization's decisions."""
+        tokens = None
+        for name in ('CORE_API_TOKENS', 'HARVESTNET_STAFF_TOKENS'):
+            if os.getenv(name):
+                tokens = json.loads(os.environ[name])
+                if not isinstance(tokens, dict):
+                    raise ValueError(f'{name} must be a JSON map of organization to token')
+                break
+        if tokens is None and os.getenv('CORE_API_TOKEN'):
+            tokens = os.environ['CORE_API_TOKEN']
+            print('Warning: one CORE_API_TOKEN for every organization; set CORE_API_TOKENS so each '
+                  "organization's decisions use its own token", flush=True)
+        if os.getenv('CORE_API_URL') and tokens is None:
+            print('Warning: no core credentials; the core will refuse decisions (401) until CORE_API_TOKENS is set', flush=True)
         return cls(os.getenv('CORE_API_URL'), tokens, os.getenv('N8N_DECISION_WEBHOOK_URL'), os.getenv('N8N_WEBHOOK_TOKEN'))
 
     def token_for(self, organization):

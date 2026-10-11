@@ -6,7 +6,8 @@ fallback, retry messages, and reject unauthorized commitment operations.
 
 `compose.platform.yaml` runs one container each for `market` (the donor), `city`,
 `rural`, `eastside`, and `advocate`. Organization IDs are names, not roles
-(contract decision 1). Set a random `TRANSPORT_TOKEN` and run
+(contract decision 1). The donor's container keeps the service name `donor`
+(`http://donor:8020`) so deployment overlays still match; it hosts `market`. Set a random `TRANSPORT_TOKEN` and run
 `docker compose -f compose.platform.yaml up --build -d`. This default uses the
 small A2A JSON-RPC host. It is labeled `a2a_jsonrpc`, not native AGNTCY.
 
