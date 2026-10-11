@@ -3,10 +3,39 @@ from dataclasses import asdict
 import math
 from datetime import timedelta
 from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt
-from harvestnet_agents.fair_share import fair_share, load_fair_share_table
-from harvestnet_agents.profiles import load_profiles, to_pounds
+from harvestnet_agents.calculators import CalculatorError as AgentsCalculatorError
+from harvestnet_agents.fair_share import FairShareError, fair_share, load_fair_share_table
+from harvestnet_agents.profiles import UnitConversionError, load_profiles, to_pounds
 from harvestnet_agents.negotiation import TimeWindow
-from .protocol import number
+from . import protocol
+
+
+class CalculatorError(AgentsCalculatorError):
+    """Bad calculator input. A ``ValueError`` and Lane B's ``CalculatorError``, so the
+    scenario runner logs it as a calculator error instead of crashing."""
+
+
+class UnknownProduce(CalculatorError, KeyError):
+    """No produce profile. Still a ``KeyError`` for callers that map it to not found."""
+
+
+class BadUnit(CalculatorError, UnitConversionError):
+    """A unit the profile can't convert. Still a ``UnitConversionError``."""
+
+
+def number(value):
+    """A finite nonnegative number, or a ``CalculatorError``."""
+    try:
+        return protocol.number(value)
+    except ValueError as exc:
+        raise CalculatorError(str(exc)) from exc
+
+
+def finite(value):
+    """A finite number of either sign (a change, or a free space that may be negative)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise CalculatorError("a finite number is required")
+    return float(value)
 
 
 class Calculators:
@@ -23,8 +52,12 @@ class Calculators:
 
     def fair_share(self, household_size):
         if isinstance(household_size, bool) or not isinstance(household_size, int) or household_size < 1:
-            raise ValueError("household size must be a positive integer")
-        return self.log("fair_share", {"household_size": household_size}, fair_share(household_size, self.table))
+            raise CalculatorError("household size must be a positive integer")
+        try:
+            share = fair_share(household_size, self.table)
+        except FairShareError as exc:
+            raise CalculatorError(str(exc)) from exc
+        return self.log("fair_share", {"household_size": household_size}, share)
 
     def fair_share_gap(self, households):
         gaps = [max(0, self.fair_share(h.household_size).pounds - number(h.received_lb)) for h in households]
@@ -34,7 +67,7 @@ class Calculators:
         available = number(pounds_available)
         codes = [h["request_code"] for h in households]
         if len(codes) != len(set(codes)):
-            raise ValueError("duplicate household")
+            raise CalculatorError("duplicate household")
         shares = [self.fair_share(h["household_size"]).pounds for h in households]
         gaps = [max(0, s - number(h["received_lb"])) for s, h in zip(shares, households)]
         # Water-fill the largest deficits until they meet the next deficit.
@@ -54,26 +87,23 @@ class Calculators:
     def storage_at(self, storage, at):
         candidates = [s for s in storage if s.window.start <= at < s.window.end]
         # Overlapping readings are conservative, never summed as extra capacity.
-        result = StorageAt(min((number(s.cold_free_lb) for s in candidates), default=0), min((number(s.dry_free_lb) for s in candidates), default=0), bool(candidates))
+        result = StorageAt(min((finite(s.cold_free_lb) for s in candidates), default=0), min((finite(s.dry_free_lb) for s in candidates), default=0), bool(candidates))
         return self.log("storage_at", {"at": at.isoformat(), "storage": [asdict(s) for s in storage]}, result)
 
     def capacity_fit(self, free_lb, needed_lb):
-        free, needed = number(free_lb), number(needed_lb)
-        return self.log("capacity_fit", {"free_lb": free, "needed_lb": needed}, CapacityFit(needed <= free, max(0, free-needed), max(0, needed-free)))
+        # Negative free space (an overfull store) counts as no room, like the stand-in.
+        recorded, needed = finite(free_lb), number(needed_lb)
+        free = max(0.0, recorded)
+        return self.log("capacity_fit", {"free_lb": recorded, "needed_lb": needed}, CapacityFit(needed <= free, max(0, free-needed), max(0, needed-free)))
 
     def gap_after_plan(self, gap_lb, planned_lb):
         gap, planned = number(gap_lb), number(planned_lb)
         return self.log("gap_after_plan", {"gap_lb": gap, "planned_lb": planned}, GapAfterPlan(max(0, gap-planned), max(0, planned-gap)))
 
     def adjust_pounds(self, current_lb, change_lb):
-        current=number(current_lb)
-        if isinstance(change_lb,bool):
-            raise ValueError('pound adjustment must be finite')
-        change=float(change_lb)
-        if not math.isfinite(change):
-            raise ValueError('pound adjustment must be finite')
-        result=number(max(0,current+change))
-        return self.log('adjust_pounds',{'current_lb':current,'change_lb':change},result)
+        # change_lb may be negative (removing pounds); the result never goes below zero.
+        current, change = number(current_lb), finite(change_lb)
+        return self.log("adjust_pounds", {"current_lb": current, "change_lb": change}, max(0.0, current + change))
 
     def arrival_time(self, departs_at, travel_minutes):
         return self.log("arrival_time", {"departs_at": departs_at.isoformat(), "travel_minutes": number(travel_minutes)}, departs_at + timedelta(minutes=travel_minutes))
@@ -92,6 +122,11 @@ class Calculators:
         number(quantity)
         if lb_per_unit is not None:
             if number(lb_per_unit) == 0:
-                raise ValueError("pack weight must be positive")
-        result = number(to_pounds(self.profiles.get(produce_id), quantity, unit, lb_per_unit))
+                raise CalculatorError("pack weight must be positive")
+        if produce_id not in self.profiles:
+            raise UnknownProduce(f"no produce profile for {produce_id!r}")
+        try:
+            result = number(to_pounds(self.profiles.get(produce_id), quantity, unit, lb_per_unit))
+        except UnitConversionError as exc:
+            raise BadUnit(str(exc)) from exc
         return self.log("to_pounds", {"produce_id": produce_id, "quantity": quantity, "unit": unit, "lb_per_unit": lb_per_unit}, result)
