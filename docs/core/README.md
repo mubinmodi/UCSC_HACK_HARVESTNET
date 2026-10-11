@@ -13,3 +13,7 @@ Real calculator, matching, recall, number-validation and stale-approval acceptan
 ## Issue #9
 
 Real public API and HTTP server, consent/privacy/expiry, owner authentication, condition checks, counter processing, commitments and household pickup release. No actual SMS or voice provider calls. The HTTP server binds localhost unless configured.
+
+## Issue #10
+
+First-come-first-served and nearest-food-bank baselines share the real harness and safety checks. Five synthetic fixtures, measured deterministic metrics and replay. Missing live LLM runs are explicitly not_run, not invented.
