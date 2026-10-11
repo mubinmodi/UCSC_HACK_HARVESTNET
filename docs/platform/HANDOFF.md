@@ -38,8 +38,11 @@ nonfinite Directory capacity queries. The combined Compose configuration and
 regeneration of all four n8n imports pass. Workflow graph checks do not certify an
 actual n8n import/SMS execution, and Compose validation does not run containers.
 
-The shared #1 API contracts/skeleton and #20 real harness have no code in
-their remote branches as last checked. Lane B's rules now exist at pinned commit
+The #1 branch now publishes agreed contracts at commit `36c4fe9`, including
+market as the donor ID, offset timestamps and lot_id approval payloads. Its
+README references an API skeleton, but the fetched tree contains no api_skeleton
+implementation. Align the platform seam with these new contracts before claiming
+full integration. The #20 real harness branch still has no implementation. Lane B's rules now exist at pinned commit
 `f06b14822d4379bc790a2f1d8a4525ac94cb7649`. The Lane C adapter verifies all 25
 recorded rule scenarios over HTTP with exact direct-policy output equality and
 duplicate retries. It supports nonvoting `pass` and explicit donor ID aliasing.
@@ -99,3 +102,13 @@ The local rehearsal is at `python -m harvestnet_platform.demo`; its URL has an
 ephemeral session fragment in ignored `runtime/demo-url.txt`. The review page
 does not allocate, commit, or create real household records. It can demonstrate
 the integration controls while the full team application is being joined.
+
+## Review submission (October 11)
+
+The user requested submission of the existing PRs for team review. PRs #26-#30
+are ready for review, with dependencies and incomplete acceptance gates retained;
+none were merged or issues closed. All 39 tests were rerun successfully. The
+user-provided n8n API key authenticated successfully and listed all five inactive
+workflows. The key is stored only in ignored local configuration. Live SMS,
+Directory daemon registration, AWS deployment and real core comparison remain
+unverified. Review readiness is not full issue acceptance.
