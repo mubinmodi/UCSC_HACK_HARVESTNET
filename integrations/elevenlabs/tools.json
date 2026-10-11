@@ -4,6 +4,8 @@
   "contract": "docs/contracts/public-api.md",
   "base_url": "https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws",
   "base_url_note": "The deployed API skeleton, which returns the contract examples. Swap in the real API's address when Lane A's server is deployed; the paths stay the same.",
+  "live_base_url": "https://18-217-110-223.sslip.io/api",
+  "live_base_url_note": "The deployed core API (deploy/aws, harvestnet_core.server). sync_agent.py points the ElevenLabs tools here by default; pass --skeleton to use base_url above instead. The paths are the same.",
   "tools": [
     {
       "name": "voice_intake",
