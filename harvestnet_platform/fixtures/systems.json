@@ -1,29 +1,30 @@
 {
-  "fixture_version": "synthetic-v1",
-  "observed_at": "2026-10-11T14:00:00Z",
-  "donor": {
-    "inventory": {"lot_id": "mixed-batch-1", "recall": false, "deadline": "2026-10-11T22:00:00Z", "items": [{"profile_id": "apples", "quantity": 300, "unit": "lb", "condition": "good"}, {"profile_id": "romaine", "quantity": 200, "unit": "lb", "condition": "good"}, {"profile_id": "potatoes", "quantity": 400, "unit": "lb", "condition": "good"}]},
-    "truck": {"available": true, "capacity_lb": 700, "refrigerated": false, "windows": [{"start": "2026-10-11T20:00:00Z", "end": "2026-10-11T23:00:00Z"}]}
+  "fixture_version": "synthetic-v2",
+  "observed_at": "2026-10-13T12:00:00-07:00",
+  "note": "Synthetic. The organizations' own systems on the core's normal afternoon (core_fixtures/normal-afternoon.json, October 13, 2026, Pacific time). Field names are each organization's own; specialists translate them (docs/contracts/README.md decision 4).",
+  "market": {
+    "inventory": {"lot_id": "lot-market-1013", "recall": false, "deadline": "2026-10-13T15:00:00-07:00", "items": [{"profile_id": "apples", "quantity": 300, "unit": "lb", "condition": "good"}, {"profile_id": "romaine", "quantity": 200, "unit": "lb", "condition": "good"}, {"profile_id": "potatoes", "quantity": 400, "unit": "lb", "condition": "good"}]},
+    "truck": {"available": true, "capacity_lb": 700, "refrigerated": false, "windows": [{"start": "2026-10-13T13:00:00-07:00", "end": "2026-10-13T15:00:00-07:00"}]}
   },
   "city": {
-    "storage": {"cold_available_lb": 250, "dry_available_lb": 200, "windows": [{"start": "2026-10-11T20:00:00Z", "end": "2026-10-12T03:00:00Z"}]},
+    "storage": {"cold_available_lb": 250, "dry_available_lb": 200, "windows": [{"start": "2026-10-13T12:00:00-07:00", "end": "2026-10-14T21:00:00-07:00"}]},
     "cooler": {"status": "working", "temperature_c": 4, "cold_available": true},
     "cooler-failed": {"status": "failed", "temperature_c": 14, "cold_available": false},
-    "pickup-hours": {"windows": [{"start": "2026-10-12T01:00:00Z", "end": "2026-10-12T03:00:00Z"}]},
-    "truck": {"available": true, "capacity_lb": 250, "refrigerated": true, "windows": [{"start": "2026-10-11T20:00:00Z", "end": "2026-10-12T00:00:00Z"}]}
+    "pickup-hours": {"windows": [{"start": "2026-10-13T18:00:00-07:00", "end": "2026-10-13T20:00:00-07:00"}, {"start": "2026-10-14T18:00:00-07:00", "end": "2026-10-14T20:00:00-07:00"}]},
+    "truck": {"available": true, "capacity_lb": 250, "refrigerated": true, "windows": [{"start": "2026-10-13T13:00:00-07:00", "end": "2026-10-13T17:00:00-07:00"}]}
   },
   "rural": {
-    "storage": {"cold_available_lb": 50, "dry_available_lb": 700, "windows": [{"start": "2026-10-11T20:00:00Z", "end": "2026-10-12T01:00:00Z"}]},
+    "storage": {"cold_available_lb": 50, "dry_available_lb": 700, "windows": [{"start": "2026-10-13T12:00:00-07:00", "end": "2026-10-14T21:00:00-07:00"}]},
     "cooler": {"status": "working", "temperature_c": 4, "cold_available": true},
     "cooler-failed": {"status": "failed", "temperature_c": 14, "cold_available": false},
-    "pickup-hours": {"windows": [{"start": "2026-10-11T23:00:00Z", "end": "2026-10-12T01:00:00Z"}]},
-    "truck": {"available": false, "capacity_lb": 100, "refrigerated": false, "windows": []}
+    "pickup-hours": {"windows": [{"start": "2026-10-13T16:00:00-07:00", "end": "2026-10-13T18:00:00-07:00"}, {"start": "2026-10-14T18:00:00-07:00", "end": "2026-10-14T20:00:00-07:00"}]},
+    "truck": {"available": false, "capacity_lb": 0, "refrigerated": false, "windows": []}
   },
   "eastside": {
-    "storage": {"cold_available_lb": 150, "dry_available_lb": 100, "windows": [{"start": "2026-10-11T20:00:00Z", "end": "2026-10-12T04:00:00Z"}]},
+    "storage": {"cold_available_lb": 150, "dry_available_lb": 100, "windows": [{"start": "2026-10-13T12:00:00-07:00", "end": "2026-10-14T21:00:00-07:00"}]},
     "cooler": {"status": "working", "temperature_c": 4, "cold_available": true},
     "cooler-failed": {"status": "failed", "temperature_c": 14, "cold_available": false},
-    "pickup-hours": {"windows": [{"start": "2026-10-12T01:00:00Z", "end": "2026-10-12T04:00:00Z"}]},
-    "truck": {"available": false, "capacity_lb": 100, "refrigerated": false, "windows": []}
+    "pickup-hours": {"windows": [{"start": "2026-10-13T18:00:00-07:00", "end": "2026-10-13T21:00:00-07:00"}, {"start": "2026-10-14T18:00:00-07:00", "end": "2026-10-14T21:00:00-07:00"}]},
+    "truck": {"available": false, "capacity_lb": 0, "refrigerated": false, "windows": []}
   }
 }

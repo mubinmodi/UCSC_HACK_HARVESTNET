@@ -24,25 +24,29 @@ real SMS messages, household saves, or actual produce commitments occur.
   A missing core records a decision but cannot commit it.
 - AGNTCY outage: choose `InProcess` before starting a run, visibly labeled.
   Never switch policies mid-event after a partial network delivery.
-- Claude outage/budget exhaustion: rules or replay. Live calls default disabled.
+- Claude outage/cap reached: rules or replay. Live calls are off until `CLAUDE_RUN_CAP_USD` is set.
 
 ## Claude spending cap
 
-`Budget.from_env()` reads `CLAUDE_RUN_CAP_USD` and `CLAUDE_TOTAL_CAP_USD`, both
-default **0**. Wrap every live call in `Budget.call(run_id, call_id,
-maximum_cost_usd, function)`. The function returns `(result, actual_cost_usd)`.
-Maximum cost must cover input tokens, capped output tokens, tool calls/retries,
-and current configured prices. Do not estimate a smaller average. Reservations
-are atomic/durable, repeated call IDs cannot repeat a live request, and uncertain
-failures retain the entire reservation. Unexpected actual cost above the bound
-records the actual cost and blocks further live calls until pricing is reconciled.
-Correct conservative bounds are a
-prerequisite, not a guaranteed provider billing cap. Share ONE ledger across all
-processes using the same credit, or give each its own partition of the cap.
-The native deployment mounts one `budget-data` ledger into all five organizations
-and the core. The reviewed core image must support the shared path and write as
-UID 10001 (or explicitly arrange equivalent volume permissions).
-Lane B's Claude client must use this guard; that client does not yet exist here.
+One setting caps Claude spending per run: **`CLAUDE_RUN_CAP_USD`**, default **0**
+(no live calls). Lane B reads it with `SpendingCap.from_env()`:
+
+- The LLM negotiators: `llm_negotiators_for(...)` without an explicit `cap` gives
+  every negotiator in the run one shared `SpendingCap.from_env()`.
+- The voice line's front-desk extractor: `ClaudeExtractor()` uses
+  `SpendingCap.from_env()` unless given a cap. Over the cap it makes no call and
+  raises `ExtractionError`, so the caller falls back to the text form.
+
+Before each call the cap reserves a deliberately high worst-case cost (input
+estimate plus the full output cap) and settles the actual cost from the
+response's usage. If the reservation doesn't fit, no call is made and the
+negotiator sends its rules-based move. The cap is per process and per run.
+
+`harvestnet_platform.budget.Budget` is a separate durable ledger (SQLite) with a
+run cap and a total cap (`CLAUDE_TOTAL_CAP_USD`), for sharing one credit across
+processes. No live path uses it yet; to use it, reserve through it as well.
+Correct conservative bounds are a prerequisite, not a guaranteed provider
+billing cap.
 
 ## AWS deployment (prepared, not executed)
 
@@ -55,8 +59,10 @@ inputs; no fake HTTPS address or deployment claim is produced.
    Keep Postgres, agent services, mock controls and Directory private. Use SSM
    or restricted SSH for administration. Back up persistent volumes first.
 2. Create a Secrets Manager JSON secret containing random `TRANSPORT_TOKEN`,
-   `API_EVENTS_TOKEN`, `DEMO_SWITCH_TOKEN`, `POSTGRES_PASSWORD`, plus configured
-   URLs/domain/API image and any provider keys. Attach an EC2 instance role
+   `API_EVENTS_TOKEN`, `DEMO_SWITCH_TOKEN`, `POSTGRES_PASSWORD`, `REPLY_BINDING_KEY`,
+   `CORE_API_TOKENS` (a JSON map of each organization to its own core staff token,
+   matching the core's `HARVESTNET_STAFF_TOKENS`), plus configured URLs/domain/API
+   image and any provider keys. Attach an EC2 instance role
    granting `secretsmanager:GetSecretValue` only for this secret (and KMS decrypt
    only if its key requires it). No static AWS keys in Git or user data.
 3. Check out the reviewed commit on the host. Run:

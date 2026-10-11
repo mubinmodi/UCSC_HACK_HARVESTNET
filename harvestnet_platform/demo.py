@@ -9,7 +9,7 @@ from .approvals import ApprovalStore, CoreAPI, handler_for as approvals_handler
 from .directory import LocalDirectory
 from .http import serve
 from .systems import Systems
-from .transport import InProcess, Receiver, ORGANIZATIONS
+from .transport import InProcess, Receiver, ORGANIZATIONS, role_of
 from .voice import text_intake
 
 PAGE = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -20,7 +20,7 @@ PAGE = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewp
 <section><h2>Agent communication</h2><button onclick="run('transport',{},'transport')">Run five organization turns</button><pre id="transport"></pre></section>
 <section><h2>Human approval</h2><p>Sample terms: synthetic 200 lb romaine to city. Links display the complete version and terms. Each invited organization's human decides.</p><button onclick="approvals()">Create sample review requests</button><div id="links"></div><pre id="approvals"></pre></section>
 <section><h2>Text instead of voice</h2><label>Household size <input id="size" type="number" min="1" max="30" value="4"></label> <label>Limited fridge <select id="fridge"><option value="yes">Yes</option><option value="no">No</option></select></label><p>Sample pickup window: 6–8 pm. Optional SNAP answer defaults to prefer not to say.</p><button onclick="intake()">Read back draft</button><pre id="intake"></pre></section>
-<script>const token=location.hash.slice(1); history.replaceState(null,'',location.pathname); async function api(path,body){const r=await fetch('/demo/'+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error);return data;}async function run(path,body,id){try{const data=await api(path,body);document.getElementById(id).textContent=JSON.stringify(data,null,2);return data;}catch(e){document.getElementById(id).textContent=e.message;}}async function cooler(failed){await run('cooler',{failed},'systems');}async function approvals(){const data=await run('approvals',{},'approvals'); const div=document.getElementById('links');div.replaceChildren();if(data)for(const request of data.requests){const a=document.createElement('a');a.textContent='Review as '+request.organization_id+' (local fallback)';a.href=request.decision_url;a.target='_blank';a.rel='noopener';div.append(a,document.createElement('br'));}}async function intake(){await run('text-intake',{household_size:Number(document.getElementById('size').value),limited_fridge:document.getElementById('fridge').value==='yes',pickup_windows:[{start:'2026-10-12T01:00:00Z',end:'2026-10-12T03:00:00Z'}],snap:'not_said'},'intake');}run('cooler',{failed:false},'systems');</script></html>'''
+<script>const token=location.hash.slice(1); history.replaceState(null,'',location.pathname); async function api(path,body){const r=await fetch('/demo/'+path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error);return data;}async function run(path,body,id){try{const data=await api(path,body);document.getElementById(id).textContent=JSON.stringify(data,null,2);return data;}catch(e){document.getElementById(id).textContent=e.message;}}async function cooler(failed){await run('cooler',{failed},'systems');}async function approvals(){const data=await run('approvals',{},'approvals'); const div=document.getElementById('links');div.replaceChildren();if(data)for(const request of data.requests){const a=document.createElement('a');a.textContent='Review as '+request.organization_id+' (local fallback)';a.href=request.decision_url;a.target='_blank';a.rel='noopener';div.append(a,document.createElement('br'));}}async function intake(){await run('text-intake',{household_size:Number(document.getElementById('size').value),limited_fridge:document.getElementById('fridge').value==='yes',pickup_windows:[{start:'2026-10-13T18:00:00-07:00',end:'2026-10-13T20:00:00-07:00'}],snap:'not_said'},'intake');}run('cooler',{failed:false},'systems');</script></html>'''
 
 
 def handler_for(systems, store, token, base):
@@ -50,18 +50,19 @@ def handler_for(systems, store, token, base):
                 data = self.read_json()
                 if path == '/demo/cooler':
                     reading = systems.switch('city',data['failed'])
-                    result = {'reading':reading,'candidates':directory.search(min_cold_lb=100,pickup_at='2026-10-12T02:00:00Z')}
+                    result = {'reading':reading,'candidates':directory.search(min_cold_lb=100,pickup_at='2026-10-13T19:00:00-07:00')}
                 elif path == '/demo/transport':
                     event = str(uuid.uuid4())
                     receipts = []
                     for seq,actor in enumerate(ORGANIZATIONS,1):
                         receipts.extend(transport.broadcast({'event_id':event,'sequence':seq,'turn':actor,
-                            'input':{'turn':actor,'draft':{'version':1,'terms':{}},'facts':{}}}))
+                            'input':{'role':role_of(actor),'draft':{'version':1,'terms':{}},'facts':{},
+                                     'turn':{'organization_id':actor,'number':seq,'now':'2026-10-13T12:00:00-07:00','accepted_by':[]}}}))
                     result = {'mode':transport.mode,'policy':'synthetic_stand_in','receipts':receipts,'committed':False}
                 elif path == '/demo/approvals':
                     event = 'synthetic-'+str(uuid.uuid4())
                     links = store.request(event,1,{'items':[{'profile_id':'romaine','pounds':200,'food_bank':'city','mover':'city'}],
-                                                 'synthetic':True},['donor','city'])
+                                                 'synthetic':True},['market','city'])
                     for link in links:
                         link['decision_url'] = base+'/human/review?token='+link.pop('token')
                     result = {'mode':'local_approval_fallback','requests':links,'committed':False}

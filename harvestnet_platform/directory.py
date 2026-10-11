@@ -4,14 +4,15 @@ import asyncio
 import json
 import math
 import os
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 from .systems import Systems, BANKS
-from .transport import ORGANIZATIONS, agent_card
+from .transport import ORGANIZATIONS, agent_card, role_of
 
 
 def capabilities(organization, systems):
     if organization not in BANKS:
-        return {'role': organization, 'synthetic': True}
+        return {'role': role_of(organization), 'synthetic': True}
     storage = systems.read(organization, 'storage')
     hours = systems.read(organization, 'pickup-hours')
     return {'role': 'food_bank', 'cold_space_lb': storage['data']['cold_available_lb'],
@@ -19,19 +20,37 @@ def capabilities(organization, systems):
             'fixture_version': storage['fixture_version'], 'observed_at': storage['observed_at']}
 
 
-def record_for(organization, endpoint, systems):
+def record_for(organization, endpoint, systems, published_at=None):
     card = agent_card(organization, endpoint)
+    info = {'organization_id': organization, 'capabilities': capabilities(organization, systems)}
+    if published_at:
+        info['published_at'] = published_at
     # OASF A2A envelope follows the official app-sdk converter.
     # Values are declared capabilities; actual reservations need owner rechecks.
     return {'name': f'harvestnet.org/agents/{organization}', 'schema_version': '1.0.0', 'version': '1.0.0',
             'description': card['description'], 'authors': [card['name']],
             'created_at': systems.fixture['observed_at'], 'skills': [{'id': 101}], 'domains': [],
             'modules': [{'id': 203, 'name': 'integration/a2a', 'data': {'card_data': card, 'card_schema_version': 'v1.0.0'}}],
-            'annotations': {'harvestnet': json.dumps({'organization_id': organization, 'capabilities': capabilities(organization, systems)}, sort_keys=True)}}
+            'annotations': {'harvestnet': json.dumps(info, sort_keys=True)}}
 
 
 def record_info(record):
     return json.loads(record.get('annotations', {}).get('harvestnet', '{}'))
+
+
+def latest_per_organization(records):
+    """One record per organization: the most recently published one.
+
+    A capability change publishes a new record (a new CID). If removing the old one
+    failed, search may still return it; the newest snapshot wins.
+    """
+    latest = {}
+    for record in records:
+        info = record_info(record)
+        org = info.get('organization_id')
+        if org and (org not in latest or info.get('published_at', '') >= record_info(latest[org]).get('published_at', '')):
+            latest[org] = record
+    return [latest[org] for org in ORGANIZATIONS if org in latest]
 
 
 def instant(value):
@@ -83,6 +102,10 @@ class AgntcyDirectory:
         ParseDict(record, proto.data)
         return self.client.push([proto])[0].cid
 
+    def unregister(self, cid):
+        from agntcy.dir_sdk.models import core_v1
+        self.client.delete([core_v1.RecordRef(cid=cid)])
+
     def search(self, **query):
         from agntcy.dir_sdk.models import search_v1
         from google.protobuf.json_format import MessageToDict
@@ -91,7 +114,46 @@ class AgntcyDirectory:
         records = [MessageToDict(response.record.data, preserving_proto_field_name=True)
                    for response in self.client.search_records(request)]
         # Search returns records; exact current capacity/time is checked locally.
-        return {'mode': self.mode, 'records': search_capability(records, **query)}
+        return {'mode': self.mode, 'records': search_capability(latest_per_organization(records), **query)}
+
+
+class DirectoryPublisher:
+    """Keeps one organization's Directory record matching its own systems.
+
+    ``refresh()`` re-reads the organization's systems and publishes a new record only
+    when its capabilities changed (for example, a failed cooler drops cold space to
+    zero), then removes the stale record. Native hosts call it periodically.
+    """
+
+    def __init__(self, directory, organization, endpoint, systems, clock=None):
+        self.directory, self.organization, self.endpoint, self.systems = directory, organization, endpoint, systems
+        self.clock = clock or (lambda: datetime.now(timezone.utc).isoformat())
+        self.cid, self.published = None, None
+        self.lock = threading.Lock()
+
+    def refresh(self):
+        with self.lock:
+            current = capabilities(self.organization, self.systems)
+            if current == self.published:
+                return {'status': 'unchanged', 'cid': self.cid}
+            cid = self.directory.register(record_for(self.organization, self.endpoint, self.systems, published_at=self.clock()))
+            stale = self.cid if self.cid and self.cid != cid else None
+            self.cid, self.published = cid, current
+            if stale:
+                try:
+                    self.directory.unregister(stale)
+                except Exception as exc:  # search still prefers the newest record
+                    return {'status': 'published', 'cid': cid, 'stale_cid': stale, 'unregister_error': str(exc)}
+            return {'status': 'published', 'cid': cid, 'replaced_cid': stale}
+
+    def run_forever(self, interval_seconds, stop=None):
+        stop = stop or threading.Event()
+        while not stop.is_set():
+            try:
+                self.refresh()
+            except Exception as exc:  # keep serving moves; report and retry next interval
+                print(f'Directory refresh failed for {self.organization}: {exc}', flush=True)
+            stop.wait(interval_seconds)
 
 
 def main():

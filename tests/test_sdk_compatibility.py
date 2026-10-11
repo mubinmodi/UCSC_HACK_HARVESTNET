@@ -29,10 +29,10 @@ class SDKCompatibilityTests(unittest.TestCase):
         ParseDict(record_for('city','http://localhost:8020',Systems()),proto.data)
 
     def test_official_a2a_client_calls_our_http_server(self):
-        server = ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver('donor'),'sdk-token','http://localhost'))
+        server = ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver('market'),'sdk-token','http://localhost'))
         base = f'http://127.0.0.1:{server.server_port}'
         # Replace the startup card URL with the actual dynamically bound port.
-        server.RequestHandlerClass = handler_for(Receiver('donor'),'sdk-token',base)
+        server.RequestHandlerClass = handler_for(Receiver('market'),'sdk-token',base)
         thread = threading.Thread(target=server.serve_forever,daemon=True)
         thread.start()
         async def exchange():

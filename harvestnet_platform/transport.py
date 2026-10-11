@@ -4,23 +4,45 @@ import copy
 import hashlib
 import importlib
 import json
+import math
 import os
 import sqlite3
 import threading
 import uuid
 from pathlib import Path
-from .http import JsonHandler, request_json, serve
+from .http import JsonHandler, request_json, seconds, serve
 
-ORGANIZATIONS = ('donor', 'city', 'rural', 'eastside', 'advocate')
+# Organization IDs are names, not roles (docs/contracts/README.md decision 1).
+ORGANIZATIONS = ('market', 'city', 'rural', 'eastside', 'advocate')
+ROLES = {'market': 'donor', 'city': 'food_bank', 'rural': 'food_bank', 'eastside': 'food_bank', 'advocate': 'advocate'}
 ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human', 'pass'}
+# docs/contracts/agent-moves.md: amendment kinds and their fields, and hold resources.
+AMENDMENTS = {'set_pounds': ('produce_id', 'food_bank_id', 'pounds'),
+              'shift_pounds': ('produce_id', 'from_food_bank_id', 'to_food_bank_id', 'pounds'),
+              'set_transport': ('food_bank_id', 'mover', 'departs_at', 'arrives_at')}
+HOLD_RESOURCES = {'lot', 'drop_off', 'storage_cold', 'storage_dry', 'truck'}
+
+
+def role_of(organization):
+    return ROLES[organization]
 
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
+def digest(value):
+    """Bare sha256 of canonical JSON, for internal receipt logs."""
+    return hashlib.sha256(canonical(value).encode()).hexdigest()
+
+
 def terms_hash(terms):
-    return hashlib.sha256(canonical(terms).encode()).hexdigest()
+    """The contract's terms hash: ``sha256:`` plus the hex digest of canonical JSON."""
+    return 'sha256:' + digest(terms)
+
+
+def _pounds(value):
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
 def validate_move(move, organization, version):
@@ -30,13 +52,56 @@ def validate_move(move, organization, version):
         raise ValueError('Move must identify its own organization and the current version')
     if not isinstance(move.get('reason'), str) or not move['reason'].strip():
         raise ValueError('Every move must include a reason')
-    if organization == 'advocate' and move['action'] not in ('counter', 'pass'):
+    action = move['action']
+    if organization == 'advocate' and action not in ('counter', 'pass'):
         raise ValueError('Advocate proposes but cannot vote or hold others\' resources')
-    if move['action'] == 'counter' and not isinstance(move.get('amendment'), dict):
-        raise ValueError('A counter requires one structured amendment')
-    if move['action'] == 'request_hold' and move.get('resource_owner') != organization:
-        raise ValueError('Only the resource owner may request a hold')
+    # A counter carries exactly one amendment; other moves carry none.
+    if action == 'counter':
+        amendment = move.get('amendment')
+        if not isinstance(amendment, dict) or amendment.get('kind') not in AMENDMENTS:
+            raise ValueError('A counter requires one structured amendment')
+        fields = AMENDMENTS[amendment['kind']]
+        if any(amendment.get(key) is None or amendment.get(key) == '' for key in fields):
+            raise ValueError(f"A {amendment['kind']} amendment requires {', '.join(fields)}")
+        if 'pounds' in fields and not _pounds(amendment['pounds']):
+            raise ValueError('Amendment pounds must be a finite, nonnegative number')
+    elif 'amendment' in move:
+        raise ValueError('Only a counter carries an amendment')
+    # A hold request names at least one of its owner's own holds; other moves name none.
+    if action == 'request_hold':
+        holds = move.get('holds')
+        if move.get('resource_owner') != organization:
+            raise ValueError('Only the resource owner may request a hold')
+        if not isinstance(holds, list) or not holds or any(
+                not isinstance(h, dict) or h.get('resource') not in HOLD_RESOURCES or not h.get('start') or not h.get('end')
+                or (h.get('pounds') is not None and not _pounds(h['pounds'])) for h in holds):
+            raise ValueError('A hold request names at least one hold: resource, pounds or null, start, end')
+    elif 'holds' in move or 'resource_owner' in move:
+        raise ValueError('Only a hold request carries holds')
     return copy.deepcopy(move)
+
+
+def turn_organization(agent_input):
+    """The organization whose turn it is, from Lane B's AgentInput.
+
+    Lane B's shape has ``turn: {organization_id, number, now, accepted_by}``. Lane A's
+    earlier wire form (``turn`` as the ID, plus ``turn_context``) is still accepted.
+    """
+    if not isinstance(agent_input, dict):
+        raise ValueError('Agent input object required')
+    turn = agent_input.get('turn')
+    if isinstance(turn, dict):
+        return turn.get('organization_id')
+    return turn
+
+
+def for_organization(envelope, organization):
+    """What one host receives: only the acting organization gets the facts."""
+    if envelope['turn'] == organization:
+        return envelope
+    observed = dict(envelope)
+    observed['input'] = {key: value for key, value in envelope['input'].items() if key != 'facts'}
+    return observed
 
 
 def stand_in(organization, agent_input):
@@ -44,8 +109,7 @@ def stand_in(organization, agent_input):
     result = {'organization_id': organization, 'version': agent_input['draft']['version'],
               'action': 'ask_human', 'reason': 'Synthetic stand-in requests its own human; no commitment.'}
     if organization == 'advocate':
-        result.update(action='counter', reason='Synthetic advocate proposes review of the largest fair-share gap.',
-                      amendment={'kind': 'review_fair_share_gap'})
+        result.update(action='pass', reason='Synthetic advocate stand-in takes its turn without a change.')
     return result
 
 
@@ -82,18 +146,24 @@ class Receiver:
         agent_input = envelope.get('input', {})
         if not isinstance(event, str) or not event or len(event) > 100 or type(seq) is not int or seq < 1:
             raise ValueError('Event and positive sequence required')
-        if not isinstance(agent_input, dict) or actor not in ORGANIZATIONS or agent_input.get('turn') != actor:
+        if not isinstance(agent_input, dict) or actor not in ORGANIZATIONS or turn_organization(agent_input) != actor:
             raise ValueError('Published turn must identify an organization')
+        if 'role' in agent_input and agent_input['role'] != role_of(actor):
+            raise ValueError('Agent input role does not match the organization whose turn it is')
         draft = agent_input.get('draft', {})
         if not isinstance(draft, dict) or type(draft.get('version')) is not int or draft['version'] < 1:
             raise ValueError('Current draft version required')
-        if not isinstance(agent_input.get('facts'), dict):
-            raise ValueError('Calculator facts object required')
-        digest = terms_hash(envelope)
+        if actor == self.organization:
+            if not isinstance(agent_input.get('facts'), dict):
+                raise ValueError('Calculator facts object required')
+        elif 'facts' in agent_input:
+            # agent-moves.md: facts are this organization's own, and nobody else's.
+            raise ValueError("Another organization's facts must not be delivered here")
+        received = digest(envelope)
         with self.lock:
             existing = self.db.execute('SELECT digest,result FROM receipts WHERE event=? AND sequence=?', (event,seq)).fetchone()
             if existing:
-                if existing[0] != digest:
+                if existing[0] != received:
                     raise ValueError('Conflicting replay for an existing sequence')
                 return json.loads(existing[1])
             latest = self.db.execute('SELECT COALESCE(MAX(sequence),0) FROM receipts WHERE event=?', (event,)).fetchone()[0]
@@ -103,7 +173,7 @@ class Receiver:
             if actor == self.organization:
                 move = validate_move(self.policy(self.organization, copy.deepcopy(agent_input)), self.organization, draft['version'])
             response = {'organization_id': self.organization, 'event_id': event, 'sequence': seq, 'move': move}
-            self.db.execute('INSERT INTO receipts VALUES (?,?,?,?)', (event,seq,digest,canonical(response)))
+            self.db.execute('INSERT INTO receipts VALUES (?,?,?,?)', (event,seq,received,canonical(response)))
             self.db.commit()
             return response
 
@@ -181,16 +251,18 @@ class InProcess:
 
     def broadcast(self, envelope):
         with self.lock:
-            return [self.receivers[org].receive(envelope) for org in ORGANIZATIONS]
+            return [self.receivers[org].receive(for_organization(envelope, org)) for org in ORGANIZATIONS]
 
 
 class A2ATransport:
     mode = 'a2a_jsonrpc'
 
-    def __init__(self, endpoints, token):
+    def __init__(self, endpoints, token, timeout=None):
         if set(endpoints) != set(ORGANIZATIONS) or not token:
             raise ValueError('All organization endpoints and transport token required')
         self.endpoints, self.token = endpoints, token
+        # A live Claude turn can take far longer than a plain HTTP call.
+        self.timeout = seconds(os.getenv('AGENT_TURN_TIMEOUT_SECONDS', '60') if timeout is None else timeout)
         self.lock = threading.RLock()
 
     def broadcast(self, envelope):
@@ -199,7 +271,8 @@ class A2ATransport:
         with self.lock:
             receipts = []
             for org in ORGANIZATIONS:
-                response = request_json(self.endpoints[org].rstrip('/') + '/', rpc_request(envelope), token=self.token)
+                response = request_json(self.endpoints[org].rstrip('/') + '/', rpc_request(for_organization(envelope, org)),
+                                        token=self.token, timeout=self.timeout)
                 if 'error' in response:
                     raise ValueError(response['error']['message'])
                 receipt = response['result']['parts'][0]['data']

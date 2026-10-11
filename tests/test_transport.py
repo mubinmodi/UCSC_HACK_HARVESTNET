@@ -1,33 +1,65 @@
 import copy
+import os
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
-from harvestnet_platform.transport import Receiver, InProcess, A2ATransport, ORGANIZATIONS, handler_for
+from unittest.mock import patch
+from harvestnet_platform.transport import Receiver, InProcess, A2ATransport, ORGANIZATIONS, handler_for, role_of, validate_move
 from harvestnet_platform.directory import LocalDirectory, record_info
 from harvestnet_platform.systems import Systems
 from harvestnet_platform.http import request_json
 from urllib.error import HTTPError
 
 
-def envelope(seq=1, actor='donor', event='transport-fixture'):
-    return {'event_id': event, 'sequence': seq, 'turn': actor,
-            'input': {'turn': actor, 'draft': {'version': 1, 'terms': {}}, 'facts': {}}}
+def agent_input(actor='market', number=1, version=1, facts=None):
+    """Lane B's AgentInput shape, unchanged: {role, draft, facts, turn}."""
+    return {'role': role_of(actor), 'draft': {'version': version, 'terms': {}},
+            'facts': {'own': actor} if facts is None else facts,
+            'turn': {'organization_id': actor, 'number': number, 'now': '2026-10-13T12:00:00-07:00', 'accepted_by': []}}
+
+
+def envelope(seq=1, actor='market', event='transport-fixture'):
+    return {'event_id': event, 'sequence': seq, 'turn': actor, 'input': agent_input(actor, seq)}
+
+
+def serve_hosts(receivers, token):
+    servers, threads, endpoints = [], [], {}
+    for org, receiver in receivers.items():
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(receiver, token, 'http://localhost'))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        servers.append(server)
+        threads.append(thread)
+        endpoints[org] = f'http://127.0.0.1:{server.server_port}'
+    def stop():
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join()
+    return endpoints, stop
+
+
+class Recording(Receiver):
+    def __init__(self, organization, *args, **kwargs):
+        super().__init__(organization, *args, **kwargs)
+        self.seen = []
+
+    def receive(self, envelope):
+        self.seen.append(copy.deepcopy(envelope))
+        return super().receive(envelope)
 
 
 class TransportTests(unittest.TestCase):
+    def test_organization_ids_are_names_not_roles(self):
+        self.assertEqual(ORGANIZATIONS, ('market', 'city', 'rural', 'eastside', 'advocate'))
+        self.assertEqual([role_of(o) for o in ORGANIZATIONS], ['donor', 'food_bank', 'food_bank', 'food_bank', 'advocate'])
+
     def test_same_order_and_moves_over_real_http_and_in_process(self):
-        servers, threads, endpoints, receivers = [], [], {}, {}
         local = InProcess({org: Receiver(org) for org in ORGANIZATIONS})
+        receivers = {org: Receiver(org) for org in ORGANIZATIONS}
+        endpoints, stop = serve_hosts(receivers, 'test-transport')
         try:
-            for org in ORGANIZATIONS:
-                receiver = Receiver(org)
-                server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(receiver, 'test-transport', 'http://localhost'))
-                servers.append(server)
-                receivers[org] = receiver
-                endpoints[org] = f'http://127.0.0.1:{server.server_port}'
-                thread = threading.Thread(target=server.serve_forever, daemon=True)
-                thread.start()
-                threads.append(thread)
             network = A2ATransport(endpoints, 'test-transport')
             for seq, actor in enumerate(ORGANIZATIONS, 1):
                 message = envelope(seq, actor)
@@ -40,14 +72,52 @@ class TransportTests(unittest.TestCase):
                 request_json(endpoints['city'] + '/commit', {'version': 1}, token='test-transport')
             self.assertEqual(failure.exception.code, 405)
         finally:
-            for server in servers:
-                server.shutdown()
-                server.server_close()
-            for thread in threads:
-                thread.join()
+            stop()
+
+    def test_each_host_receives_only_its_own_facts(self):
+        receivers = {org: Recording(org) for org in ORGANIZATIONS}
+        endpoints, stop = serve_hosts(receivers, 'facts-test')
+        local = {org: Recording(org) for org in ORGANIZATIONS}
+        try:
+            network = A2ATransport(endpoints, 'facts-test')
+            for seq, actor in enumerate(ORGANIZATIONS, 1):
+                message = envelope(seq, actor)
+                network.broadcast(message)
+                InProcess(local).broadcast(message)
+            for hosts in (receivers, local):
+                for org, receiver in hosts.items():
+                    self.assertEqual(len(receiver.seen), 5)
+                    for seen in receiver.seen:
+                        if seen['turn'] == org:
+                            self.assertEqual(seen['input']['facts'], {'own': org})
+                        else:
+                            self.assertNotIn('facts', seen['input'])
+                            self.assertNotIn(seen['turn'], repr(seen['input'].get('facts')))
+            # A host that is handed someone else's facts refuses them.
+            with self.assertRaises(ValueError):
+                Receiver('city').receive(envelope(1, 'market'))
+        finally:
+            stop()
+
+    def test_lane_b_agent_input_travels_unchanged(self):
+        seen = {}
+        def policy(org, data):
+            seen['input'] = data
+            return {'organization_id': org, 'version': 1, 'action': 'pass', 'reason': 'Nothing to change'}
+        message = envelope(1, 'advocate')
+        receipt = Receiver('advocate', policy).receive(message)
+        self.assertEqual(seen['input'], message['input'])
+        self.assertEqual(receipt['move']['action'], 'pass')
+        # Lane A's earlier wire form (turn string plus turn_context) is still accepted.
+        legacy = {**message, 'input': {**message['input'], 'turn': 'advocate', 'turn_context': message['input']['turn']}}
+        self.assertEqual(Receiver('advocate', policy).receive(legacy)['move']['action'], 'pass')
+        for wrong in ({**message['input'], 'turn': {**message['input']['turn'], 'organization_id': 'city'}},
+                      {**message['input'], 'role': 'donor'}):
+            with self.assertRaises(ValueError):
+                Receiver('advocate', policy).receive({**message, 'input': wrong})
 
     def test_conflicts_gaps_unauthorized_commit_and_advocate_vote_fail(self):
-        receiver = Receiver('donor')
+        receiver = Receiver('market')
         with self.assertRaises(ValueError):
             receiver.receive(envelope(2))
         receiver.receive(envelope())
@@ -55,19 +125,89 @@ class TransportTests(unittest.TestCase):
         changed['input']['draft']['version'] = 2
         with self.assertRaises(ValueError):
             receiver.receive(changed)
-        for action, org in [('commit', 'donor'), ('accept', 'advocate')]:
+        for action, org in [('commit', 'market'), ('accept', 'advocate')]:
             policy = lambda organization, data: {'organization_id': organization, 'version': 1, 'action': action, 'reason': 'Unauthorized'}
             with self.assertRaises(ValueError):
                 Receiver(org, policy).receive(envelope(actor=org))
 
+    def test_moves_follow_the_agent_move_contract(self):
+        base = {'organization_id': 'city', 'version': 3, 'reason': 'Cold space is short'}
+        amendments = [
+            {'kind': 'set_pounds', 'produce_id': 'romaine', 'food_bank_id': 'city', 'pounds': 150},
+            {'kind': 'shift_pounds', 'produce_id': 'potatoes', 'from_food_bank_id': 'city', 'to_food_bank_id': 'rural', 'pounds': 160},
+            {'kind': 'set_transport', 'food_bank_id': 'city', 'mover': 'food_bank',
+             'departs_at': '2026-10-13T13:00:00-07:00', 'arrives_at': '2026-10-13T13:20:00-07:00'}]
+        for amendment in amendments:
+            self.assertEqual(validate_move({**base, 'action': 'counter', 'amendment': amendment}, 'city', 3)['amendment'], amendment)
+        hold = {**base, 'action': 'request_hold', 'resource_owner': 'city',
+                'holds': [{'resource': 'storage_cold', 'pounds': 150, 'start': '2026-10-13T13:00:00-07:00', 'end': '2026-10-14T21:00:00-07:00'}]}
+        self.assertEqual(validate_move(hold, 'city', 3), hold)
+        for action in ('accept', 'reject', 'ask_human', 'pass'):
+            self.assertEqual(validate_move({**base, 'action': action}, 'city', 3)['action'], action)
+        invalid = [
+            {**base, 'action': 'counter'},
+            {**base, 'action': 'counter', 'amendment': {}},
+            {**base, 'action': 'counter', 'amendment': {'kind': 'review_fair_share_gap'}},
+            {**base, 'action': 'counter', 'amendment': {'kind': 'set_pounds', 'produce_id': 'romaine', 'food_bank_id': 'city'}},
+            {**base, 'action': 'counter', 'amendment': {**amendments[0], 'pounds': -1}},
+            {**base, 'action': 'request_hold', 'resource_owner': 'city', 'holds': []},
+            {**base, 'action': 'request_hold', 'resource_owner': 'city', 'holds': [{'resource': 'freezer'}]},
+            {**base, 'action': 'request_hold', 'resource_owner': 'rural', 'holds': hold['holds']},
+            *({**base, 'action': action, 'amendment': amendments[0]} for action in ('accept', 'reject', 'ask_human', 'pass')),
+            *({**base, 'action': action, 'holds': hold['holds']} for action in ('accept', 'pass')),
+        ]
+        for move in invalid:
+            with self.subTest(move=move), self.assertRaises(ValueError):
+                validate_move(move, 'city', 3)
+        advocate = {'organization_id': 'advocate', 'version': 3, 'reason': 'No gap to close'}
+        self.assertEqual(validate_move({**advocate, 'action': 'pass'}, 'advocate', 3)['action'], 'pass')
+        with self.assertRaises(ValueError):
+            validate_move({**advocate, 'action': 'pass', 'amendment': amendments[1]}, 'advocate', 3)
+
+    def test_agent_turn_timeout_is_configurable_and_long_enough_for_claude(self):
+        endpoints = {org: f'http://127.0.0.1:{port}' for port, org in enumerate(ORGANIZATIONS, 9001)}
+        self.assertEqual(A2ATransport(endpoints, 'token').timeout, 60)
+        with patch.dict(os.environ, {'AGENT_TURN_TIMEOUT_SECONDS': '90'}):
+            self.assertEqual(A2ATransport(endpoints, 'token').timeout, 90)
+        self.assertEqual(A2ATransport(endpoints, 'token', timeout=5).timeout, 5)
+        for bad in ('0', 'nan', '-3', 'soon'):
+            with patch.dict(os.environ, {'AGENT_TURN_TIMEOUT_SECONDS': bad}), self.assertRaises(ValueError):
+                A2ATransport(endpoints, 'token')
+        calls = []
+        def fake(url, body=None, **kwargs):
+            calls.append(kwargs['timeout'])
+            org = next(o for o, e in endpoints.items() if url == e + '/')
+            data = {'organization_id': org, 'event_id': body['params']['message']['parts'][0]['data']['event_id'], 'sequence': 1, 'move': None}
+            return {'result': {'parts': [{'data': data}]}}
+        with patch('harvestnet_platform.transport.request_json', side_effect=fake):
+            A2ATransport(endpoints, 'token', timeout=75).broadcast(envelope(1, 'market'))
+        self.assertEqual(calls, [75] * 5)
+
     def test_discovery_filters_cold_space_hours_and_changed_state(self):
         systems = Systems()
         directory = LocalDirectory(systems, {org: 'http://localhost' for org in ORGANIZATIONS})
-        query = dict(min_cold_lb=100, pickup_at='2026-10-12T02:00:00Z')
+        query = dict(min_cold_lb=100, pickup_at='2026-10-13T19:00:00-07:00')
         result = directory.search(**query)
         self.assertEqual(result['mode'], 'local_directory_fallback')
         self.assertEqual([record_info(r)['organization_id'] for r in result['records']], ['city','eastside'])
         systems.switch('city', True)
         self.assertEqual([record_info(r)['organization_id'] for r in directory.search(**query)['records']], ['eastside'])
-        equivalent = dict(min_cold_lb=100, pickup_at='2026-10-11T19:00:00-07:00')
+        equivalent = dict(min_cold_lb=100, pickup_at='2026-10-14T02:00:00Z')
         self.assertEqual(len(directory.search(**equivalent)['records']),1)
+        roles = {record_info(r)['organization_id']: record_info(r)['capabilities']['role'] for r in directory.records()}
+        self.assertEqual(roles['market'], 'donor')
+
+
+class ContractExampleTests(unittest.TestCase):
+    def test_agreed_agent_move_examples_travel_and_validate_unchanged(self):
+        import json
+        from pathlib import Path
+        pairs = json.loads((Path(__file__).parents[1] / 'docs' / 'contracts' / 'examples' / 'agent-moves.json').read_text())['pairs']
+        self.assertEqual(len(pairs), 4)
+        for pair in pairs:
+            actor = pair['input']['turn']['organization_id']
+            with self.subTest(pair=pair.get('name', actor)):
+                policy = lambda org, data, out=pair['output']: copy.deepcopy(out)
+                message = {'event_id': 'lot-market-1013', 'sequence': 1, 'turn': actor, 'input': pair['input']}
+                receipt = Receiver(actor, policy).receive(message)
+                self.assertEqual(receipt['move'], pair['output'])

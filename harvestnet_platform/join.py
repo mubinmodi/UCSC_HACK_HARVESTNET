@@ -10,7 +10,7 @@ import os
 import threading
 import uuid
 from pathlib import Path
-from .transport import ORGANIZATIONS, Receiver, InProcess, A2ATransport, canonical, load_policy, validate_move
+from .transport import ORGANIZATIONS, Receiver, InProcess, A2ATransport, canonical, load_policy, turn_organization, validate_move
 
 REQUIRED_CHECKS = {'no_double_booking', 'pounds_conserved', 'versioned_approvals',
                    'no_auto_commit', 'all_pounds_have_pathway', 'zero_invalid_commitments'}
@@ -23,9 +23,10 @@ class MoveBridge:
         self.lock = threading.RLock()
 
     def __call__(self, organization, agent_input):
-        if not isinstance(agent_input, dict) or organization not in ORGANIZATIONS or agent_input.get('turn') != organization:
+        if not isinstance(agent_input, dict) or organization not in ORGANIZATIONS or turn_organization(agent_input) != organization:
             raise ValueError('Harness must follow the published organization turn')
         with self.lock:
+            # The envelope adds ordering only; Lane B's AgentInput rides inside unchanged.
             envelope = {'event_id': self.event, 'sequence':self.sequence+1,
                         'turn':organization,'input':copy.deepcopy(agent_input)}
             if self.pending and canonical(envelope) != canonical(self.pending):
