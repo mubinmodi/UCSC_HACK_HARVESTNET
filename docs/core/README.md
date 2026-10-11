@@ -171,3 +171,14 @@ For Lane C, use `AGENT_POLICY=harvestnet_core.join_adapter:policy` and the harne
 export `harvestnet_core.join_adapter:harness`. Bake both core and reviewed agents
 into the organization images. This local proof does not replace container,
 native Directory daemon or public HTTPS deployment acceptance.
+
+## Latest teammate compatibility
+
+Merged main `3e427e6` adds the team's beyond-fair-share bank bidding policy.
+The original six branches now include it. The core implements its signed
+`adjust_pounds` operation and preserves each owner's negotiator across turns in
+the harness, public scheduler, baselines and evaluation provider. A2A policy
+sessions isolate owner memory between independent runs. This memory is local
+process state; host-restart recovery and native Directory deployment are not
+claimed verified. Household portions retain the agreed fair-share cap; a bank
+bid beyond its gap does not fabricate consent or allocate above household caps.

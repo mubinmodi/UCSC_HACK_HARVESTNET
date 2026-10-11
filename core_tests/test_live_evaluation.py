@@ -19,6 +19,12 @@ from test_core import fixture
 from harvestnet_core.evaluation import evaluate,replay
 
 class LiveEvaluationTests(unittest.TestCase):
+    def test_invalid_or_unauthorized_spending_caps_are_rejected(self):
+        from harvestnet_core.live_evaluation import LLMProvider
+        for cap in (float('nan'),float('inf'),True,-1,101):
+            with self.assertRaises(ValueError): LLMProvider(None,limit_usd=cap)
+        with self.assertRaises(ValueError): LLMProvider(None,limit_usd=1)
+
     def test_zero_cap_cannot_call_provider_or_claim_llm_measurement(self):
         from types import SimpleNamespace
         from harvestnet_core.live_evaluation import LLMProvider

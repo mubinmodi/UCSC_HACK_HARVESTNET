@@ -3,12 +3,14 @@ from harvestnet_agents.llm_negotiators import LLMNegotiator,SpendingCap
 from harvestnet_agents.negotiation import parse_agent_input
 from .calculators import Calculators
 from .evaluation import evaluate
+from .protocol import number
 
 
 class LLMProvider:
     label='LLM negotiators with real core calculators; fallback sources recorded'
     def __init__(self,client,*,limit_usd=0,allow_paid=False,config=None):
-        if limit_usd<0 or limit_usd>100:
+        limit_usd=number(limit_usd)
+        if limit_usd>100:
             raise ValueError('cap must be between zero and 100 USD')
         if limit_usd>0 and not allow_paid:
             raise ValueError('paid calls require explicit authorization')
@@ -17,10 +19,14 @@ class LLMProvider:
         self.config=config
         self.decisions=[]
         self.metadata=None
+        self.agents={}
 
     def __call__(self,org,wire):
         role,typed=parse_agent_input({**wire,'turn':wire['turn_context']})
-        agent=LLMNegotiator(role,org,cap=self.cap,client=self.client,config=self.config,calculators=Calculators())
+        key=(wire['policy_session'],role,org)
+        if key not in self.agents:
+            self.agents[key]=LLMNegotiator(role,org,cap=self.cap,client=self.client,config=self.config,calculators=Calculators())
+        agent=self.agents[key]
         decision=agent.decide(typed)
         self.decisions.append(decision)
         self.metadata={'source':decision.source,'model_calls':decision.model_calls,'number_check_failures':decision.number_check_failures,'cost_usd':decision.cost_usd,'fallback_reason':decision.fallback_reason}
