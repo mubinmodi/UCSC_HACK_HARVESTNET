@@ -150,9 +150,9 @@ class ApprovalTests(unittest.TestCase):
     def test_issued_review_link_can_be_emailed_without_exposing_recipient_in_response(self):
         store = ApprovalStore()
         handler = handler_for(store, CoreAPI(), 'events-token', 'https://demo.example',
-                              approver_emails={'market':'mubinmodi@gmail.com'},
+                              approver_emails={'market':'staff@example.org'},
                               approval_webhook='https://n8n.example/webhook/approval',
-                              webhook_token='outbound-token', test_recipients=['mubinmodi@gmail.com'])
+                              webhook_token='outbound-token', test_recipients=['staff@example.org'])
         base, stop = serve(handler)
         try:
             with patch('harvestnet_platform.approvals.request_json', return_value={'sent':True}) as send:
@@ -161,10 +161,10 @@ class ApprovalTests(unittest.TestCase):
                                       token='events-token')
             link = result['requests'][0]
             self.assertEqual(link['email_delivery'],'sent')
-            self.assertNotIn('mubinmodi@gmail.com',str(result))
+            self.assertNotIn('staff@example.org',str(result))
             self.assertIn('/human/review?token=',link['decision_url'])
             self.assertEqual(send.call_args.args[0],'https://n8n.example/webhook/approval')
-            self.assertEqual(send.call_args.args[1]['to'],'mubinmodi@gmail.com')
+            self.assertEqual(send.call_args.args[1]['to'],'staff@example.org')
             self.assertEqual(send.call_args.kwargs['token'],'outbound-token')
         finally:
             stop()
