@@ -306,11 +306,10 @@ def pickup_message(notice, *, now=None):
         raise ValueError('Pickup window requires start and end')
     if not isinstance(notice['items'], list) or any(not isinstance(item, dict) or not isinstance(item.get('name'), str) or not item['name'].strip() or type(item.get('pounds')) not in (int,float) or not math.isfinite(item['pounds']) or item['pounds'] <= 0 for item in notice['items']):
         raise ValueError('Pickup pounds must come from positive calculator results')
-    items = ', '.join(f"{item['pounds']:g} lb {item['name']}" for item in notice['items'])
-    message = (f"HarvestNet: {items} at {notice['food_bank']}, {notice['window']['start']} to "
-               f"{notice['window']['end']}. Your pickup code: {notice['request_code']}. "
-               f"Wash before eating. Reply YES to confirm, or CAN'T MAKE IT to pass it to another family "
-               f"({notice['release_url']}).")
+    words = PICKUP_TEXT.get(notice.get('language'), PICKUP_TEXT['en'])
+    items = ', '.join(words['item'].format(lb=f"{item['pounds']:g}", name=item['name']) for item in notice['items'])
+    message = words['body'].format(items=items, food_bank=notice['food_bank'], start=notice['window']['start'],
+                                   end=notice['window']['end'], code=notice['request_code'], url=notice['release_url'])
     # The Market Match tip: SNAP households only, and only a verified, nearby, recently checked market.
     # Markets are trusted, verified records, never arbitrary model suggestions.
     market = notice.get('market')
@@ -321,8 +320,26 @@ def pickup_message(notice, *, now=None):
         if checked.tzinfo is None:
             raise ValueError('Market verification timestamp requires timezone')
         if current - timedelta(days=30) <= checked <= current:
-            message += f" Market Match tip: ask {market['name']} about its verified CalFresh produce match. {market['source_url']}"
+            message += words['tip'].format(market=market['name'], url=market['source_url'])
     return message
+
+
+# The household's pickup text, in its own language (ticket #6). The reply words match
+# CANT_MAKE_IT and YES above. Numbers, names and times come only from the notice.
+PICKUP_TEXT = {
+    'en': {
+        'item': '{lb} lb {name}',
+        'body': ("HarvestNet: {items} at {food_bank}, {start} to {end}. Your code: {code}. "
+                 "Wash before eating. Reply YES to confirm, or CAN'T MAKE IT to pass it to another family ({url})."),
+        'tip': ' Market Match tip: ask {market} about its verified CalFresh produce match. {url}',
+    },
+    'es': {
+        'item': '{lb} lb de {name}',
+        'body': ('HarvestNet: {items} en {food_bank}, de {start} a {end}. Su código: {code}. '
+                 'Lave los productos antes de comerlos. Responda SÍ para confirmar, o NO PUEDO IR para pasarla a otra familia ({url}).'),
+        'tip': ' Consejo de Market Match: pregunte en {market} por su programa verificado que iguala sus dólares de CalFresh para frutas y verduras. {url}',
+    },
+}
 
 
 def reply_words(data):
@@ -355,7 +372,7 @@ def household_reply(store, core, data):
     if words in YES:
         where = f" at {pickup['food_bank']}, {pickup['window_start']} to {pickup['window_end']}" if pickup.get('food_bank') else ''
         return 200, {**base, 'status': 'confirmed', 'pickup_id': pickup['pickup_id'],
-                     'message': f"HarvestNet: thanks, see you{where}. Your pickup code: {pickup['request_code']}."}
+                     'message': f"HarvestNet: thanks, see you{where}. Your code: {pickup['request_code']}."}
     if words in CANT_MAKE_IT:
         result = core.release(pickup['request_code'], pickup['pickup_id'], pickup.get('release_token'))
         if result.get('released') is True and sender:

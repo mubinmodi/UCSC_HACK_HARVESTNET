@@ -103,6 +103,16 @@ class ProduceProfile:
     units: Mapping[str, float | None]  # pounds per unit; None means the donor must state it
     provenance: Mapping[str, Provenance]
     profile_set_version: str
+    name_es: str | None = None  # the reviewed Spanish name households see (ticket #6)
+
+    def display_name(self, language: str = "en") -> str:
+        """The name a household sees, in ``"en"`` or ``"es"``. A Spanish name comes only from
+        the data (``name_es``); it is never machine-translated. ``KeyError`` when it's missing."""
+        if language == "en":
+            return self.name
+        if language == "es" and self.name_es:
+            return self.name_es
+        raise KeyError(f"no {language} name for {self.id}")
 
     @property
     def needs_cold(self) -> bool:
@@ -237,4 +247,5 @@ def _profile(raw: Mapping[str, Any], sources: Mapping[str, Source], version: str
         units=units,
         provenance=provenance,
         profile_set_version=version,
+        name_es=raw.get("name_es") or None,
     )

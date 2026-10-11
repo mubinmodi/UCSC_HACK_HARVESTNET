@@ -25,7 +25,7 @@ FIXTURE = Path('core_fixtures/cooler-failure.json')
 LOT = 'lot-market-1013'
 TOKENS = {'market': 'synthetic-market-staff', 'city': 'synthetic-city-staff', 'rural': 'synthetic-rural-staff', 'eastside': 'synthetic-eastside-staff'}
 EVENTS, DEMO = 'synthetic-events-token', 'synthetic-demo-switch'
-# Translation pending ticket #6; the same name Lane B's recorded fixture uses.
+# The same Spanish name as the produce profile's name_es (ticket #6); passed explicitly here.
 ITEM_NAMES = {'es': {'romaine': 'lechuga romana'}}
 # Fictional 555 numbers, only to show where the core attaches a phone.
 PHONES = {'C4N6': '+15555550101', 'K7P4': '+15555550102'}

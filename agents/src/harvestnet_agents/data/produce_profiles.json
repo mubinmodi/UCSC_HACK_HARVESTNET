@@ -44,6 +44,7 @@
     {
       "id": "apples",
       "name": "Apples",
+      "name_es": "Manzanas",
       "specificity": "Whole fresh apples. Temperature targets use Golden Delicious as the reference cultivar; other cultivars may differ.",
       "needs_fridge": {
         "value": false,
@@ -83,6 +84,7 @@
     {
       "id": "romaine",
       "name": "Romaine lettuce",
+      "name_es": "Lechuga romana",
       "specificity": "Whole romaine heads (the UC Davis sheet also covers loose-leaf lettuce).",
       "needs_fridge": {
         "value": true,
@@ -122,6 +124,7 @@
     {
       "id": "potatoes",
       "name": "Potatoes",
+      "name_es": "Papas",
       "specificity": "Whole fresh table potatoes. Temperature target is from the UC Davis early-crop sheet (table use); household times are FoodKeeper's general potato entry.",
       "needs_fridge": {
         "value": false,
@@ -161,6 +164,7 @@
     {
       "id": "tomatoes",
       "name": "Tomatoes",
+      "name_es": "Tomates",
       "specificity": "Whole ripe tomatoes (firm-ripe, USDA color stage 6, or riper). Mature-green tomatoes would need their own profile.",
       "needs_fridge": {
         "value": false,
