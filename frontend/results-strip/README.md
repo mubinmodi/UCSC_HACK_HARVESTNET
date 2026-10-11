@@ -17,7 +17,8 @@ npm run dev
 ```
 
 Open the local URL Vite prints (usually http://localhost:5173). `npm run build` checks TypeScript and
-creates the production bundle; `npm run preview` serves it.
+creates the production bundle; `npm run preview` serves it. `npm run typecheck` and `npm test` run on
+their own.
 
 ## Data
 
@@ -27,11 +28,17 @@ creates the production bundle; `npm run preview` serves it.
   (`docs/contracts/examples/public-api/get_results.json`). It's synthetic, so the page shows an
   "Example data" banner.
 - **Real API:** start it with `VITE_API_BASE_URL=http://127.0.0.1:8050 npm run dev`. The API must allow
-  this page's origin for CORS (the core server reads `HARVESTNET_ALLOWED_ORIGIN`).
+  this page's origin for CORS (the core server reads `HARVESTNET_ALLOWED_ORIGIN`). The deployed skeleton
+  (`https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`) serves the same synthetic example.
 - **The page calculates nothing.** It shows the API's numbers as sent. The only formatting is showing
   coverage (sent as a share, such as 0.25) as a percent. A missing number shows "Not measured yet", and
   a method the API marks `not_run` shows "Not run" with the API's reason.
 - The banner appears whenever the API says `measured: false` or `synthetic: true`.
+- Each card also follows its own method's `status` and `measured` (the evaluation runner's labels,
+  `docs/core/README.md` #24), because a response can be `measured: true` while one method isn't:
+  `fallback_only` shows "Fallback only · not an LLM result" and a dashed border, `partial` shows
+  "Partial" with the API's reason, `not_run` shows no numbers, and a method with `measured: false`
+  says "Not a measured result". `src/labels.ts` decides this; `npm test` checks it.
 
 ## Done-when checklist (from ticket #5)
 

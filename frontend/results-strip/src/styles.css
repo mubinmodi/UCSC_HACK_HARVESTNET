@@ -31,6 +31,12 @@ h1{font-size:clamp(28px,2.8vw,56px);line-height:1.15;font-weight:700;letter-spac
 .mode-replay{background:#1d4f91}
 .mode-synthetic{background:#8a5300}
 .mode-unknown{background:#4f5f58}
+.mode-fallback{background:#7a2e0e}
+.mode-partial{background:#5b3f8c}
+.badges{display:flex;flex-wrap:wrap;gap:.4em}
+.badges .mode{align-self:auto}
+.run-fallback{border:3px dashed #7a2e0e}
+.unmeasured{font-weight:800;color:#7a2e0e}
 .reason{font-size:.8em;color:#4f5f58}
 
 .metric dt{display:flex;align-items:center;gap:.4em;color:#4f5f58;font-weight:700}
