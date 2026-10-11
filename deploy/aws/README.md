@@ -118,3 +118,7 @@ It deletes the instance with its disk and data, the Elastic IP, the security gro
 - `sslip.io` certificates depend on a free public DNS service and on Let's Encrypt rate limits. If Caddy can't get a certificate, use a real domain.
 - The approvals service relays human decisions to the core with one `CORE_API_TOKEN`, but the core accepts each organization's own staff token. With one token, only that organization's decisions commit through the relay. This setup doesn't change that seam.
 - A t4g.micro has 1 GB of memory. Nine small Python services use about 35 MB each when idle (measured locally); the Directory daemon adds another process with a 256 MB memory ceiling. Actual full-stack memory use has not been measured on the instance. If it runs short, use `INSTANCE_TYPE=t4g.small`.
+
+## Reset the demo data
+
+`deploy/aws/reset_data.sh` (add `--dry-run` to preview, `--yes` to skip the prompt) deletes the live core records, review links, cooler state and organization host data, restarts the services on a fresh synthetic scenario, and re-publishes the free rules-based evaluation. It keeps the Claude spending ledger, the Directory, the HTTPS certificates and every AWS resource.
