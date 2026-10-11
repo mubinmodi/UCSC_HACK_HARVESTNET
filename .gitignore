@@ -18,3 +18,9 @@ deploy/aws/outputs.json
 
 # Root uv.lock is created by ad-hoc `uv run --with pytest` test runs
 /uv.lock
+
+# Local demo recording output (docs/demo/record/); never committed.
+demo-video/
+
+# Local demo handouts (one copy contains staff tokens)
+/demo-handout/
