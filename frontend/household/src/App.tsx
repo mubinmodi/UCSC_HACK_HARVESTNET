@@ -1,58 +1,374 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, Clock3, Copy, Leaf, MapPin, Minus, Plus, ShieldCheck, Sprout, Store, Users, Wallet, CalendarX } from 'lucide-react';
-import { banks, placeholderApi, type Household } from './api';
+// The household page: three screens from docs/MVP_DESIGN.md §10.
+//   1. About your household (answers, then read-back and consent)
+//   2. Choose your food banks
+//   3. Your pickup
+// Every number shown comes from the API. Answers live only in memory for this visit.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Leaf, Sprout } from 'lucide-react';
+import {
+  api,
+  isExampleData,
+  type ChosenFoodBanks,
+  type CreatedRequest,
+  type FairShare,
+  type FoodBankList,
+  type Language,
+  type Preview,
+  type Release,
+  type RequestStatus,
+} from './api';
+import { ExampleNotice } from './components';
+import { emptyForm, toAnswers, toCreateBody, type FormState } from './form';
+import { STRINGS } from './i18n';
+import { AboutScreen } from './screens/AboutScreen';
+import { ReviewScreen } from './screens/ReviewScreen';
+import { FoodBanksScreen } from './screens/FoodBanksScreen';
+import { PickupScreen } from './screens/PickupScreen';
+
+type Screen = 'about' | 'review' | 'not_saved' | 'food_banks' | 'pickup';
+
+const STEP: Record<Screen, 1 | 2 | 3> = { about: 1, review: 1, not_saved: 1, food_banks: 2, pickup: 3 };
+
+interface Load<T> {
+  loading: boolean;
+  data: T | null;
+  error: unknown;
+}
+
+const idle = <T,>(): Load<T> => ({ loading: false, data: null, error: null });
+
+function initialLanguage(): Language {
+  const nav = typeof navigator !== 'undefined' ? navigator.language : 'en';
+  return nav?.toLowerCase().startsWith('es') ? 'es' : 'en';
+}
 
 export default function App() {
-  const [household, setHousehold] = useState<Household>({ size: 4, neighborhood: '', time: 'afternoon', fridge: 'yes', avoid: '', snap: 'private', language: 'en', phone: '' });
-  const [page, setPage] = useState(0);
-  const [consent, setConsent] = useState(false);
-  const [bankId, setBankId] = useState('buena');
-  const [windowIndex, setWindowIndex] = useState(0);
-  const [notes, setNotes] = useState('');
-  const [request, setRequest] = useState<{ requestId: string; fairShare: number } | null>(null);
-  const [pickup, setPickup] = useState<{ code: string; balance: number } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const es = household.language === 'es';
-  const t = (en: string, spanish: string) => es ? spanish : en;
-  const bank = banks.find(b => b.id === bankId)!;
-  const update = <K extends keyof Household>(key: K, value: Household[K]) => setHousehold(h => ({ ...h, [key]: value }));
-  useEffect(() => { document.documentElement.lang = household.language; }, [household.language]);
-  useEffect(() => { titleRef.current?.focus(); window.scrollTo(0, 0); setMessage(''); }, [page]);
-  const step = page < 2 ? 1 : page === 2 ? 2 : 3;
-  async function submit() { setBusy(true); try { setRequest(await placeholderApi.submitHousehold(household)); setPage(2); } catch { setMessage(t('Something went wrong. Please try again.', 'Algo salió mal. Inténtalo de nuevo.')); } finally { setBusy(false); } }
-  async function confirm() { if (!request) return; setBusy(true); try { setPickup(await placeholderApi.confirmPickup(request.requestId, bankId, bank.windows[windowIndex], notes)); setMessage(t('Your example pickup is confirmed.', 'Tu recogida de ejemplo está confirmada.')); } catch { setMessage(t('Please try again.', 'Inténtalo de nuevo.')); } finally { setBusy(false); } }
-  async function cancel() { if (!request) return; setBusy(true); try { await placeholderApi.cancelPickup(request.requestId); setPickup(null); setPage(2); } catch { setMessage(t('Please try again.', 'Inténtalo de nuevo.')); } finally { setBusy(false); } }
-  const choices = (key: 'time' | 'fridge' | 'snap', options: [string, string, string][]) => <div className="choices">{options.map(([value, en, spanish]) => <button type="button" key={value} aria-pressed={household[key] === value} className={household[key] === value ? 'choice selected' : 'choice'} onClick={() => update(key, value)}>{t(en, spanish)}</button>)}</div>;
-  const primary = (label: string, action: () => void, disabled = false) => <button type="button" className="primary" onClick={action} disabled={disabled || busy}>{busy ? t('Please wait…', 'Espera…') : label}<ArrowRight size={21}/></button>;
-  const timeLabel = household.time === 'morning' ? t('Morning', 'Mañana') : household.time === 'afternoon' ? t('Afternoon', 'Tarde') : t('Either works', 'Cualquiera');
-  return <div className="min-h-screen px-3 py-5 sm:px-6 sm:py-10">
-    <div className="desktop-note"><Sprout size={18}/>{t('A little help. A healthier community.', 'Un poco de ayuda. Una comunidad más sana.')}</div>
-    <main className="shell">
-      <header className="brand"><div><div className="brand-name"><Sprout aria-hidden="true"/><span>HarvestNet</span></div><p>{t('Good food. Stronger communities.', 'Buena comida. Comunidades más fuertes.')}</p></div><button className="language" onClick={() => update('language', es ? 'en' : 'es')}>{es ? 'English' : 'Español'}</button></header>
-      <div className="content">
-        <div className="step-label"><span>{t(`Step ${step} of 3`, `Paso ${step} de 3`)}</span><span>{step === 1 ? t('Your household', 'Tu hogar') : step === 2 ? t('Food banks', 'Bancos de alimentos') : t('Your pickup', 'Tu recogida')}</span></div>
-        <div className="progress" aria-label={t(`Step ${step} of 3`, `Paso ${step} de 3`)}>{[1,2,3].map(n => <span key={n} className={n <= step ? 'active' : ''}/>)}</div>
-        <h1 ref={titleRef} tabIndex={-1}>{page === 0 ? t('About your household', 'Acerca de tu hogar') : page === 1 ? t('Review your answers', 'Revisa tus respuestas') : page === 2 ? t('Choose your food bank', 'Elige tu banco de alimentos') : t('Your pickup', 'Tu recogida')}</h1>
-        <p className="intro">{page === 0 ? t('Tell us what works for you. No name, address, or income needed.', 'Cuéntanos qué te funciona. No necesitamos tu nombre, dirección ni ingresos.') : page === 1 ? t('Check your answers before continuing.', 'Revisa tus respuestas antes de continuar.') : page === 2 ? t('Choose a location that works for you.', 'Elige un lugar que te convenga.') : t('Choose a time and review your pickup details.', 'Elige un horario y revisa los detalles.')}</p>
-        {page === 0 && <form onSubmit={e => { e.preventDefault(); setPage(1); }} className="form">
-          <fieldset><legend>{t('How many people are in your household?', '¿Cuántas personas hay en tu hogar?')}</legend><div className="counter"><button type="button" aria-label={t('Fewer people', 'Menos personas')} disabled={household.size <= 1} onClick={() => update('size', household.size - 1)}><Minus size={20}/></button><output aria-live="polite">{household.size}</output><button type="button" aria-label={t('More people', 'Más personas')} disabled={household.size >= 20} onClick={() => update('size', household.size + 1)}><Plus size={20}/></button></div></fieldset>
-          <label>{t('Your neighborhood', 'Tu vecindario')}<input value={household.neighborhood} onChange={e => update('neighborhood', e.target.value)} placeholder={t('e.g. Mission District', 'p. ej. Mission District')} autoComplete="off" maxLength={100}/></label>
-          <fieldset><legend>{t('When can you pick up food?', '¿Cuándo puedes recoger comida?')}</legend>{choices('time', [['morning','Morning','Mañana'],['afternoon','Afternoon','Tarde'],['either','Either works','Cualquiera']])}</fieldset>
-          <fieldset><legend>{t('Do you have limited fridge space?', '¿Tienes poco espacio en el refrigerador?')}</legend>{choices('fridge', [['yes','Yes','Sí'],['no','No','No']])}</fieldset>
-          <label>{t('Foods you cannot eat', 'Alimentos que no puedes comer')}<textarea value={household.avoid} onChange={e => update('avoid', e.target.value)} placeholder={t('Allergies or foods to avoid (optional)', 'Alergias o alimentos a evitar (opcional)')} maxLength={500}/></label>
-          <fieldset><legend>{t('Do you receive SNAP benefits? (Optional)', '¿Recibes beneficios SNAP? (Opcional)')}</legend>{choices('snap', [['yes','Yes','Sí'],['no','No','No'],['private','Prefer not to say','Prefiero no decirlo']])}</fieldset>
-          <fieldset><legend>{t('Preferred language', 'Idioma preferido')}</legend><div className="choices">{(['en','es'] as const).map(lang => <button type="button" key={lang} className={`choice ${household.language === lang ? 'selected' : ''}`} aria-pressed={household.language === lang} onClick={() => update('language', lang)}>{lang === 'en' ? 'English' : 'Español'}</button>)}</div></fieldset>
-          <label>{t('Phone number (optional)', 'Número de teléfono (opcional)')}<input type="tel" autoComplete="tel" value={household.phone} onChange={e => update('phone', e.target.value)} placeholder="(555) 000-0000" maxLength={30}/></label>
-          <button className="primary" type="submit">{t('Review answers', 'Revisar respuestas')}<ArrowRight size={21}/></button>
-        </form>}
-        {page === 1 && <div className="stack"><dl className="review">{[[t('Household size','Personas en el hogar'),household.size],[t('Neighborhood','Vecindario'),household.neighborhood || t('Not provided','No indicado')],[t('Pickup time','Horario de recogida'),timeLabel],[t('Limited fridge space','Poco espacio en el refrigerador'),household.fridge === 'yes' ? t('Yes','Sí') : 'No'],[t('Foods to avoid','Alimentos a evitar'),household.avoid || t('None','Ninguno')],[t('SNAP benefits','Beneficios SNAP'),household.snap === 'private' ? t('Prefer not to say','Prefiero no decirlo') : household.snap === 'yes' ? t('Yes','Sí') : 'No'],[t('Language','Idioma'),es ? 'Español' : 'English'],[t('Phone','Teléfono'),household.phone || t('Not provided','No indicado')]].map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl><button className="secondary" onClick={() => setPage(0)}>{t('Edit answers','Editar respuestas')}</button><section className="consent"><h2><ShieldCheck size={40}/>{t('Your information and consent','Tu información y consentimiento')}</h2><p>{t('We use these answers to help find food and pickup times that work for you. We share only the information needed with your chosen food bank. You can choose not to continue.','Usamos estas respuestas para encontrar comida y horarios que te convengan. Solo compartimos la información necesaria con el banco de alimentos que elijas. Puedes decidir no continuar.')}</p><label className="checkbox"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/><span>{t('I understand and agree to share these answers.','Entiendo y acepto compartir estas respuestas.')}</span></label></section>{primary(t('Agree and continue','Aceptar y continuar'), submit, !consent)}</div>}
-        {page === 2 && <div className="stack"><section className="fair-share"><strong>{t('Your fair share this week','Tu parte justa esta semana')}</strong><div><span>{request?.fairShare}</span> {t('credits','créditos')}</div><p>{t('Example only. Your actual amount will come from the API.','Solo un ejemplo. La cantidad real vendrá de la API.')}</p></section><fieldset className="bank-list"><legend className="sr-only">{t('Choose a food bank','Elige un banco de alimentos')}</legend>{banks.map(b => <label className={`bank-card ${bankId === b.id ? 'chosen' : ''}`} key={b.id}><input type="radio" name="bank" checked={bankId === b.id} onChange={() => { setBankId(b.id); setWindowIndex(0); setPickup(null); }}/><h2>{b.name}</h2><strong className="distance">{b.distance} {t('mi away','millas de distancia')}</strong><p><MapPin size={20}/>{b.address}</p><p><Clock3 size={20}/>{es ? b.id === 'mission' ? 'Mar y jue · 3–6 PM' : 'Mié y sáb · 10 AM–2 PM' : b.hours}</p><div className="tags">{b.tags.map((tag,i) => <span key={tag}>{es ? i === 0 ? 'Productos frescos' : b.id === 'mission' ? 'Alimentos básicos' : 'Comida familiar' : tag}</span>)}</div></label>)}</fieldset>{primary(t('Continue with this food bank','Continuar con este banco'), () => setPage(3))}<button className="secondary" onClick={() => setPage(1)}>{t('Back','Atrás')}</button></div>}
-        {page === 3 && <div className="stack pickup-stack"><section><h3>{t('Food bank','Banco de alimentos')}</h3><div className="location"><h2><Store size={26}/>{bank.name}</h2><p><MapPin size={20}/>{bank.address}</p><p><Clock3 size={20}/>{es ? bank.id === 'mission' ? 'Mar y jue · 3–6 PM' : 'Mié y sáb · 10 AM–2 PM' : bank.hours}</p></div></section><fieldset><legend>{t('Choose a pickup window','Elige un horario de recogida')}</legend><div className="windows">{bank.windows.map((w,i) => <label className={`window ${windowIndex === i ? 'chosen' : ''}`} key={w}><span>{es ? w.replace('Wed','Mié').replace('Sat','Sáb').replace('Thu','Jue') : w}</span><input type="radio" name="window" checked={windowIndex === i} disabled={!!pickup} onChange={() => setWindowIndex(i)}/></label>)}</div></fieldset><label>{t('Notes for the food bank (optional)','Notas para el banco (opcional)')}<textarea value={notes} disabled={!!pickup} onChange={e => setNotes(e.target.value)} placeholder={t('Anything we should know? (optional)','¿Algo que debamos saber? (opcional)')} maxLength={500}/></label><section className="pickup-card"><div className="eyebrow">{pickup ? t('EXAMPLE PICKUP CONFIRMED','RECOGIDA DE EJEMPLO CONFIRMADA') : t('YOUR PICKUP','TU RECOGIDA')}</div><h2>{bank.name}</h2><p><MapPin size={19}/>{es ? bank.windows[windowIndex].replace('Wed','Mié').replace('Sat','Sáb').replace('Thu','Jue') : bank.windows[windowIndex]}</p><p><Users size={19}/>{household.size} {t('people','personas')}</p><div className="code-area"><div><div className="eyebrow">{t('PICKUP CODE — EXAMPLE','CÓDIGO — EJEMPLO')}</div><strong>{pickup?.code || 'FS-4827'}</strong></div><button onClick={async () => { try { await navigator.clipboard.writeText(pickup?.code || 'FS-4827'); setMessage(t('Example code copied.','Código de ejemplo copiado.')); } catch { setMessage(t('Your example code is FS-4827.','Tu código de ejemplo es FS-4827.')); } }}><Copy size={18}/>{t('Copy code','Copiar')}</button></div><small>{t('This code is for preview only and cannot be used for pickup.','Este código es de ejemplo y no sirve para recoger comida.')}</small><div className="balance"><div>{t("This week's balance (example)",'Saldo de esta semana (ejemplo)')}<p><strong>{pickup?.balance ?? 18}</strong> {t('credits','créditos')}</p></div><Wallet size={29}/></div></section><div className="actions"><button className="secondary" disabled={busy} onClick={() => { setPickup(null); setPage(2); }}>{t('Back','Atrás')}</button>{pickup ? <div className="confirmed"><CheckCircle2 size={20}/>{t('Confirmed','Confirmada')}</div> : primary(t('Confirm pickup','Confirmar recogida'), confirm)}</div><button className="secondary" disabled={busy} onClick={cancel}><CalendarX size={21}/>{t("Can't make it",'No puedo asistir')}</button></div>}
-        <p className="status" role="status">{message}</p>
-        <div className="preview-note"><Leaf size={14}/>{t('Demo preview · All locations and amounts are examples.','Vista de ejemplo · Lugares y cantidades de ejemplo.')}</div>
+  const [form, setForm] = useState<FormState>(() => emptyForm(initialLanguage()));
+  const [screen, setScreen] = useState<Screen>('about');
+  const [fairShare, setFairShare] = useState<Load<FairShare>>(idle);
+  const [preview, setPreview] = useState<Load<Preview>>(idle);
+  const [creating, setCreating] = useState<Load<CreatedRequest>>(idle);
+  const [foodBanks, setFoodBanks] = useState<Load<FoodBankList>>(idle);
+  const [choosing, setChoosing] = useState<Load<ChosenFoodBanks>>(idle);
+  const [status, setStatus] = useState<Load<RequestStatus>>(idle);
+  const [requestCode, setRequestCode] = useState<string | null>(null);
+  const [releases, setReleases] = useState<Record<string, Release>>({});
+  const [releasing, setReleasing] = useState<string | null>(null);
+  const [releaseError, setReleaseError] = useState<{ pickupId: string; error: unknown } | null>(null);
+  const [exampleSeen, setExampleSeen] = useState(false);
+  const [fairShareTick, setFairShareTick] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const firstRender = useRef(true);
+
+  const lang = form.language;
+  const t = STRINGS[lang];
+  const step = STEP[screen];
+
+  const note = useCallback(<T extends object>(body: T): T => {
+    if (isExampleData(body as { mode: string })) setExampleSeen(true);
+    return body;
+  }, []);
+
+  const update = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => setForm(f => ({ ...f, [key]: value })), []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = lang === 'es' ? 'HarvestNet · Tu hogar' : 'HarvestNet · Your household';
+  }, [lang]);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.scrollTo?.(0, 0);
+    headingRef.current?.focus();
+  }, [screen]);
+
+  // Fair share for the chosen size, from the API (never calculated here).
+  useEffect(() => {
+    if (form.size === null) {
+      setFairShare(idle);
+      return;
+    }
+    let current = true;
+    setFairShare(s => ({ ...s, loading: true, error: null }));
+    const timer = setTimeout(() => {
+      api.getFairShare(form.size as number, lang).then(
+        body => current && setFairShare({ loading: false, data: note(body), error: null }),
+        error => current && setFairShare({ loading: false, data: null, error }),
+      );
+    }, 300);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [form.size, lang, fairShareTick, note]);
+
+  const runPreview = useCallback(() => {
+    setPreview({ loading: true, data: null, error: null });
+    api.previewRequest(toAnswers(form)).then(
+      body => setPreview({ loading: false, data: note(body), error: null }),
+      error => setPreview({ loading: false, data: null, error }),
+    );
+  }, [form, note]);
+
+  const loadFoodBanks = useCallback(
+    (code: string) => {
+      setFoodBanks({ loading: true, data: null, error: null });
+      api.listFoodBanks(form.neighborhood.trim(), code).then(
+        body => setFoodBanks({ loading: false, data: note(body), error: null }),
+        error => setFoodBanks({ loading: false, data: null, error }),
+      );
+    },
+    [form.neighborhood, note],
+  );
+
+  const loadStatus = useCallback(
+    (code: string, language: Language) => {
+      setStatus(s => ({ ...s, loading: true, error: null }));
+      api.getRequest(code, language).then(
+        body => setStatus({ loading: false, data: note(body), error: null }),
+        error => setStatus(s => ({ loading: false, data: s.data, error })),
+      );
+    },
+    [note],
+  );
+
+  // The pickup screen's wording comes from the API in the household's language.
+  useEffect(() => {
+    if (screen === 'pickup' && requestCode) loadStatus(requestCode, lang);
+  }, [screen, requestCode, lang, loadStatus]);
+
+  // Switching language on the review screen asks again, so the read-back matches.
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+  const previewRef = useRef(runPreview);
+  previewRef.current = runPreview;
+  useEffect(() => {
+    if (screenRef.current === 'review') previewRef.current();
+  }, [lang]);
+
+  function review() {
+    setScreen('review');
+    runPreview();
+  }
+
+  function consent(yes: boolean) {
+    if (!yes) {
+      setForm(f => ({ ...f, phone: '' }));
+      setScreen('not_saved');
+      return;
+    }
+    setCreating({ loading: true, data: null, error: null });
+    api.createRequest(toCreateBody(form)).then(
+      body => {
+        note(body);
+        setCreating({ loading: false, data: body, error: null });
+        setForm(f => ({ ...f, phone: '' })); // write-only: not kept once sent
+        setRequestCode(body.request_code);
+        setScreen('food_banks');
+        loadFoodBanks(body.request_code);
+      },
+      error => setCreating({ loading: false, data: null, error }),
+    );
+  }
+
+  function choose(ids: string[]) {
+    if (!requestCode) return;
+    setChoosing({ loading: true, data: null, error: null });
+    api.chooseFoodBanks(requestCode, ids).then(
+      body => {
+        setChoosing({ loading: false, data: note(body), error: null });
+        setScreen('pickup');
+      },
+      error => setChoosing({ loading: false, data: null, error }),
+    );
+  }
+
+  function release(pickupId: string) {
+    if (!requestCode) return;
+    setReleasing(pickupId);
+    setReleaseError(null);
+    api.releasePickup(pickupId, requestCode).then(
+      body => {
+        note(body);
+        setReleases(r => ({ ...r, [pickupId]: body }));
+        setReleasing(null);
+      },
+      error => {
+        setReleaseError({ pickupId, error });
+        setReleasing(null);
+      },
+    );
+  }
+
+  function lookup(code: string) {
+    setRequestCode(code);
+    setStatus(idle);
+    setScreen('pickup');
+  }
+
+  function startOver() {
+    setForm(emptyForm(lang));
+    setPreview(idle);
+    setCreating(idle);
+    setFoodBanks(idle);
+    setChoosing(idle);
+    setStatus(idle);
+    setRequestCode(null);
+    setReleases({});
+    setScreen('about');
+  }
+
+  const titles: Record<Screen, string> = {
+    about: t.aboutTitle,
+    review: t.reviewTitle,
+    not_saved: t.notSavedTitle,
+    food_banks: t.foodBanksTitle,
+    pickup: t.pickupTitle,
+  };
+  const intros: Record<Screen, string> = {
+    about: `${t.aboutIntro} ${t.noPersonalInfo}`,
+    review: t.reviewIntro,
+    not_saved: t.notSavedBody,
+    food_banks: t.foodBanksIntro,
+    pickup: '',
+  };
+
+  return (
+    <div className="page">
+      <a className="skip-link" href="#main-content">
+        {lang === 'es' ? 'Saltar al contenido' : 'Skip to content'}
+      </a>
+      <div className="shell">
+        <header className="brand">
+          <div>
+            <p className="brand-name">
+              <Sprout aria-hidden="true" />
+              <span>HarvestNet</span>
+            </p>
+            <p className="tagline">{t.tagline}</p>
+          </div>
+          <button
+            type="button"
+            className="language"
+            lang={lang === 'es' ? 'en' : 'es'}
+            aria-label={t.switchLanguageLabel}
+            onClick={() => update('language', lang === 'es' ? 'en' : 'es')}
+          >
+            {t.switchLanguage}
+          </button>
+        </header>
+        <main className="content" id="main-content">
+          <div className="step-label">
+            <span>{t.step(step)}</span>
+            <span>{t.stepNames[step - 1]}</span>
+          </div>
+          <div
+            className="progress"
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={3}
+            aria-valuenow={step}
+            aria-valuetext={`${t.step(step)}: ${t.stepNames[step - 1]}`}
+            aria-label={t.step(step)}
+          >
+            {[1, 2, 3].map(n => (
+              <span key={n} className={n <= step ? 'active' : ''} />
+            ))}
+          </div>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {titles[screen]}
+          </h1>
+          {intros[screen] && <p className="intro">{intros[screen]}</p>}
+
+          {exampleSeen && <ExampleNotice t={t} />}
+
+          {screen === 'about' && (
+            <AboutScreen
+              t={t}
+              form={form}
+              update={update}
+              fairShare={{ ...fairShare, retry: () => setFairShareTick(n => n + 1) }}
+              onReview={review}
+              onLookup={lookup}
+            />
+          )}
+
+          {screen === 'review' && (
+            <ReviewScreen
+              t={t}
+              form={form}
+              preview={preview.data}
+              loading={preview.loading}
+              error={preview.error}
+              retry={runPreview}
+              saving={creating.loading}
+              saveError={creating.error}
+              onEdit={() => setScreen('about')}
+              onConsent={consent}
+            />
+          )}
+
+          {screen === 'not_saved' && (
+            <div className="stack">
+              <button type="button" className="secondary" onClick={() => setScreen('about')}>
+                {t.editAnswers}
+              </button>
+              <button type="button" className="secondary" onClick={startOver}>
+                {t.startOver}
+              </button>
+            </div>
+          )}
+
+          {screen === 'food_banks' && creating.data && (
+            <FoodBanksScreen
+              t={t}
+              lang={lang}
+              created={creating.data}
+              fairShare={fairShare.data}
+              list={foodBanks.data}
+              loading={foodBanks.loading}
+              error={foodBanks.error}
+              retry={() => requestCode && loadFoodBanks(requestCode)}
+              saving={choosing.loading}
+              saveError={choosing.error}
+              onChoose={choose}
+            />
+          )}
+
+          {screen === 'pickup' && requestCode && (
+            <>
+              <PickupScreen
+                t={t}
+                lang={lang}
+                status={status.data}
+                loading={status.loading}
+                error={status.error}
+                retry={() => loadStatus(requestCode, lang)}
+                waitingMessage={choosing.data?.message ?? null}
+                texts={creating.data?.texts ?? false}
+                releases={releases}
+                releasing={releasing}
+                releaseError={releaseError}
+                onRelease={release}
+              />
+              {creating.data && (
+                <button type="button" className="secondary back" onClick={() => setScreen('food_banks')}>
+                  {t.back}
+                </button>
+              )}
+            </>
+          )}
+
+          <p className="preview-note">
+            <Leaf size={14} aria-hidden="true" />
+            {t.noPersonalInfo}
+          </p>
+        </main>
       </div>
-    </main><footer>HarvestNet <span>·</span> {t('Growing stronger, together.','Creciendo juntos.')}</footer>
-  </div>;
+      <footer>{t.footer}</footer>
+    </div>
+  );
 }
