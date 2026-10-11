@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harvestnet-platform"
+version = "0.1.0"
+description = "HarvestNet Lane C integrations and explicitly labeled demo fallbacks"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["harvestnet_platform*"]
+
+[tool.setuptools.package-data]
+harvestnet_platform = ["fixtures/*.json"]
