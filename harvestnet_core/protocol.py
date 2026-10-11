@@ -74,7 +74,8 @@ class Protocol:
             from .engine import jsonable
             draft = jsonable(updated)
             # Enum subclasses serialize as strings.
-            lot.update(draft=draft, approvals={}, holds={})
+            lot.update(draft=draft, approvals={}, holds={},status='negotiating')
+            lot.pop('stop_reason',None)
             lot["versions"].append(copy.deepcopy(draft))
             self.records.put("lot", lot_id, lot)
             self.records.event(lot_id, now, "amendment", {"organization_id": organization_id, "amendment": amendment, "draft": draft})
@@ -155,6 +156,8 @@ class Protocol:
                     return previous["result"]
             lot = self.records.get("lot", lot_id)
             draft = lot["draft"]
+            if any(m['lot_id']==lot_id for m in self.records.all('queued_move')):
+                raise Conflict('an owner counter is awaiting its published turn')
             if receipt["version"] != draft["version"] or receipt["terms_hash"] != terms_hash(draft):
                 raise Conflict("stale version or changed terms")
             if owner not in named(draft) or dt(now) >= dt(draft["deadline"]):
