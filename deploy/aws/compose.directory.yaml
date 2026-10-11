@@ -1,0 +1,65 @@
+# The AGNTCY Directory on the AWS instance, layered on compose.platform.yaml and
+# deploy/aws/compose.aws.yaml (tickets #17 and #21):
+#
+#   docker compose ... -f compose.platform.yaml -f deploy/aws/compose.aws.yaml \
+#     -f deploy/aws/compose.directory.yaml up -d --no-build
+#
+# - The official dirctl daemon image (agntcy/dir v1.7.1), pinned by digest. The
+#   daemon includes the gRPC server and the search indexer in one process, with
+#   a local OCI store and SQLite on one volume. The standalone apiserver image
+#   needs a separate reconciler for indexing, so it is not used here.
+# - No published port. The organization hosts reach it at directory:8888 on the
+#   private `platform` network. It is also on `egress` because every push is validated
+#   against the public OASF schema service (it refuses records when it can't reach it).
+# - P2P routing has no bootstrap peers, so this Directory stays a single, private node.
+# - The 256 MiB limit is a ceiling, not a reservation; GOMEMLIMIT makes the Go
+#   runtime collect before it reaches it. Check actual use before relying on a
+#   t4g.micro's 1 GB RAM for the full stack.
+# - Each organization host registers its own card and capabilities and re-reads its
+#   own systems every DIRECTORY_REFRESH_SECONDS (harvestnet_platform.directory). When
+#   the Directory is down, the hosts keep serving moves and retry; searches from
+#   `python -m harvestnet_platform.directory` fall back to the local registry, labeled
+#   `local_directory_fallback`, never as AGNTCY results.
+
+x-directory-env: &directory-env
+  AGNTCY_DIRECTORY_ADDRESS: directory:8888
+  SYSTEMS_URL: http://systems:8010
+  DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
+
+services:
+  directory:
+    image: ghcr.io/agntcy/dir-ctl:v1.7.1@sha256:245f56ed4057130f8011ce33a45b4befb922dae31fc2d2328684bbf5ba17d441
+    command: [daemon, start, --data-dir, /home/nonroot/dir]
+    environment:
+      HOME: /home/nonroot
+      DIRECTORY_DAEMON_SERVER_LISTEN_ADDRESS: 0.0.0.0:8888
+      DIRECTORY_DAEMON_SERVER_OASF_API_VALIDATION_SCHEMA_URL: https://schema.oasf.outshift.com
+      DIRECTORY_DAEMON_SERVER_ROUTING_GOSSIPSUB_ENABLED: 'false'
+      GOMEMLIMIT: 192MiB
+    # The image runs as uid 65532 and owns /home/nonroot, so a new volume there is writable.
+    volumes: [directory-data:/home/nonroot]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 256m
+    networks: [platform, egress]
+    healthcheck:
+      test: [CMD, dirctl, daemon, status, --data-dir, /home/nonroot/dir]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  donor:
+    environment: *directory-env
+  city:
+    environment: *directory-env
+  rural:
+    environment: *directory-env
+  eastside:
+    environment: *directory-env
+  advocate:
+    environment: *directory-env
+
+volumes:
+  directory-data:

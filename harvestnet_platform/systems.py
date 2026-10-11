@@ -117,6 +117,14 @@ class Systems:
         return {'openapi': '3.0.3', 'info': {'title': 'HarvestNet synthetic organization systems', 'version': 'synthetic-v1'}, 'paths': paths}
 
 
+def organization_systems():
+    """An organization host's own systems: the HarvestNet systems service (which applies the
+    demo cooler switch) when ``SYSTEMS_URL`` is set, else Beeceptor or recorded copies."""
+    if os.getenv('SYSTEMS_URL'):
+        return Systems(os.environ['SYSTEMS_URL'], upstream='harvestnet_systems')
+    return Systems(os.getenv('BEECEPTOR_BASE_URL'))
+
+
 def handler_for(systems, token):
     class Handler(JsonHandler):
         def do_GET(self):

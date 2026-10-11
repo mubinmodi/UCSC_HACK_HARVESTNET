@@ -2,16 +2,10 @@
 import asyncio
 import json
 import os
+from .systems import organization_systems
 from .transport import Receiver, agent_card, load_policy, ORGANIZATIONS
 
 
-def organization_systems():
-    """This organization's own systems: the HarvestNet systems service (which applies the
-    demo cooler switch) when ``SYSTEMS_URL`` is set, else Beeceptor or recorded copies."""
-    from .systems import Systems
-    if os.getenv('SYSTEMS_URL'):
-        return Systems(os.environ['SYSTEMS_URL'], upstream='harvestnet_systems')
-    return Systems(os.getenv('BEECEPTOR_BASE_URL'))
 
 
 async def main():

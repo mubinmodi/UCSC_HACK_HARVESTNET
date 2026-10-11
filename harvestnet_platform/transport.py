@@ -292,6 +292,16 @@ def main():
     receiver = Receiver(args.organization, policy, os.getenv('RECEIPTS_DB', ':memory:'))
     endpoint = os.getenv('AGENT_PUBLIC_URL', f'http://127.0.0.1:{args.port}')
     print(f'Policy: {label}; transport: A2A JSON-RPC; approvals disabled', flush=True)
+    address = os.getenv('AGNTCY_DIRECTORY_ADDRESS')
+    if address:
+        # Register this organization's own card and capabilities, and keep them current.
+        from .directory import start_publisher
+        from .systems import organization_systems
+        interval = seconds(os.getenv('DIRECTORY_REFRESH_SECONDS', '30'))
+        start_publisher(args.organization, endpoint, address, organization_systems(), interval)
+        print(f'Directory: AGNTCY Directory at {address}, refreshed every {interval:g}s', flush=True)
+    else:
+        print('Directory: none configured; searches use the labeled local registry fallback', flush=True)
     serve(handler_for(receiver, os.getenv('TRANSPORT_TOKEN'), endpoint), args.port, args.host)
 
 
