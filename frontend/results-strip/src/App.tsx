@@ -5,7 +5,7 @@ import { cardLabel, type CardLabel } from './labels';
 
 // The four methods, always in this order. Labels only: every number comes from the API.
 const methods: [MethodId, string, string][] = [
-  ['first_come_first_served', 'First-come-first-served', 'Primero en llegar'],
+  ['first_come_first_served', 'First-come-first-served', 'Por orden de llegada'],
   ['nearest_food_bank', 'Nearest food bank', 'Banco de alimentos más cercano'],
   ['rules_based', 'Rules-based negotiators', 'Negociadores con reglas'],
   ['llm', 'LLM negotiators', 'Negociadores con IA'],
@@ -66,7 +66,7 @@ export default function App() {
       {label.reason && label.status !== 'completed' && <p className="reason">{label.reason}</p>}
       <dl>
         {metric('produce_wasted_lb', <Trash2 aria-hidden="true"/>, t('Produce wasted', 'Producto desperdiciado'), label.showNumbers ? run?.produce_wasted_lb : null, v => `${v} lb`, missing)}
-        {metric('worst_served_coverage', <Sprout aria-hidden="true"/>, t('Worst-served coverage', 'Cobertura del peor atendido'), label.showNumbers ? run?.worst_served_coverage : null, v => percent.format(v), missing)}
+        {metric('worst_served_coverage', <Sprout aria-hidden="true"/>, t('Worst-served coverage', 'Cobertura del banco peor atendido'), label.showNumbers ? run?.worst_served_coverage : null, v => percent.format(v), missing)}
         {metric('households_reached', <Users aria-hidden="true"/>, t('Households reached', 'Hogares alcanzados'), label.showNumbers ? run?.households_reached : null, v => String(v), missing)}
       </dl>
       {label.showNumbers && has(run?.invalid_commitments) && <p className="invalid">{t('Invalid commitments', 'Compromisos inválidos')}: <b>{run!.invalid_commitments}</b></p>}
@@ -91,7 +91,7 @@ export default function App() {
 
     <footer className="legend">
       <p><b>{t('Produce wasted', 'Producto desperdiciado')}:</b> {t('pounds not collected by the end of the scenario. Lower is better.', 'libras no recogidas al final del escenario. Menos es mejor.')}</p>
-      <p><b>{t('Worst-served coverage', 'Cobertura del peor atendido')}:</b> {t('share of the weekly fair share received by the worst-served households. Higher is better.', 'parte de la porción justa semanal que recibieron los hogares peor atendidos. Más es mejor.')}</p>
+      <p><b>{t('Worst-served coverage', 'Cobertura del banco peor atendido')}:</b> {t('the lowest average share of the weekly fair share received, across food banks. Higher is better.', 'el promedio más bajo, entre los bancos de alimentos, de la porción semanal que recibieron sus hogares. Más es mejor.')}</p>
       <p><b>{t('Households reached', 'Hogares alcanzados')}:</b> {t('counted by pickup confirmations.', 'contados por confirmaciones de recogida.')}</p>
       <p><b>{t('Live', 'En vivo')}</b> {t('ran just now', 'se ejecutó ahora')} · <b>{t('Replay', 'Repetición')}</b> {t('a recorded run played back', 'una ejecución grabada')} · <b>{t('Synthetic', 'Sintético')}</b> {t('made-up inputs for testing', 'datos inventados para pruebas')}</p>
       <p><b>{t('Fallback only', 'Solo respaldo')}</b> {t('no LLM decisions happened, so these are rule fallback outcomes, not LLM results', 'no hubo decisiones de IA; son resultados de respaldo con reglas, no de IA')} · <b>{t('Partial', 'Parcial')}</b> {t('some decisions fell back to rules or templates', 'algunas decisiones usaron reglas o plantillas')} · <b>{t('Not run', 'Sin ejecutar')}</b> {t('this method has no results', 'este método no tiene resultados')}</p>

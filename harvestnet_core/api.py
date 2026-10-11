@@ -47,6 +47,16 @@ OPERATIONS = (
 # Voice intake calls per process in a sliding window (#22). Each call can cost a model call.
 VOICE_RATE_LIMIT = (20, 60.0)
 
+# What a household sees after "Can't make it", in its own language (ticket #6).
+RELEASED_MESSAGE = {
+    'en': "Thanks for telling us. Your portion will go to another family.",
+    'es': "Gracias por avisarnos. Su porción pasará a otra familia.",
+}
+SAVED_MESSAGE = {
+    'en': "Your food banks are saved.",
+    'es': "Sus bancos de alimentos están guardados.",
+}
+
 
 class API:
     def __init__(self, engine, *, clock=None, staff_tokens=None, extractor=None, voice_rate_limit=VOICE_RATE_LIMIT, monotonic=time.monotonic):
@@ -120,10 +130,21 @@ class API:
     def preview(self, draft):
         return {"saved":False,"draft_request":draft.to_dict(),"complete":draft.is_complete,"fair_share_lb":self.engine.calc.fair_share(draft.household_size).pounds if draft.household_size else None,"read_back":desk.read_back(draft),"missing_questions":list(desk.missing_questions(draft)),"consent_question":desk.consent_wording(draft) if draft.is_complete else None}
 
-    def wording(self,p,r):
+    def item_name(self,produce_id,language):
+        """The produce name a household sees, in its language (ticket #6). Spanish names come
+        from the reviewed produce profiles; an item without one keeps its English name."""
+        profile=self.engine.calc.profiles.get(produce_id)
+        try:
+            return profile.display_name(language)
+        except KeyError:
+            return profile.name
+
+    def wording(self,p,r,language=None):
+        language=desk.Language(language or r["language"])
         window=p["window"]
-        facts=desk.PickupFacts(p["food_bank_name"],dt(window["start"]).time(),dt(window["end"]).time(),r["request_code"],[desk.ProducePortion(i["name"],i["pounds"],"committed") for i in p["items"]],r.get("received_this_week_lb",0),r["fair_share_lb"])
-        return desk.pickup_wording(facts,desk.Language(r["language"]))
+        portions=[desk.ProducePortion(self.item_name(i["produce_id"],language.value).lower(),i["pounds"],"committed") for i in p["items"]]
+        facts=desk.PickupFacts(p["food_bank_name"],dt(window["start"]).time(),dt(window["end"]).time(),r["request_code"],portions,r.get("received_this_week_lb",0),r["fair_share_lb"])
+        return desk.pickup_wording(facts,language)
 
     def voice_allowed(self):
         """A per-process sliding-window rate limit; one process is one counter."""
@@ -215,7 +236,11 @@ class API:
                         new={**p,"pickup_id":new_id,"request_code":r["request_code"],"pounds":part["pounds"],"items":[{**item,"pounds":part["pounds"]}],"window":self.engine.eligible(r,bank,original,max(dt(self.engine.now),dt(p["window"]["start"]))),"status":"committed"}
                         self.records.put("pickup",new_id,new)
                         self.records.event(p["lot_id"],self.engine.now,"pickup_notice",new)
-            return {"pickup_id":pid,"status":"released","released":True,"released_lb":p["pounds"],"message":"Thanks for telling us. Your portion will go to another family."}
+            try:
+                language=self.records.get("request",code).get("language","en")
+            except KeyError:
+                language="en"
+            return {"pickup_id":pid,"status":"released","released":True,"released_lb":p["pounds"],"message":RELEASED_MESSAGE.get(language,RELEASED_MESSAGE["en"])}
 
     def dispatch(self,method,target,b,token):
         path=urlsplit(target).path.strip('/').split('/')
@@ -286,9 +311,11 @@ class API:
                 with self.records.transaction():
                     r['chosen_food_bank_ids']=ids
                     self.records.put('request',path[1],r)
-                return 200,{"request_code":path[1],"chosen_food_bank_ids":ids,"status":"saved","message":"Your food banks are saved."}
+                return 200,{"request_code":path[1],"chosen_food_bank_ids":ids,"status":"saved","message":SAVED_MESSAGE.get(r.get('language'),SAVED_MESSAGE['en'])}
             if method=='GET' and len(path)==2:
-                pickups=[{k:v for k,v in p.items() if k!='request_code'} | {"wording":self.wording(p,r)} for p in self.records.all('pickup') if p['request_code']==path[1] and p['status']=='committed']
+                # The page's language when it sends one, else the language the household chose.
+                language=desk.Language(q.get('language') or r['language']).value
+                pickups=[{k:v for k,v in p.items() if k!='request_code'} | {"items":[{**i,"name":self.item_name(i["produce_id"],language)} for i in p["items"]],"wording":self.wording(p,r,language)} for p in self.records.all('pickup') if p['request_code']==path[1] and p['status']=='committed']
                 return 200,{k:r[k] for k in ('request_code','household_size','fair_share_lb','received_this_week_lb','chosen_food_bank_ids','expires_at')} | {"pickups":pickups,"market_match_tip":None}
         if root=='pickups' and method=='POST' and len(path)==3 and path[2]=='release':
             return 200,self.release(path[1],b['request_code'])
@@ -397,9 +424,10 @@ class API:
             if len(path)==1 and method=='GET':
                 banks=[]
                 request=self.records.get('request',q['request_code']) if q.get('request_code') else None
+                language=desk.Language(q.get('language') or (request or {}).get('language') or 'en').value
                 for bid in self.engine.banks:
                     bank=self.records.get('bank',bid)
-                    committed=[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds'],"badges":["keep_cold"] if calc.profiles.get(a['produce_id']).needs_cold else []} for lot in self.records.all('lot') if lot['status']=='committed' for a in lot['commitments'] if a['food_bank_id']==bid]
+                    committed=[{"produce_id":a['produce_id'],"name":self.item_name(a['produce_id'],language),"pounds":a['pounds'],"badges":["keep_cold"] if calc.profiles.get(a['produce_id']).needs_cold else []} for lot in self.records.all('lot') if lot['status']=='committed' for a in lot['commitments'] if a['food_bank_id']==bid]
                     fits=None
                     if request:
                         probe={"produce_id":"apples","usable_until":request['expires_at']}

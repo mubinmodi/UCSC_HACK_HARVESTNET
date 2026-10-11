@@ -57,6 +57,16 @@ class ApprovalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pickup_message({**notice,'committed':False},now=now)
 
+    def test_spanish_pickup_text_uses_the_same_facts_and_reply_words(self):
+        """Ticket #6: a Spanish household gets its text in Spanish; the numbers are unchanged."""
+        notice = {'committed': True, 'language': 'es', 'food_bank': 'Rural food bank', 'items': [{'name':'manzanas','pounds':8}],
+                  'window': {'start':'18:00','end':'20:00'}, 'request_code':'ABCD', 'pickup_id':'pickup-1',
+                  'version':2, 'release_url':'https://demo.example/release'}
+        text = pickup_message(notice)
+        for part in ('8 lb de manzanas','Rural food bank','18:00','20:00','ABCD','SÍ','NO PUEDO IR'):
+            self.assertIn(part,text)
+        self.assertNotIn('Reply YES',text)
+
     def test_release_calls_core_operation_with_pickup_token(self):
         core = CoreAPI('https://core.example',{'market':'market-staff','city':'city-staff'})
         with patch('harvestnet_platform.approvals.request_json', return_value={'released':True}) as call:

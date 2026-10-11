@@ -374,7 +374,7 @@ def test_english_pickup_wording_uses_only_given_facts():
 def test_spanish_pickup_wording_uses_only_given_facts():
     f = facts(ProducePortion("manzanas", 5, AgreementStatus.COMMITTED), ProducePortion("papas", 3, AgreementStatus.COMMITTED))
     assert pickup_wording(f, Language.ES) == (
-        "Listo para recoger en Rural Food Bank, de 6 a 8 p. m.: 5 lb manzanas y 3 lb papas. "
+        "Puede recoger en Rural Food Bank, de 6 a 8 p. m.: 5 lb de manzanas y 3 lb de papas. "
         "Su código es K7Q2. Por favor lave los productos antes de comerlos."
     )
 

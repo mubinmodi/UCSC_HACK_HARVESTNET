@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HarvestNet demo slides</title>
+<!--
+  HarvestNet demo deck for the 3-minute demo (docs/MVP_DESIGN.md section 17, ticket #6).
+  Self-contained: no network, no web fonts, inline CSS and JS. Open the file in any browser.
+  Keys: Right, Down, Space, PageDown = next. Left, Up, PageUp = back. Home, End.
+  T = light or dark theme. Speaker notes are in docs/demo/SCRIPT.md.
+  Every result number comes from the JSON block "harvestnet-results" below, copied from
+  `python -m harvestnet_core evaluate core_fixtures/*.json`. core_tests/test_demo_slides.py
+  checks that it still matches what the code produces. All data is synthetic.
+-->
+<style>
+:root {
+  --bg: #fbfaf6; --panel: #ffffff; --ink: #1d2320; --muted: #4f5a54; --line: #d6dbd4;
+  --accent: #2f6b3a; --accent-soft: #e4efe2; --warn: #8a4b00; --warn-soft: #fbefd9;
+  --l1: #2d5f8b; --l2: #8a4b00; --l3: #2f6b3a; --ev: #6b3f86;
+}
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1d2320; --ink: #eef2ec; --muted: #b8c2bb; --line: #39433d;
+  --accent: #8fd19b; --accent-soft: #23362a; --warn: #f2b45c; --warn-soft: #3a2c16;
+  --l1: #8cc0ee; --l2: #f2b45c; --l3: #8fd19b; --ev: #d3a8ee;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+.deck { position: relative; width: 100vw; height: 100vh; }
+.slide {
+  position: absolute; inset: 0; display: none; flex-direction: column; justify-content: flex-start;
+  padding: 5vh 6vw 10vh; font-size: clamp(16px, min(2.4vw, 4.2vh), 34px); line-height: 1.35;
+}
+.slide.active { display: flex; }
+h1 { font-size: 2.3em; margin: 0 0 .3em; line-height: 1.1; }
+h2 { font-size: 1.55em; margin: 0 0 .55em; line-height: 1.15; }
+p { margin: .3em 0 .5em; }
+ul { margin: .2em 0 .4em; padding-left: 1.1em; }
+li { margin: .22em 0; }
+.lead { font-size: 1.15em; color: var(--muted); }
+.tag { display: inline-block; font-size: .62em; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: .2em .55em; border-radius: .4em; border: 2px solid currentColor; vertical-align: middle; }
+.l1 { color: var(--l1); } .l2 { color: var(--l2); } .l3 { color: var(--l3); } .ev { color: var(--ev); }
+.label { display: inline-block; font-size: .6em; font-weight: 700; padding: .2em .6em; border-radius: .4em;
+  background: var(--warn-soft); color: var(--warn); vertical-align: middle; }
+.grid { display: grid; gap: .7em; }
+.g2 { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: repeat(3, 1fr); }
+.card { background: var(--panel); border: 2px solid var(--line); border-radius: .5em; padding: .55em .75em; font-size: .82em; }
+.card h3 { margin: 0 0 .25em; font-size: 1.05em; }
+.card p { margin: .15em 0; }
+.quote { border-left: .3em solid var(--accent); padding: .2em .7em; margin: .3em 0; background: var(--accent-soft); font-size: .78em; }
+table { border-collapse: collapse; font-size: .78em; }
+th, td { border-bottom: 2px solid var(--line); padding: .3em .7em; text-align: left; }
+th { color: var(--muted); font-weight: 700; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.small { font-size: .7em; color: var(--muted); }
+.foot { position: absolute; left: 6vw; right: 6vw; bottom: 2.5vh; display: flex; justify-content: space-between;
+  font-size: clamp(12px, 1.2vw, 18px); color: var(--muted); }
+.big { font-size: 1.6em; font-weight: 700; color: var(--accent); }
+.moments { counter-reset: m; list-style: none; padding: 0; }
+.moments li { counter-increment: m; display: flex; gap: .6em; align-items: baseline; margin: .25em 0; font-size: .9em; }
+.moments li::before { content: counter(m); font-weight: 800; color: var(--accent); min-width: 1.1em; }
+.moments .tag { margin-left: auto; white-space: nowrap; }
+.flow { display: flex; gap: .4em; align-items: center; flex-wrap: wrap; font-size: .8em; }
+.flow .card { flex: 1 1 0; text-align: center; }
+.arrow { color: var(--muted); font-weight: 700; }
+@media (max-width: 700px) { .g2, .g3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main class="deck" id="deck" aria-live="polite">
+
+<section class="slide" aria-label="Title">
+  <p class="small">UCSC AI Hackathon · Cisco Cloud Track · "When AI Agents Disagree" · Level 3</p>
+  <h1>HarvestNet</h1>
+  <p class="lead">Surplus fruit and vegetables, shared fairly with low-income households, by agents that negotiate. No one in the middle decides.</p>
+  <p class="big">Every organization keeps its own keys. The food still moves.</p>
+  <p class="small">All data in this demo is synthetic. Results are labeled synthetic, recorded, or not run.</p>
+</section>
+
+<section class="slide" aria-label="The problem">
+  <h2>The problem</h2>
+  <p>Farms, grocers, and farmers markets end up with good produce they can't sell. It spoils within days. Nearby, low-income families would use it.</p>
+  <p>The hard part is splitting it fairly and fast:</p>
+  <ul>
+    <li>A food bank in a low-access area may get far less than one near the donors.</li>
+    <li>A family that works until 6 pm can't collect lettuce at 2 pm.</li>
+    <li>A small donor has no truck.</li>
+    <li>When a food bank's cooler fails, the greens in it are lost.</li>
+  </ul>
+</section>
+
+<section class="slide" aria-label="Who negotiates">
+  <h2>Who negotiates: no central decider</h2>
+  <div class="grid g3">
+    <div class="card"><h3>Donor agent</h3><p>Wants the produce used, with little extra work. Would rather a food bank collects.</p></div>
+    <div class="card"><h3>Food bank agents</h3><p>City, rural, eastside. Want what their households can collect and use. Compete for limited produce.</p></div>
+    <div class="card"><h3>Advocate agent</h3><p>Speaks for the households furthest below their fair share. Proposes changes. <b>No vote.</b></p></div>
+  </div>
+  <ul>
+    <li>Each agent has specialists that check facts with calculators. The AI never invents a number.</li>
+    <li>They edit one shared, numbered draft agreement, item by item, including who moves the produce.</li>
+    <li>Each organization's own human approves the exact version. Nothing commits on its own.</li>
+  </ul>
+</section>
+
+<section class="slide" aria-label="Fair share and SNAP">
+  <h2>Fair share, like a SNAP benefit</h2>
+  <div class="grid g2">
+    <div>
+      <p>Each household has a weekly produce amount that grows with household size. It is the yardstick for fairness, not an allocation.</p>
+      <table aria-label="Fair-share table">
+        <tr><th>Household size</th><th>Weekly fair share</th></tr>
+        <tr><td>1 person</td><td class="num">4 lb</td></tr>
+        <tr><td>2 people</td><td class="num">7 lb</td></tr>
+        <tr><td>3 people</td><td class="num">10 lb</td></tr>
+        <tr><td>4 people</td><td class="num">12 lb</td></tr>
+        <tr><td>Each extra person</td><td class="num">+2 lb</td></tr>
+      </table>
+      <p class="small"><span class="label">Synthetic</span> Placeholder table, version 0.1.0-placeholder. Real food banks would publish their own.</p>
+    </div>
+    <div>
+      <ul>
+        <li>SNAP/CalFresh is optional and self-reported. "Prefer not to say" is always offered.</li>
+        <li>The answer never changes the fair share.</li>
+        <li>Farmers markets can join as donors.</li>
+        <li>A Market Match tip goes only to SNAP households, and only for a verified nearby market.</li>
+        <li>No name, no address, no income. Requests expire after 7 days.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="slide" aria-label="The demo in seven moments">
+  <h2>The demo in seven moments</h2>
+  <ol class="moments">
+    <li>A parent calls the voice line in Spanish and hears their fair share. <span class="tag l1">Level 1</span></li>
+    <li>A farmers market reports end-of-day surplus. <span class="tag l1">Level 1</span></li>
+    <li>Food bank and donor agents negotiate item by item; the advocate argues from fair-share gaps. <span class="tag l3">Level 3</span></li>
+    <li>Managers approve the exact version. No one approves for anyone else. <span class="tag l3">Level 3</span></li>
+    <li>The city cooler fails. The Directory finds a food bank with cold space; reason cards explain why. <span class="tag l2">Level 2</span></li>
+    <li>The parent gets a text with the food bank, time, items, and code. <span class="tag ev">Evidence</span></li>
+    <li>The results strip compares against first-come-first-served. <span class="tag ev">Evidence</span></li>
+  </ol>
+</section>
+
+<section class="slide" aria-label="Moment 1 and 2">
+  <h2>1 · 2 &nbsp;A household asks, a donor offers</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3>Household <span class="tag l1">Level 1</span></h3>
+      <p>Family of 4, near Watsonville, after 6 pm, small fridge, receives CalFresh. Chooses the rural and city food banks.</p>
+      <p>The front-desk assistant reads it back, asks for consent, and says the fair share: <b>12 lb a week</b>.</p>
+      <p class="small">The read-back and the number come from templates and the fair-share calculator, not from the AI.</p>
+    </div>
+    <div class="card">
+      <h3>Farmers market <span class="tag l1">Level 1</span></h3>
+      <p>300 lb apples, 200 lb romaine, 400 lb potatoes (8 sacks of 50 lb). Gone by 3 pm. Can drop off.</p>
+      <p>Donor specialists check the produce profiles, condition, deadline, and drop-off.</p>
+      <p class="small">Romaine needs a fridge. Apples and potatoes keep without one. The profile decides.</p>
+    </div>
+  </div>
+  <p class="small"><span class="label">Synthetic</span> Scenario <code>core_fixtures/normal-afternoon.json</code>.</p>
+</section>
+
+<section class="slide" aria-label="Moment 3 and 4">
+  <h2>3 · 4 &nbsp;Agents negotiate, humans approve <span class="tag l3">Level 3</span></h2>
+  <p>In the recorded rules-based run, the draft goes from version 1 to version 14. Each change has a reason:</p>
+  <div class="quote">City food bank: "Our 4 households are 31 lb below their fair share this week. 200 lb of romaine lettuce is unclaimed. …"</div>
+  <div class="quote">Farmers market: "Asking City food bank to collect by our 3 pm deadline, since we can't drop off there."</div>
+  <div class="quote">Rural food bank: "Asking Farmers market to drop off our 32 lb, as it offered, since we have no truck free today. …"</div>
+  <p>Every named organization accepts version 14, places holds on its own resources, and its own human approves that exact version. Then it is a commitment.</p>
+  <p class="small"><span class="label">Recorded</span> Quotes from <code>python -m harvestnet_core evaluate</code> on the synthetic normal-afternoon scenario. The LLM negotiators were not run for these results.</p>
+</section>
+
+<section class="slide" aria-label="The advocate">
+  <h2>The advocate argues; it doesn't decide <span class="tag l3">Level 3</span></h2>
+  <p>When there are more households than produce, the advocate proposes a change:</p>
+  <div class="quote">"Rural food bank's 4 households are 31 lb below fair share under version 4, the largest gap (others: City food bank 30 lb, Eastside food bank 0 lb). It is in a low-access area (USDA Food Access Research Atlas). 31 lb of potatoes is unclaimed. Proposing 31 lb of it for Rural food bank."</div>
+  <p>The food banks and the donor still decide. In the normal afternoon, every gap is already planned, so the advocate proposes no change and says so.</p>
+  <p class="small"><span class="label">Recorded</span> From the synthetic more-households-than-produce scenario.</p>
+</section>
+
+<section class="slide" aria-label="Moment 5: the cooler fails">
+  <h2>5 &nbsp;The city cooler fails <span class="tag l2">Level 2</span></h2>
+  <div class="flow">
+    <div class="card">Beeceptor switch: cooler reads 14 °C</div><span class="arrow">→</span>
+    <div class="card">Profile: romaine must move, apples stay</div><span class="arrow">→</span>
+    <div class="card">Directory: find food banks with cold space</div><span class="arrow">→</span>
+    <div class="card">Reason card for every candidate</div><span class="arrow">→</span>
+    <div class="card">New version, fresh approvals, new texts</div>
+  </div>
+  <div class="quote">"Rural food bank: has cold space for only 50 lb of the 200 lb, 40 minutes away, but its pickup hours don't overlap households' pickup time, 6 pm to 8 pm. Not chosen."</div>
+  <div class="quote">"Eastside food bank: has cold space for only 150 lb of the 200 lb, 15 minutes away, households can collect 6 pm to 8 pm. Chosen."</div>
+  <p class="small"><span class="label">Recorded</span> Reason cards from the synthetic cooler-failure scenario. Old approvals don't carry over: the city and eastside managers must approve the new version.</p>
+</section>
+
+<section class="slide" aria-label="Moment 6: the household text">
+  <h2>6 &nbsp;The household hears back <span class="tag ev">Evidence</span></h2>
+  <ul>
+    <li>A text names the food bank, the pickup window, the items and pounds, and the household's code.</li>
+    <li>Pounds come from the portion calculator, up to the fair share. Never guessed by an AI.</li>
+    <li>"Can't make it" releases the portion to the next household furthest below its fair share.</li>
+    <li>If the cooler change moves a pickup to a food bank the household didn't choose, it can accept or decline.</li>
+    <li>A household counts as reached only when it confirms pickup.</li>
+  </ul>
+  <p class="small">Texts are in the household's language. Spanish produce names come from the reviewed produce profiles.</p>
+</section>
+
+<section class="slide" aria-label="Moment 7: honest results">
+  <h2>7 &nbsp;Results: normal afternoon <span class="tag ev">Evidence</span></h2>
+  <div id="results-normal"></div>
+  <p class="small" id="results-normal-note"></p>
+</section>
+
+<section class="slide" aria-label="Results in all five scenarios">
+  <h2>Results in all five scenarios</h2>
+  <div id="results-all"></div>
+  <p class="small">Report whatever the numbers show. Here, rules-based negotiation is not better everywhere: with more households than produce it reaches more households but has lower worst-served coverage than first-come-first-served.</p>
+</section>
+
+<section class="slide" aria-label="When to stop">
+  <h2>When to stop, keep the disagreement, or ask a human</h2>
+  <table>
+    <tr><th>Rule</th><th>What happens</th></tr>
+    <tr><td>Agreement</td><td>Every named organization approves the same version, so it becomes a commitment.</td></tr>
+    <tr><td>Ask a human</td><td>Any condition doubt, or any change to a committed plan.</td></tr>
+    <tr><td>Keep the disagreement</td><td>3 rounds with no new terms. Dashboards show the options and each side's reason.</td></tr>
+    <tr><td>Deadline</td><td>No commitment by the donor's deadline: the produce is unclaimed, with reasons. Nothing commits on its own.</td></tr>
+  </table>
+  <p class="small">In the shipped cooler-failure scenario the eastside manager answers only when the planned trip is due, so the core refuses the late answer and the romaine waits for a human. That is reported as is.</p>
+</section>
+
+<section class="slide" aria-label="Architecture and sponsors">
+  <h2>Architecture and sponsors: none of them decides</h2>
+  <div class="grid g3">
+    <div class="card"><h3>Cisco AGNTCY</h3><p>A2A messages in the negotiation room. Directory finds food banks by capability.</p></div>
+    <div class="card"><h3>Claude</h3><p>Negotiators, the advocate, and the front-desk assistant. Calculators supply every number.</p></div>
+    <div class="card"><h3>ElevenLabs</h3><p>The voice line, with English and Spanish read-back.</p></div>
+    <div class="card"><h3>n8n</h3><p>Text alerts, approval requests, and the "Can't make it" reply.</p></div>
+    <div class="card"><h3>Beeceptor</h3><p>Mock inventory, storage, cooler status, and truck schedules, with a cooler switch.</p></div>
+    <div class="card"><h3>AWS</h3><p>Hosting for the agents, the API, and the web pages.</p></div>
+  </div>
+  <p class="small">Fallbacks if a sponsor is down: recorded readings for Beeceptor, the text form for voice, local approval links for n8n, in-process messages for AGNTCY, and a recorded replay.</p>
+</section>
+
+<section class="slide" aria-label="Level mapping">
+  <h2>How HarvestNet meets each level</h2>
+  <table>
+    <tr><th>Level</th><th>Evidence</th></tr>
+    <tr><td><span class="tag l1">Level 1</span></td><td>Specialists inside each agent (demand, storage, hours, truck, condition, fair-share gap) feed its negotiator.</td></tr>
+    <tr><td><span class="tag l2">Level 2</span></td><td>A cooler fails. Directory rediscovery of food banks with cold space, a reason card for every candidate. The produce profile decides what must move.</td></tr>
+    <tr><td><span class="tag l3">Level 3</span></td><td>Donor and food bank agents with competing goals negotiate one item-by-item draft with no central decider. The advocate argues from fair-share gaps. Compared with first-come-first-served. Clear stop rules.</td></tr>
+  </table>
+</section>
+
+<section class="slide" aria-label="Closing">
+  <h1>HarvestNet</h1>
+  <p class="big">Every organization keeps its own keys. The food still moves.</p>
+  <ul>
+    <li>Agents disagree for real, and the disagreement stays visible.</li>
+    <li>Humans approve their own commitments. Nothing is committed automatically.</li>
+    <li>Every number comes from a calculator, and every result says how it was made.</li>
+  </ul>
+  <p class="small">Design: docs/MVP_DESIGN.md · Decisions: docs/adr/ · Rules: docs/CHALLENGE.md</p>
+</section>
+
+<div class="foot"><span>HarvestNet · synthetic demo data</span><span id="counter"></span></div>
+</main>
+
+<script type="application/json" id="harvestnet-results">
+{
+  "source": "python -m harvestnet_core evaluate core_fixtures/*.json",
+  "run_mode": "synthetic",
+  "note": "Calculated from labeled scripted fixtures with 8 scripted households each. Produce wasted counts produce not collected by the scenario end; it is not observed spoilage. Worst-served coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM negotiators were not run.",
+  "scenarios": [
+    {"scenario_id": "normal-afternoon", "run_mode": "synthetic", "synthetic": true, "methods": [
+      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 877.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 3, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+    {"scenario_id": "more-produce-than-storage", "run_mode": "synthetic", "synthetic": true, "methods": [
+      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 882.6666666666666, "worst_served_coverage": 0.3148809523809524, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+    {"scenario_id": "more-households-than-produce", "run_mode": "synthetic", "synthetic": true, "methods": [
+      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 32.0, "worst_served_coverage": 0.3208333333333333, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+    {"scenario_id": "cooler-failure", "run_mode": "synthetic", "synthetic": true, "methods": [
+      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 896.0, "worst_served_coverage": 0.05, "households_reached": 1, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+    {"scenario_id": "condition-doubt", "run_mode": "synthetic", "synthetic": true, "methods": [
+      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]}
+  ]
+}
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var data = JSON.parse(document.getElementById('harvestnet-results').textContent);
+  var METHOD = { first_come_first_served: 'First-come-first-served', nearest_food_bank: 'Nearest food bank',
+                 rules_based: 'Rules-based negotiators', llm: 'LLM negotiators' };
+  var SCENARIO = { 'normal-afternoon': 'Normal afternoon', 'more-produce-than-storage': 'More produce than storage',
+                   'more-households-than-produce': 'More households than produce', 'cooler-failure': 'Cooler fails',
+                   'condition-doubt': 'Condition doubt' };
+  // Display formatting only: coverage is a share (0.55), shown as a percent with one decimal.
+  function pct(v) { return v === null ? null : (Math.round(v * 1000) / 10) + '%'; }
+  function lb(v) { return v === null ? null : (Math.round(v * 10) / 10) + ' lb'; }
+  function cell(v) { return v === null ? '<td class="num small">not run</td>' : '<td class="num">' + v + '</td>'; }
+  function label(s) { return s.synthetic ? '<span class="label">Synthetic</span>' : '<span class="label">' + s.run_mode + '</span>'; }
+
+  var normal = data.scenarios.filter(function (s) { return s.scenario_id === 'normal-afternoon'; })[0];
+  var rows = normal.methods.map(function (m) {
+    return '<tr><td>' + METHOD[m.method] + (m.status === 'not_run' ? ' <span class="label">Not run</span>' : '') + '</td>' +
+      cell(lb(m.produce_wasted_lb)) + cell(pct(m.worst_served_coverage)) + cell(m.households_reached) + cell(m.invalid_commitments) + '</tr>';
+  }).join('');
+  document.getElementById('results-normal').innerHTML = '<p>' + label(normal) + ' 900 lb offered, 8 scripted households.</p>' +
+    '<table style="font-size:.66em"><tr><th>Method</th><th>Produce not collected</th><th>Worst-served coverage</th><th>Households reached</th><th>Invalid commitments</th></tr>' + rows + '</table>';
+  document.getElementById('results-normal-note').textContent = 'Not collected = produce not picked up by the scenario end, not observed spoilage. ' +
+    'Worst-served coverage = the lowest food bank average of its households’ share of fair share received. Source: ' + data.source + '.';
+
+  // One row per scenario: first-come-first-served (the baseline) next to rules-based negotiators.
+  function pick(s, method) { return s.methods.filter(function (m) { return m.method === method; })[0]; }
+  function pair(a, b, f) { return '<td class="num">' + f(a) + ' → ' + f(b) + '</td>'; }
+  var all = '<table style="font-size:.62em"><tr><th>Scenario</th><th>Not collected</th><th>Worst-served coverage</th><th>Households reached</th></tr>';
+  data.scenarios.forEach(function (s) {
+    var a = pick(s, 'first_come_first_served'), b = pick(s, 'rules_based');
+    all += '<tr><td>' + SCENARIO[s.scenario_id] + '</td>' +
+      pair(a.produce_wasted_lb, b.produce_wasted_lb, lb) + pair(a.worst_served_coverage, b.worst_served_coverage, pct) +
+      pair(a.households_reached, b.households_reached, String) + '</tr>';
+  });
+  all += '</table><p class="small"><span class="label">Synthetic</span> Each cell: first-come-first-served → rules-based negotiators. ' +
+    'Nearest food bank is on the previous slide and the results strip. LLM negotiators: not run in any scenario.</p>';
+  document.getElementById('results-all').innerHTML = all;
+
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var counter = document.getElementById('counter');
+  var index = 0;
+  function show(i) {
+    index = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, n) { s.classList.toggle('active', n === index); });
+    counter.textContent = (index + 1) + ' / ' + slides.length;
+    if (location.hash !== '#' + (index + 1)) history.replaceState(null, '', '#' + (index + 1));
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') { show(index + 1); e.preventDefault(); }
+    else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') { show(index - 1); e.preventDefault(); }
+    else if (k === 'Home') { show(0); e.preventDefault(); }
+    else if (k === 'End') { show(slides.length - 1); e.preventDefault(); }
+    else if (k === 't' || k === 'T') {
+      var root = document.documentElement;
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+  });
+  document.getElementById('deck').addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    show(e.clientX < window.innerWidth / 3 ? index - 1 : index + 1);
+  });
+  var start = parseInt((location.hash || '').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>

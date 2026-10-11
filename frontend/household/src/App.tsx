@@ -73,7 +73,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.lang = lang;
-    document.title = lang === 'es' ? 'HarvestNet · Tu hogar' : 'HarvestNet · Your household';
+    document.title = lang === 'es' ? 'HarvestNet · Su hogar' : 'HarvestNet · Your household';
   }, [lang]);
 
   useEffect(() => {

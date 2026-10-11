@@ -116,13 +116,17 @@ when the call is in Spanish.
 | English | Spanish |
 |---|---|
 | If you'd like, you can tell me whether you receive CalFresh, or skip this question. | Si quiere, puede decirme si recibe CalFresh, o saltar esta pregunta. |
-| Your household's fresh produce share is [fair_share_lb] pounds a week. | La porción de productos frescos de su hogar es de [fair_share_lb] libras por semana. |
+| Your household's fresh produce share is [fair_share_lb] pounds a week. | La porción de frutas y verduras frescas de su hogar es de [fair_share_lb] libras por semana. |
 | Which of these food banks can you get to? You can choose more than one. | ¿A cuáles de estos bancos de alimentos puede llegar? Puede elegir más de uno. |
 | You're on the list for … | Ya está en la lista de … |
 | Your code is … Again: … | Su código es … Otra vez: … |
-| Show this code at the food bank when you pick up. When produce is ready at a food bank you chose, the food bank will tell you. You can also call back and give me your code. | Muestre este código en el banco de alimentos cuando recoja. Cuando haya productos listos en un banco de alimentos que eligió, el banco de alimentos le avisará. También puede volver a llamar y darme su código. |
-| Nothing was saved. | No se guardó nada. |
+| Show this code at the food bank when you pick up. When produce is ready at a food bank you chose, the food bank will tell you. You can also call back and give me your code. | Muestre este código en el banco de alimentos cuando recoja. Cuando haya frutas y verduras listas en un banco de alimentos que eligió, el banco de alimentos le avisará. También puede volver a llamar y darme su código. |
+| Thank you. Nothing was saved. | Gracias. No se guardó nada. |
+| Nothing is ready there yet. | Todavía no hay nada listo ahí. |
+| You're still on the list. The food bank will tell you when produce is ready. | Todavía está en la lista. El banco de alimentos le avisará cuando haya frutas y verduras listas. |
 | Sorry, I can't reach the HarvestNet system right now. Please try again in a little while, or use the HarvestNet web page. | Lo siento, no puedo conectarme con el sistema de HarvestNet ahora. Por favor intente más tarde, o use la página web de HarvestNet. |
 | Please wash the produce before eating. | Por favor lave los productos antes de comerlos. |
 
-The frontend person should review the Spanish wording (ticket #6, wording and translations).
+Ticket #6 reviewed this wording for plain English and for Spanish that matches the web page and
+the API's sentences ("usted", "porción", "frutas y verduras"). A native speaker still needs to
+check it; see `docs/demo/WORDING_REVIEW.md`.
