@@ -71,6 +71,18 @@ def cooler_failure_report(run):
             "held_for_human_lb":sum(f.get('held_for_human_lb',0) for f in faults)}
 
 
+def collected_before_spoiling(run, records, collected):
+    """Pickup-window match (design section 16): the share of collected pounds whose recorded
+    confirmation came before the item's usable time. ``None`` when nothing was collected."""
+    total=sum(p['pounds'] for p in collected)
+    if not total:
+        return None
+    confirmed={e['data']['pickup_id']:dt(e['at']) for e in run['events'] if e['kind']=='pickup_confirmation'}
+    usable={(lot['draft']['lot_id'],i['produce_id']):dt(i['usable_until']) for lot in records.all('lot') for i in lot['draft']['items']}
+    ok=sum(p['pounds'] for p in collected if p['pickup_id'] in confirmed and all(confirmed[p['pickup_id']]<usable[(p['lot_id'],i['produce_id'])] for i in p['items']))
+    return ok/total
+
+
 def metrics(fixture, run, records):
     requests=records.all('request')
     collected=[p for p in records.all('pickup') if p['status']=='collected']
@@ -81,7 +93,7 @@ def metrics(fixture, run, records):
     start=min((dt(o['reported_at']) for o in fixture['surplus_offers']),default=dt(fixture['clock']['start']))
     checks=run['rule_checks']
     coverage=coverage_by_food_bank(fixture,requests)
-    result={"produce_wasted_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":sum(bool(p['window']) for p in collected)/len(collected) if collected else 0,"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
+    result={"produce_wasted_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
     if fixture.get('faults'):
         result['cooler_failure']=cooler_failure_report(run)
     return result

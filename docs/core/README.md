@@ -115,7 +115,11 @@ only the pounds, items and food bank; the request code and the household's picku
 window are removed (design section 12). Names, addresses and income are refused.
 
 `GET /` lists every operation (the agreed contract plus the three additive,
-proposed routes), with `contract_version`. A missing body field, an unknown
+proposed routes), with `contract_version`. A contract test calls all 20 agreed
+operations for real and checks each status and field against its example, one
+level into nested objects and list items (`core_tests/test_followups.py`).
+`get_lot` items carry `split` (food bank, pounds, mover), `unclaimed_lb` once the
+lot is settled, and `households_reached`. A missing body field, an unknown
 `produce_id` or another bad input returns the contract's 400; only unknown
 records return 404.
 
@@ -162,7 +166,9 @@ first commitment, invalid commitments and counted number failures.
 **Worst-served coverage** follows design section 16: for each food bank, the
 average over the households that chose it of each household's share of fair share
 received (capped at 1, zeros included), then the lowest of those averages.
-`coverage_by_food_bank` shows each average. A household that chose several food
+`coverage_by_food_bank` shows each average. **Pickup-window match** is the share
+of collected pounds whose recorded confirmation came before the item's usable
+time (`null` when nothing was collected). A household that chose several food
 banks counts in each. The old value took the single lowest household and was 0.0
 in every run; it now differs across scenarios and methods.
 

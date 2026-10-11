@@ -196,6 +196,84 @@ class PublicAPITests(unittest.TestCase):
         self.assertEqual(created['items'][0]['usable_until_basis']['kind'], 'donor_condition_check')
 
 
+def example(operation):
+    return json.loads(Path(f'docs/contracts/examples/public-api/{operation}.json').read_text())
+
+
+class EveryOperationShapeTests(unittest.TestCase):
+    """#9: every agreed operation, called for real, answers with the example's status and fields."""
+
+    def check(self, operation, status, body):
+        response = example(operation)['example']['response']
+        self.assertEqual(status, response['status'], (operation, body))
+        self.assertNotEqual(body['mode'], 'example')
+        self.assertTrue(set(response['body']) <= set(body), (operation, set(response['body']) - set(body)))
+        for key, value in response['body'].items():
+            # One level down too: the first item of each list, and each nested object.
+            if isinstance(value, list) and value and isinstance(value[0], dict) and body[key]:
+                self.assertTrue(set(value[0]) <= set(body[key][0]), (operation, key, set(value[0]) - set(body[key][0])))
+            if isinstance(value, dict) and isinstance(body[key], dict):
+                self.assertTrue(set(value) <= set(body[key]), (operation, key, set(value) - set(body[key])))
+        return body
+
+    def test_every_operation_matches_its_example(self):
+        from harvestnet_core.live_evaluation import publish_evaluation
+        from harvestnet_core.protocol import terms_hash
+        f = fixture()
+        f['household_replies'] = []
+        engine = Engine(f)
+        clock = {'now': NOW}
+        data = json.loads(Path('agents/tests/fixtures/front_desk/en_complete.json').read_text())
+        api = API(engine, clock=lambda: clock['now'], staff_tokens=TOKENS, extractor=lambda t: data['extractor_output'])
+        call = lambda op, target, body=None, token=None: self.check(op, *api.call(example(op)['method'], target, body, token))
+        done = set()
+
+        def run(op, target, body=None, token=None):
+            done.add(op)
+            return call(op, target, body, token)
+        form = {k: f['requests'][0][k] for k in ('household_size', 'pickup_windows', 'limited_fridge', 'neighborhood', 'cant_eat', 'snap', 'language')}
+        run('get_health', '/health')
+        run('get_fair_share', '/fair-share?household_size=4&language=en')
+        run('preview_request', '/requests/preview', form)
+        code = run('create_request', '/requests', {**form, 'household_size': 3, 'consent': True, 'channel': 'web', 'phone': '+15555550142'})['request_code']
+        run('list_food_banks', '/food-banks?request_code=' + code)
+        run('choose_food_banks', f'/requests/{code}/food-banks', {'food_bank_ids': ['city']})
+        run('list_produce_profiles', '/produce-profiles')
+        run('voice_intake', '/voice-intake', {'transcript': data['transcript'], 'call_id': 'recorded'})
+        lot_id = run('create_surplus_offer', '/surplus-offers', copy.deepcopy(f['surplus_offers'][0]), 'donor-test')['lot_id']
+        run('get_lot', '/lots/' + lot_id)
+        run('list_lot_versions', f'/lots/{lot_id}/versions')
+        run('list_approvals', '/approvals?organization_id=city', None, 'city-test')
+        d = engine.records.get('lot', lot_id)['draft']
+        for owner, token in (('market', 'donor-test'), ('city', 'city-test')):
+            run('record_approval', '/approvals', {'lot_id': lot_id, 'version': d['version'], 'organization_id': owner,
+                                                  'terms_hash': terms_hash(d), 'decision': 'approve', 'receipt_id': 'shape-' + owner}, token)
+        pickups = [p for p in engine.records.all('pickup') if p['status'] == 'committed']
+        self.assertTrue(pickups)
+        first = pickups[0]
+        run('get_request', '/requests/' + first['request_code'])
+        run('get_food_bank_dashboard', '/food-banks/city/dashboard', None, 'city-test')
+        clock['now'] = first['window']['start']
+        run('confirm_pickup', '/pickup-confirmations', {'food_bank_id': 'city', 'request_code': first['request_code']}, 'city-test')
+        status = example('update_food_bank_status')['example']['request']['body']
+        run('update_food_bank_status', '/food-banks/city/status', status, 'city-test')
+        clock['now'] = NOW
+        second = run('create_surplus_offer', '/surplus-offers', copy.deepcopy(f['surplus_offers'][0]), 'donor-test')['lot_id']
+        v = engine.records.get('lot', second)['draft']['version']
+        run('submit_counter', f'/lots/{second}/counters', {'organization_id': 'city', 'version': v, 'reason': 'Owner asks for less',
+                                                          'amendment': {'kind': 'set_pounds', 'produce_id': 'apples', 'food_bank_id': 'city', 'pounds': 2}}, 'city-test')
+        publish_evaluation(f, engine.records)
+        run('get_results', '/results?scenario_id=' + f['scenario_id'])
+        # Release, on a separate run that leaves a pickup open.
+        records = Records()
+        run_fixture(fixture() | {'household_replies': []}, records=records)
+        other = API(Engine(fixture(), records), clock=lambda: '2026-10-13T18:00:00-07:00')
+        p = records.all('pickup')[0]
+        done.add('release_pickup')
+        self.check('release_pickup', *other.call('POST', f"/pickups/{p['pickup_id']}/release", {'request_code': p['request_code']}))
+        self.assertEqual(done, {p.stem for p in Path('docs/contracts/examples/public-api').glob('*.json')})
+
+
 class LaneCApprovalPayloadTests(unittest.TestCase):
     """The approval relay works with Lane C's old payload and its new agreed one."""
 
@@ -271,6 +349,20 @@ class WorstServedTests(unittest.TestCase):
         m = metrics(f, {'events': [], 'rule_checks': {}}, records)
         self.assertEqual(m['worst_served_coverage'], 0.25)  # b averages 0.25; a averages 0.5 despite one household at 0
         self.assertEqual(m['coverage_by_food_bank'], {'a': 0.5, 'b': 0.25})
+
+    def test_pickup_window_match_counts_pounds_collected_before_the_usable_time(self):
+        f = {'food_banks': [{'organization_id': 'a'}], 'surplus_offers': [], 'clock': {'start': NOW}}
+        records = Records()
+        lot = {'draft': {'lot_id': 'L', 'items': [{'produce_id': 'romaine', 'pounds': 4, 'usable_until': '2026-10-14T12:00:00-07:00'}]}}
+        with records.transaction():
+            records.put('lot', 'L', lot)
+            for pid, lb in (('early', 3), ('late', 1)):
+                records.put('pickup', pid, {'pickup_id': pid, 'lot_id': 'L', 'status': 'collected', 'pounds': lb, 'request_code': pid,
+                                            'items': [{'produce_id': 'romaine', 'pounds': lb}], 'window': {}})
+        events = [{'kind': 'pickup_confirmation', 'at': '2026-10-13T18:00:00-07:00', 'data': {'pickup_id': 'early'}},
+                  {'kind': 'pickup_confirmation', 'at': '2026-10-14T18:00:00-07:00', 'data': {'pickup_id': 'late'}}]
+        self.assertEqual(metrics(f, {'events': events, 'rule_checks': {}}, records)['pickup_window_match'], 0.75)
+        self.assertIsNone(metrics(f, {'events': [], 'rule_checks': {}}, Records())['pickup_window_match'])
 
     def test_metric_differs_between_scenarios_and_methods(self):
         values = set()

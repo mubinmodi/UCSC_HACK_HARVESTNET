@@ -177,6 +177,18 @@ class API:
                "note":"The profile's general minimum life, counted from the report time; not this lot's own condition. A condition check overrides it."}
         return (dt(self.engine.now)+timedelta(days=days.min)).isoformat(),basis
 
+    def lot_item(self, lot, item):
+        """One item of ``get_lot``: its split, unclaimed pounds once the lot is settled, and reach."""
+        d,pid=lot['draft'],item['produce_id']
+        movers={t['food_bank_id']:t['mover'] for t in d['transports']}
+        split=[{"food_bank_id":a['food_bank_id'],"pounds":a['pounds'],"mover":movers.get(a['food_bank_id'])} for a in d['allocations'] if a['produce_id']==pid and a['pounds']>0]
+        committed=sum(a['pounds'] for a in lot['commitments'] if a['produce_id']==pid)
+        settled=lot['status'] in ('committed','unclaimed','preserved_disagreement')
+        reached={p['request_code'] for p in self.records.all('pickup') if p['lot_id']==d['lot_id'] and p['status']=='collected' and any(x['produce_id']==pid for x in p['items'])}
+        return {**item,"name":self.engine.calc.profiles.get(pid).name,"status":lot['status'],"split":split,
+                "unclaimed_lb":max(0.0,item['pounds']-committed) if settled else 0,"households_reached":len(reached),
+                "usable_until_basis":lot.get('usable_until_basis',{}).get(pid)}
+
     def release(self, pid, code):
         with self.records.transaction():
             p=self.records.get("pickup",pid)
@@ -331,7 +343,7 @@ class API:
         if root=='lots' and len(path)>=2:
             lot=self.records.get('lot',path[1]); d=lot['draft']
             if method=='GET' and len(path)==2:
-                return 200,{"lot_id":path[1],"donor_id":d['donor_id'],"status":lot['status'],"current_version":d['version'],"deadline":d['deadline'],"items":[{**i,"name":calc.profiles.get(i['produce_id']).name,"status":lot['status'],"usable_until_basis":lot.get('usable_until_basis',{}).get(i['produce_id'])} for i in d['items']],"draft":d,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[o for o in named(d) if lot['approvals'].get(o,{}).get('decision')!='approve'],"disagreement":lot.get('stop_reason')}
+                return 200,{"lot_id":path[1],"donor_id":d['donor_id'],"status":lot['status'],"current_version":d['version'],"deadline":d['deadline'],"items":[self.lot_item(lot,i) for i in d['items']],"draft":d,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[o for o in named(d) if lot['approvals'].get(o,{}).get('decision')!='approve'],"disagreement":lot.get('stop_reason')}
             if method=='GET' and path[2:]==['versions']:
                 return 200,{"lot_id":path[1],"versions":[{"version":v['version'],"proposer_id":v['proposer_id'],"move":"counter" if v['version']>1 else "offer","reason":v['reason'],"change":next((e['data']['amendment'] for e in self.records.events(path[1]) if e['kind']=='amendment' and e['data']['draft']['version']==v['version']),None)} for v in lot['versions']],"current_version":d['version']}
             if method=='POST' and path[2:]==['counters']:
