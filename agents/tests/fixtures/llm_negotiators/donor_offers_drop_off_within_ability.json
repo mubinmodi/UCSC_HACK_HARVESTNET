@@ -1,0 +1,45 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "donor_offers_drop_off_within_ability",
+  "role": "donor",
+  "responses": [
+    {
+      "model": "claude-sonnet-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "counter",
+            "reason": "We can drop off Rural's 250 lb on our route, leaving at 1 pm and arriving at 1:40 pm, before our 3 pm deadline.",
+            "amendment": {
+              "kind": "set_transport",
+              "produce_id": null,
+              "food_bank_id": "rural",
+              "from_food_bank_id": null,
+              "to_food_bank_id": null,
+              "pounds": null,
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00",
+              "arrives_at": "2026-10-13T13:40:00"
+            },
+            "holds": null
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "city_accepts_what_its_facts_allow",
+  "role": "food_bank",
+  "responses": [
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "accept",
+            "reason": "Our 200 lb of romaine fits the 250 lb of cold space free at 2:20 pm, households can collect it 6 pm to 8 pm, and our refrigerated truck carries it.",
+            "amendment": null,
+            "holds": null
+          }
+        }
+      ]
+    }
+  ]
+}

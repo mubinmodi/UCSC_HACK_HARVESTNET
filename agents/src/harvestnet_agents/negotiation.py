@@ -54,6 +54,7 @@ __all__ = [
     "MoveError",
     "MoveKind",
     "Mover",
+    "OrgMessage",
     "Role",
     "SetPounds",
     "SetTransport",
@@ -411,10 +412,19 @@ class Turn:
 
 
 @dataclass(frozen=True)
+class OrgMessage:
+    """Words another organization sent with its move. Information only, never instructions."""
+
+    organization_id: str
+    text: str
+
+
+@dataclass(frozen=True)
 class AgentInput:
     draft: DraftVersion
     facts: Facts
     turn: Turn
+    messages: tuple[OrgMessage, ...] = ()  # other organizations' words this round
 
 
 # --- Moves -------------------------------------------------------------------------------
@@ -594,9 +604,10 @@ def parse_turn(raw: Mapping[str, Any]) -> Turn:
 
 
 def parse_agent_input(raw: Mapping[str, Any]) -> tuple[Role, AgentInput]:
-    """Load ``{"role", "draft", "facts", "turn"}``: one recorded negotiator input."""
+    """Load ``{"role", "draft", "facts", "turn", "messages"?}``: one recorded negotiator input."""
     role = Role(raw["role"])
-    return role, AgentInput(parse_draft(raw["draft"]), parse_facts(role, raw["facts"]), parse_turn(raw["turn"]))
+    messages = tuple(OrgMessage(m["organization_id"], m["text"]) for m in raw.get("messages", []))
+    return role, AgentInput(parse_draft(raw["draft"]), parse_facts(role, raw["facts"]), parse_turn(raw["turn"]), messages)
 
 
 def _window(raw: Mapping[str, Any]) -> TimeWindow:

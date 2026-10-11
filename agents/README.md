@@ -6,7 +6,7 @@ Python package `harvestnet_agents` for Lane B tickets (#11–#15). Interfaces ar
 cd agents
 uv run pytest              # all tests
 uv run pytest tests/test_profiles.py::test_name   # one test
-uv sync --extra claude     # only for the live ClaudeExtractor in front_desk.py (needs an API key)
+uv sync --extra claude     # only for live Claude calls: ClaudeExtractor (front_desk.py) and LLMNegotiator (needs an API key)
 ```
 
 ## Module map
@@ -17,4 +17,5 @@ uv sync --extra claude     # only for the live ClaudeExtractor in front_desk.py 
 - `negotiation.py`: the **proposed** agent move interface (#11). A negotiator gets an `AgentInput` (a `DraftVersion`, its own specialists' facts, and its `Turn`) and returns one `Move`: accept, counter with one amendment (`SetPounds`, `ShiftPounds`, or `SetTransport`), reject, request a hold on its own resources, ask its human, or pass. `Move` refuses an advocate accept, reject, hold, or ask-a-human, a counter without exactly one amendment, and any move without a reason; no move ever commits. `Move.to_dict()` matches Lane C's proposed wire shape. `parse_agent_input()` loads recorded inputs.
 - `calculators.py`: the **proposed** calculator interface (`Calculators`) and `StandInCalculators`, stand-ins until Lane A's (#8): fair-share gap, gap after a plan, storage over time, capacity fit, pickup-window feasibility, arrival time, and unit conversion. Every call is logged.
 - `rules_negotiators.py`: rules-based donor, food bank, and advocate negotiators (#11). `rules_negotiator(role, organization_id)` builds one. Tests replay the recorded inputs in `tests/fixtures/negotiators/`.
+- `llm_negotiators.py`: Claude negotiators with calculator tools (#13), behind the same `move()` interface. Calculators run first; the model calls strict calculator tools for anything extra and submits one move through a strict `submit_move` tool. Deterministic code then checks it: every number in the move must trace to the inputs or a calculator result, the reason can contain no arithmetic, and accept or hold is allowed only when the organization's own checks pass. Other organizations' words are wrapped as information. After two failed checks, a refusal, or the spending cap, it sends the rules-based move. The model per role, effort, and run cap come from `data/llm_config.json`. `SpendingCap` reserves each call's worst-case cost before calling and logs the actual cost. Tests replay recorded responses from `tests/fixtures/llm_negotiators/` and never call the API.
 - `front_desk.py`: front-desk assistant (#14). Claude only extracts fields from a transcript; deterministic code checks them against the household's own words, marks missing fields, and builds the read-back, consent, and pickup wording (committed produce only), in English and Spanish. Tests replay recorded extractor outputs from `tests/fixtures/front_desk/` and never call the API.

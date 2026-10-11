@@ -80,6 +80,12 @@ def test_to_pounds_converts_through_produce_profiles():
         calc.to_pounds("apples", 10, "case")  # no pack weight: never guessed
 
 
+def test_adjust_pounds_changes_a_share_and_never_goes_below_zero():
+    assert calc.adjust_pounds(200, -50) == 150
+    assert calc.adjust_pounds(60, 300) == 360
+    assert calc.adjust_pounds(40, -100) == 0
+
+
 def test_every_call_is_logged_with_inputs_and_result():
     c = StandInCalculators()
     c.gap_after_plan(310, 250)
