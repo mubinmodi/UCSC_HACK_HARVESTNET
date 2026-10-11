@@ -14,6 +14,7 @@ Example: [`examples/scenario-normal-afternoon.json`](examples/scenario-normal-af
 | `contract_version` | `"contract-v0.1"`. |
 | `synthetic` | `true` for any made-up scenario. Recorded live data would say `false` and give its source. |
 | `scenario_id`, `title` | Short ID and a plain name. |
+| `note` | A plain sentence saying what's synthetic or where the data came from. |
 | `mode` | `synthetic`, `replay`, or `live`. Results carry it forward, so judges know what they're seeing. |
 | `timezone` | The region's time zone. Every timestamp still carries its own offset. |
 | `clock` | `start` and `end` of the scripted day. The harness owns the clock; no agent reads the wall clock. |

@@ -9,7 +9,7 @@ Every operation has one example file in [`examples/public-api/`](examples/public
 ## How to call it
 
 - JSON in and out, UTF-8. Send `Content-Type: application/json` with a body.
-- Base address: the skeleton runs at `http://127.0.0.1:8040` locally. The AWS address is added here once it's deployed.
+- Base address: run the skeleton locally with `cd api_skeleton && uv run python -m harvestnet_api_skeleton.server`, then call `http://127.0.0.1:8040`. The AWS Lambda address is added here once it's deployed ([`api_skeleton/DEPLOY.md`](../../api_skeleton/DEPLOY.md)).
 - Browsers can call it from any origin during development (CORS is open).
 - Every response says `"mode"`: `example` from the skeleton, then `live`, `replay`, or `synthetic` from real logic. Example responses also say `"synthetic": true`.
 - Errors look like `{"error": {"code": "not_found", "message": "..."}}`, with status 400 (bad input), 404 (unknown route or record), 409 (stale version), or 503 (try again).
@@ -40,6 +40,10 @@ Every operation has one example file in [`examples/public-api/`](examples/public
 | `list_approvals` | GET | `/approvals` | Dashboards, donor page, n8n |
 | `record_approval` | POST | `/approvals` | Dashboards, donor page, n8n approval bridge |
 | `get_results` | GET | `/results` | Results strip |
+
+## System
+
+- **`get_health`**: is the API up, and which contract version does it serve? `GET /` also lists every operation. [Example](examples/public-api/get_health.json)
 
 ## Households
 
