@@ -125,6 +125,23 @@ front-desk extractor now read their cap from `CLAUDE_RUN_CAP_USD` (default 0).
 
 ## Resume work
 
+### n8n Cloud draft refresh (October 11, 2026)
+
+The four existing application workflows were updated in place from the merged
+email workflow definitions after the team's email decision. Their IDs above are
+unchanged. The three notification workflows now use email; the fourth relays
+explicit human decisions. All four remain inactive and unpublished. The manual
+Beeceptor check was left unchanged, and no message or workflow execution was
+triggered. Previous workflow snapshots are backed up only in ignored local
+`runtime/n8n-before-email-update/`.
+
+n8n rejects the generated `CONFIGURE_IN_N8N` credential IDs as inaccessible.
+Those placeholder references were omitted from the cloud drafts; authentication
+requirements remain in the nodes. Bind the incoming header credential, platform
+event credential and SES SMTP credential before publication. Set the platform
+URL and sender variables, verify the SES sender/recipient requirements, and
+perform an authorized end-to-end check. Saving drafts does not verify delivery.
+
 1. Fetch latest remote branches and inspect #1/#20 for actual adapter exports.
 2. Use the module interfaces in `JOIN.md`; integrate without rewriting teammate
    policies or core rules. Test the same deterministic fixture in both transports.
