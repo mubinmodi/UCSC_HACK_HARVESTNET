@@ -2064,7 +2064,10 @@
     }
   ],
   "metrics": {
-    "produce_wasted_lb": 869.0,
+    "collected_by_households_lb": 31.0,
+    "committed_to_food_banks_lb": 869.0,
+    "produce_wasted_lb": 0.0,
+    "uncollected_by_scenario_households_lb": 869.0,
     "worst_served_coverage": 0.55,
     "coverage_by_food_bank": {
       "city": 0.55,
@@ -2097,12 +2100,15 @@
         "fixture": "core_fixtures/normal-afternoon.json",
         "run_mode": "synthetic",
         "synthetic": true,
-        "note": "Calculated from labeled scripted fixtures. produce_wasted_lb counts produce not collected by the scenario end; it is not observed spoilage. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
+        "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
         "methods": [
           {
             "method": "first_come_first_served",
             "status": "completed",
-            "produce_wasted_lb": 877.0,
+            "collected_by_households_lb": 23.0,
+            "committed_to_food_banks_lb": 877.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 877.0,
             "worst_served_coverage": 0.4761904761904762,
             "households_reached": 3,
             "invalid_commitments": 0
@@ -2110,7 +2116,10 @@
           {
             "method": "nearest_food_bank",
             "status": "completed",
-            "produce_wasted_lb": 869.0,
+            "collected_by_households_lb": 31.0,
+            "committed_to_food_banks_lb": 869.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 869.0,
             "worst_served_coverage": 0.55,
             "households_reached": 4,
             "invalid_commitments": 0
@@ -2118,7 +2127,10 @@
           {
             "method": "rules_based",
             "status": "completed",
-            "produce_wasted_lb": 869.0,
+            "collected_by_households_lb": 31.0,
+            "committed_to_food_banks_lb": 869.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 869.0,
             "worst_served_coverage": 0.55,
             "households_reached": 4,
             "invalid_commitments": 0
@@ -2126,7 +2138,10 @@
           {
             "method": "llm",
             "status": "not_run",
+            "collected_by_households_lb": null,
+            "committed_to_food_banks_lb": null,
             "produce_wasted_lb": null,
+            "uncollected_by_scenario_households_lb": null,
             "worst_served_coverage": null,
             "households_reached": null,
             "invalid_commitments": null
@@ -2138,12 +2153,15 @@
         "fixture": "core_fixtures/cooler-failure.json",
         "run_mode": "synthetic",
         "synthetic": true,
-        "note": "Calculated from labeled scripted fixtures. produce_wasted_lb counts produce not collected by the scenario end; it is not observed spoilage. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result. The cooler failure is not known to any method before its time; Workflow 4 runs when it happens, and cooler_failure reports what it did.",
+        "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result. The cooler failure is not known to any method before its time; Workflow 4 runs when it happens, and cooler_failure reports what it did.",
         "methods": [
           {
             "method": "first_come_first_served",
             "status": "completed",
-            "produce_wasted_lb": 896.0,
+            "collected_by_households_lb": 4.0,
+            "committed_to_food_banks_lb": 696.0,
+            "produce_wasted_lb": 200.0,
+            "uncollected_by_scenario_households_lb": 896.0,
             "worst_served_coverage": 0.05,
             "households_reached": 1,
             "invalid_commitments": 0,
@@ -2170,7 +2188,10 @@
           {
             "method": "nearest_food_bank",
             "status": "completed",
-            "produce_wasted_lb": 888.0,
+            "collected_by_households_lb": 12.0,
+            "committed_to_food_banks_lb": 688.0,
+            "produce_wasted_lb": 200.0,
+            "uncollected_by_scenario_households_lb": 888.0,
             "worst_served_coverage": 0.05,
             "households_reached": 2,
             "invalid_commitments": 0,
@@ -2197,7 +2218,10 @@
           {
             "method": "rules_based",
             "status": "completed",
-            "produce_wasted_lb": 888.0,
+            "collected_by_households_lb": 12.0,
+            "committed_to_food_banks_lb": 688.0,
+            "produce_wasted_lb": 200.0,
+            "uncollected_by_scenario_households_lb": 888.0,
             "worst_served_coverage": 0.05,
             "households_reached": 2,
             "invalid_commitments": 0,
@@ -2224,7 +2248,10 @@
           {
             "method": "llm",
             "status": "not_run",
+            "collected_by_households_lb": null,
+            "committed_to_food_banks_lb": null,
             "produce_wasted_lb": null,
+            "uncollected_by_scenario_households_lb": null,
             "worst_served_coverage": null,
             "households_reached": null,
             "invalid_commitments": null

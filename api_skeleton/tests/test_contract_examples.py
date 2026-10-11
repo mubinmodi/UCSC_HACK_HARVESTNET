@@ -341,6 +341,21 @@ def test_nothing_in_the_examples_is_committed_by_an_approval_alone(api_examples)
     assert body["committed"] is False and body["awaiting_approval_from"]
 
 
+SPLIT = ("collected_by_households_lb", "committed_to_food_banks_lb", "produce_wasted_lb")
+
+
+def test_results_split_every_pound_once(api_examples):
+    """Design section 16 (October 11, 2026): collected, committed to food banks, or wasted, each pound once.
+    The earlier measure stays as uncollected_by_scenario_households_lb."""
+    results = next(e for e in api_examples if e["operation"] == "get_results")
+    for method in results["example"]["response"]["body"]["methods"]:
+        assert all(isinstance(method[k], (int, float)) and method[k] >= 0 for k in SPLIT), method
+        assert method["collected_by_households_lb"] + method["uncollected_by_scenario_households_lb"] == sum(method[k] for k in SPLIT)
+        assert method["produce_wasted_lb"] <= method["uncollected_by_scenario_households_lb"]
+    for name in SPLIT + ("uncollected_by_scenario_households_lb",):
+        assert f"`{name}`" in doc("public-api.md")
+
+
 def test_json_round_trips_without_nan():
     for path in ALL_EXAMPLE_FILES:
         json.dumps(load(path), allow_nan=False)

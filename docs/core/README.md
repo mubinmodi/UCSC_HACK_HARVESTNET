@@ -36,8 +36,14 @@ and never resets existing household balances on restart.
 The default fixture is synthetic, and responses retain that label. A real
 deployment must supply reviewed organization facts, a real clock, and a fixture
 without scripted households. Changing a label does not turn recorded facts into
-live evidence. The existing AWS address serves the example skeleton, not this
-new core. AWS remains deferred by the user; no resources were provisioned here.
+live evidence. The original Lambda address serves the example skeleton. The
+team subsequently deployed the core at `https://18-217-110-223.sslip.io/api`
+and the household, donor-dashboard and results-strip pages on the same host.
+Read-only checks on October 11 verified HTTP 200 responses for health, fair share,
+food banks, published results and all three pages. API responses remain explicitly
+synthetic. These checks do not verify browser interactions, voice calls, SMS,
+n8n publication or Directory registration. AWS work remains deferred for this
+Codex session; no resources were provisioned here.
 
 ## #7: scenario harness and records
 
@@ -160,7 +166,7 @@ opportunity by earliest household request or recorded donor travel time,
 respectively. They still use each owner's real review, resource holds and human
 approvals. The advocate makes no baseline amendments.
 
-Metrics come from run records: produce not collected by the scripted end,
+Metrics come from run records: produce wasted with its split (below),
 worst-served weekly coverage, households reached, pickup-window match, time to
 first commitment, invalid commitments and counted number failures.
 **Worst-served coverage** follows design section 16: for each food bank, the
@@ -177,9 +183,22 @@ faults, `mid_run_workflow_4`, the change statuses and any refusals, pounds and
 pickups moved or released, and pounds `held_for_human`. On the shipped cooler
 fixture every method reports the refused late answer and held cold pickups,
 because the fixture's scripted timing is what it is. Change commitments count
-toward `invalid_commitments` like first commitments. The
-`produce_wasted_lb` field currently means **not collected by scenario end**, not
-observed spoilage. This definition is stated beside each result. Replays carry
+toward `invalid_commitments` like first commitments.
+
+**Produce wasted** (design section 16, decided by the user October 11, 2026):
+`produce_split` in `evaluation.py` counts every offered pound once, as
+`collected_by_households_lb`, else `committed_to_food_banks_lb`, else
+`produce_wasted_lb`. A committed pound counts as committed only when its food
+bank's own storage hold (cold if the produce profile needs it) overlaps the food
+bank's pickup hours before the item's usable time, checked with the
+`pickup_feasibility` calculator. A failed cooler ends cold storage at the
+failure. A Workflow 4 fallback kept at the failed cooler counts only as a
+`same_day_offer`, using the profile's room-temperature life. Everything else is
+wasted: unclaimed pounds, and commitments that would spoil first. A household's
+collected pounds come out of its food bank's committed share, so nothing is
+counted twice. The old value (everything the scripted households did not collect)
+is still reported as `uncollected_by_scenario_households_lb`. None of this is
+observed spoilage, and the note beside each result says so. Replays carry
 the original moves and must reproduce commitments/pathways/checks without any
 Claude calls. Results remain whatever the run computes.
 

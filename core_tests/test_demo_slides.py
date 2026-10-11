@@ -18,7 +18,8 @@ from harvestnet_core.evaluation import evaluate
 sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
 
 SLIDES = Path('docs/demo/slides.html')
-FIELDS = ('method', 'status', 'produce_wasted_lb', 'worst_served_coverage', 'households_reached', 'invalid_commitments')
+FIELDS = ('method', 'status', 'collected_by_households_lb', 'committed_to_food_banks_lb', 'produce_wasted_lb',
+          'uncollected_by_scenario_households_lb', 'worst_served_coverage', 'households_reached', 'invalid_commitments')
 
 
 def slide_results():

@@ -10,7 +10,11 @@ export interface MethodResult {
   status?: string; // the evaluation runner sends "not_run" for a method it didn't run
   reason?: string;
   measured?: boolean;
-  produce_wasted_lb: number | null;
+  // Each offered pound counts once in these three (design section 16, October 11, 2026).
+  collected_by_households_lb?: number | null;
+  committed_to_food_banks_lb?: number | null; // beyond the households' pickups, with storage and pickup hours in time
+  produce_wasted_lb: number | null; // no pathway at the scenario end
+  uncollected_by_scenario_households_lb?: number | null; // the earlier "produce wasted"
   worst_served_coverage: number | null; // a share from 0 to 1, as the API sends it
   households_reached: number | null;
   invalid_commitments?: number | null;
@@ -35,10 +39,10 @@ export const exampleResults: Results = {
   measured: false,
   note: 'Example values for building the results strip. Not a measured result.',
   methods: [
-    { method: 'first_come_first_served', produce_wasted_lb: 210, worst_served_coverage: 0.25, households_reached: 5, invalid_commitments: 0 },
-    { method: 'nearest_food_bank', produce_wasted_lb: 180, worst_served_coverage: 0.31, households_reached: 5, invalid_commitments: 0 },
-    { method: 'rules_based', produce_wasted_lb: 60, worst_served_coverage: 0.58, households_reached: 6, invalid_commitments: 0 },
-    { method: 'llm', produce_wasted_lb: 50, worst_served_coverage: 0.62, households_reached: 6, invalid_commitments: 0 },
+    { method: 'first_come_first_served', collected_by_households_lb: 40, committed_to_food_banks_lb: 650, produce_wasted_lb: 210, uncollected_by_scenario_households_lb: 860, worst_served_coverage: 0.25, households_reached: 5, invalid_commitments: 0 },
+    { method: 'nearest_food_bank', collected_by_households_lb: 45, committed_to_food_banks_lb: 675, produce_wasted_lb: 180, uncollected_by_scenario_households_lb: 855, worst_served_coverage: 0.31, households_reached: 5, invalid_commitments: 0 },
+    { method: 'rules_based', collected_by_households_lb: 60, committed_to_food_banks_lb: 780, produce_wasted_lb: 60, uncollected_by_scenario_households_lb: 840, worst_served_coverage: 0.58, households_reached: 6, invalid_commitments: 0 },
+    { method: 'llm', collected_by_households_lb: 62, committed_to_food_banks_lb: 788, produce_wasted_lb: 50, uncollected_by_scenario_households_lb: 838, worst_served_coverage: 0.62, households_reached: 6, invalid_commitments: 0 },
   ],
   headline: ['produce_wasted_lb', 'worst_served_coverage'],
 };

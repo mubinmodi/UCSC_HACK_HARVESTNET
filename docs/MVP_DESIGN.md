@@ -572,7 +572,7 @@ All four run on the same inputs.
 
 **Metrics:**
 
-- **Produce wasted:** pounds unclaimed or spoiled. Proposed as a headline.
+- **Produce wasted:** pounds with no pathway at the end of the scenario: not collected by a household, and not committed to a food bank that can store it and hand it out before it stops being usable. The produce profile's usable life and the food bank's held storage decide this (ADR 0003). A commitment that spoils before it could be handed out, such as cold produce left in a failed cooler, still counts as wasted. Each pound counts once, and results show the split: collected by households, committed to food banks, wasted. The earlier measure (everything the scenario's households didn't collect) stays visible beside it. **Decided (user, October 11, 2026).** Whether it is a headline is still Proposed.
 - **Worst-served fair-share coverage:** the lowest average share of fair share received, across food banks. Proposed as the second headline.
 - **Households actually reached,** counted by pickup confirmations.
 - **Pickup-window match:** produce collected before it spoils.

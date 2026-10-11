@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Sprout, Trash2, Users } from 'lucide-react';
 import { resultsApi, type MethodId, type MethodResult, type Results } from './api';
 import { cardLabel, type CardLabel } from './labels';
+import { earlierMeasure, hasProduceSplit, produceSplit, wastedLegend } from './split';
 
 // The four methods, always in this order. Labels only: every number comes from the API.
 const methods: [MethodId, string, string][] = [
@@ -33,6 +34,8 @@ export default function App() {
   const headline = new Set(results?.headline ?? []);
   // Display formatting only: the API sends coverage as a share (0.25), shown as a percent.
   const percent = new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 1 });
+  const weight = new Intl.NumberFormat(language, { maximumFractionDigits: 1 });
+  const pounds = (v: number) => `${weight.format(v)} lb`;
 
   const metric = (key: string, icon: ReactNode, label: string, value: number | null | undefined, show: (v: number) => string, missing: string) =>
     <div className="metric">
@@ -53,6 +56,7 @@ export default function App() {
     const label = cardLabel(results!, run);
     const notRun = label.status === 'not_run';
     const missing = notRun ? t('Not run', 'Sin ejecutar') : t('Not measured yet', 'Aún sin medir');
+    const earlier = run ? earlierMeasure(run, language) : null;
     return <article className={`run${label.status === 'fallback_only' ? ' run-fallback' : ''}`} key={id}>
       <h2>{t(en, spanish)}</h2>
       <div className="badges">
@@ -65,7 +69,17 @@ export default function App() {
       {!label.measured && !example && label.status !== 'fallback_only' && label.showNumbers && <p className="unmeasured">{t('Not a measured result.', 'No es un resultado medido.')}</p>}
       {label.reason && label.status !== 'completed' && <p className="reason">{label.reason}</p>}
       <dl>
-        {metric('produce_wasted_lb', <Trash2 aria-hidden="true"/>, t('Produce wasted', 'Producto desperdiciado'), label.showNumbers ? run?.produce_wasted_lb : null, v => `${v} lb`, missing)}
+        {metric('produce_wasted_lb', <Trash2 aria-hidden="true"/>, t('Produce wasted', 'Producto desperdiciado'), label.showNumbers && run && hasProduceSplit(run) ? run.produce_wasted_lb : null, pounds, missing)}
+        {label.showNumbers && run && <div className="split">
+          <dt className="split-title">{t('Where each pound went', 'Adónde fue cada libra')}</dt>
+          <dd>{hasProduceSplit(run) ? <ul>
+            {produceSplit(run, language).map(row => <li key={row.key} className={`split-${row.key}`}>
+              <span>{row.label}</span><b>{has(row.value) ? pounds(row.value) : <span className="missing">{missing}</span>}</b>
+            </li>)}
+          </ul> : <p className="split-unavailable">{t('Updated breakdown unavailable from this API.', 'El desglose actualizado no está disponible en esta API.')}</p>}
+          {earlier && <p className="earlier">{earlier.label}: {pounds(earlier.value)}</p>}
+          </dd>
+        </div>}
         {metric('worst_served_coverage', <Sprout aria-hidden="true"/>, t('Worst-served coverage', 'Cobertura del banco peor atendido'), label.showNumbers ? run?.worst_served_coverage : null, v => percent.format(v), missing)}
         {metric('households_reached', <Users aria-hidden="true"/>, t('Households reached', 'Hogares alcanzados'), label.showNumbers ? run?.households_reached : null, v => String(v), missing)}
       </dl>
@@ -90,7 +104,7 @@ export default function App() {
     </section>}
 
     <footer className="legend">
-      <p><b>{t('Produce wasted', 'Producto desperdiciado')}:</b> {t('pounds not collected by the end of the scenario. Lower is better.', 'libras no recogidas al final del escenario. Menos es mejor.')}</p>
+      <p><b>{t('Produce wasted', 'Producto desperdiciado')}:</b> {wastedLegend[language]}</p>
       <p><b>{t('Worst-served coverage', 'Cobertura del banco peor atendido')}:</b> {t('the lowest average share of the weekly fair share received, across food banks. Higher is better.', 'el promedio más bajo, entre los bancos de alimentos, de la porción semanal que recibieron sus hogares. Más es mejor.')}</p>
       <p><b>{t('Households reached', 'Hogares alcanzados')}:</b> {t('counted by pickup confirmations.', 'contados por confirmaciones de recogida.')}</p>
       <p><b>{t('Live', 'En vivo')}</b> {t('ran just now', 'se ejecutó ahora')} · <b>{t('Replay', 'Repetición')}</b> {t('a recorded run played back', 'una ejecución grabada')} · <b>{t('Synthetic', 'Sintético')}</b> {t('made-up inputs for testing', 'datos inventados para pruebas')}</p>
