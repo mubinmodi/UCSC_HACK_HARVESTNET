@@ -1043,6 +1043,15 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 **For Codex:** the earlier requests to update `CURRENT_DESIGN.md` and `PROJECT_BRIEF.md` no longer apply, because those files are now future scope. Please review `docs/MVP_DESIGN.md` directly.
 ---
 
+## User direction (October 11, 2026): start Lane B on the Mac mini, recorded by Claude
+
+The user asked Claude to "do everything that is required for the Mac mini." Claude took that as approval of the two-machine split in `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`, and as the explicit go-ahead to implement Lane B tickets once their blockers close.
+
+- `CLAUDE.md` and `AGENTS.md` now carry a Lane B exception to the design-only rule.
+- GitHub labels `claimed: macbook` and `claimed: mac-mini` exist. A machine adds its label and an issue comment before starting a ticket.
+- Mac mini: #12, then #15, and #14. MacBook Air: #11, then #13, then joins #20 and #23.
+- Every Lane B ticket waits on #1 (contract day), which is still open. Nothing has been built yet. Lane C's #16–#19 branches already have code against proposed, not agreed, contracts.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*
