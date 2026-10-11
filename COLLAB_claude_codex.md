@@ -1062,6 +1062,13 @@ The user decided that food banks may bid past their households' fair-share gap o
 
 Simulated result (synthetic numbers): in the normal-afternoon scenario, unclaimed produce drops from 818 lb (249 lb apples, 169 lb romaine, 400 lb potatoes) to 0 lb. Fair-share figures don't change, and extra pounds are recorded apart from fair share.
 
+## User direction (October 11, 2026): committed produce is not wasted; n8n Cloud; AGNTCY Directory on the server, recorded by Claude
+
+- **Produce wasted (design §16, Decided):** pounds with no pathway at the scenario end: not collected by a household, and not committed to a food bank whose held storage and pickup hours let it hand the produce out before it stops being usable (profile usable life, ADR 0003). A commitment that spoils first, such as cold produce left in a failed cooler, still counts. Each pound counts once; results now carry `collected_by_households_lb`, `committed_to_food_banks_lb`, `produce_wasted_lb`, and the old number as `uncollected_by_scenario_households_lb`.
+- Simulated result, normal afternoon (synthetic numbers): first-come-first-served 877 → 0 lb wasted, nearest food bank 869 → 0 lb, rules-based negotiators 869 → 0 lb. LLM negotiators were not run. Coverage and households reached don't change.
+- **n8n** runs on n8n Cloud.
+- **The AGNTCY Directory** runs on the AWS instance.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*
@@ -1101,3 +1108,9 @@ Validation: `git diff --check` passes. Node.js, npm, Bun, and Deno are unavailab
 ## User direction (October 11, 2026): finish ticket #3 on its branch, recorded by Claude
 
 The team lead authorized finishing teammates' tickets on their own branches. On `gianellerella/03-donor-page-food-bank-dashboard`, Claude moved the frontend from the repository root into `frontend/donor-dashboard/`, kept its layout, styles, and produce pictures, and replaced the in-memory fixtures with calls to the agreed public API (default: the live API skeleton). The invented example figures from the first version are gone; every number now comes from an API response (ADR 0002). Accept and Decline record one exact version through `record_approval` after an explicit confirmation (ADR 0001). The dashboard shows the core's `disruptions` reason cards (#23) when present. Condition checks use the core's proposed `POST /lots/{lot_id}/condition-checks`, which still needs contract review on #1. Node.js is available here, so dependencies were installed and the typecheck, build, and tests were run. No design documents or ADRs were changed.
+
+## Codex review (October 11, 2026): produce-wasted metric branch
+
+The revised evaluation follows the user's recorded definition above: offered pounds are counted once as collected, held at a food bank with a feasible pickup window, or wasted. The old not-collected measure remains separately labeled. I found one compatibility gap in the results strip: an older deployed API can still send `produce_wasted_lb` with its previous meaning and omit the new split. The strip now withholds the new waste measure in that case and shows the old value only as the earlier measure.
+
+Checks: 11 evaluation tests, 3 slide tests, 5 replay tests, 122 API example tests, replay freshness, results-strip typecheck, 12 frontend tests, production build, and `git diff --check` passed. These are local synthetic checks, not a live AWS evaluation or evidence of observed spoilage. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after the Markdown edit.

@@ -1,10 +1,13 @@
 """Same fixture and safety rules for every method; replay never calls a model."""
+from collections import defaultdict
 import copy
+from datetime import timedelta
 import json
 from pathlib import Path
 from statistics import mean, pstdev
-from harvestnet_agents.negotiation import parse_agent_input, Move, MoveKind
+from harvestnet_agents.negotiation import parse_agent_input, Move, MoveKind, TimeWindow
 from harvestnet_agents.rules_negotiators import rules_negotiator
+from .calculators import Calculators
 from .engine import Engine, run_fixture
 from .protocol import dt
 from .records import Records
@@ -83,17 +86,91 @@ def collected_before_spoiling(run, records, collected):
     return ok/total
 
 
+def _can_hand_out(lot, commitment, item, bank, calc):
+    """Can this food bank store this committed produce and hand it out before it stops being usable?
+
+    Storage is the owner's own hold for the produce's storage (cold if the profile needs it), from
+    the arrival, cut short when the food bank's cooler failed (ADR 0003: the profile decides). It
+    must overlap the food bank's pickup hours before the item's usable time (``pickup_feasibility``).
+    A Workflow 4 fallback kept at a failed cooler counts only as a ``same_day_offer``, with the
+    profile's room-temperature life from the failure."""
+    if bank is None:
+        return False
+    profile=calc.profiles.get(item['produce_id'])
+    usable=dt(item['usable_until'])
+    cooler=bank.get('cooler') or {}
+    failed=dt(cooler['observed_at']) if cooler.get('status')=='failed' and cooler.get('observed_at') else None
+    hours=[TimeWindow(dt(w['start']),dt(w['end'])) for w in bank.get('pickup_windows',[])]
+    if commitment.get('pathway'):
+        room=profile.days_usable_room
+        if commitment['pathway']!='same_day_offer' or failed is None or room is None:
+            return False
+        return calc.pickup_feasibility(failed,hours,min(usable,failed+timedelta(days=room.min))).feasible
+    cold=profile.needs_cold
+    resource='storage_cold' if cold else 'storage_dry'
+    bid=commitment['food_bank_id']
+    arrival=next((dt(t['arrives_at']) for t in lot['draft'].get('transports',[]) if t['food_bank_id']==bid),None) if commitment.get('version') is None else None
+    for hold in lot.get('holds',{}).get(bid,[]):
+        if hold['resource']!=resource or hold.get('version')!=commitment.get('version'):
+            continue
+        start,end=dt(hold['start']),dt(hold['end'])
+        if arrival is not None:
+            start=max(start,arrival)
+        if cold and failed is not None:
+            end=min(end,failed)
+        stored=[TimeWindow(max(w.start,start),min(w.end,end)) for w in hours if max(w.start,start)<min(w.end,end)]
+        if stored and calc.pickup_feasibility(start,stored,usable).feasible:
+            return True
+    return False
+
+
+def produce_split(records, calc=None):
+    """Design section 16, produce wasted (Decided, user, October 11, 2026). Every offered pound
+    counts once: collected by a household; else committed to a food bank that can store it and
+    hand it out before it stops being usable; else wasted. Waste is pounds with no pathway at the
+    scenario end, including a commitment that spoils before it could be handed out."""
+    calc=calc or Calculators()
+    banks={b['organization_id']:b for b in records.all('bank')}
+    collected=defaultdict(float)
+    for p in records.all('pickup'):
+        if p['status']=='collected':
+            for i in p['items']:
+                collected[(p['lot_id'],p.get('food_bank_id'),i['produce_id'])]+=i['pounds']
+    out={"collected_by_households_lb":0.0,"committed_to_food_banks_lb":0.0,"produce_wasted_lb":0.0}
+    for lot in records.all('lot'):
+        lot_id=lot['draft']['lot_id']
+        for item in lot['draft']['items']:
+            pid=item['produce_id']
+            taken=min(item['pounds'],sum(lb for (l,_,p),lb in collected.items() if l==lot_id and p==pid))
+            groups=defaultdict(lambda:[0.0,0.0])  # food bank -> [pounds committed, pounds it can hand out]
+            for a in lot.get('commitments',[]):
+                if a['produce_id']==pid and a['pounds']>0:
+                    g=groups[a['food_bank_id']]
+                    g[0]+=a['pounds']
+                    if _can_hand_out(lot,a,item,banks.get(a['food_bank_id']),calc):
+                        g[1]+=a['pounds']
+            # Households' collected pounds come out of their food bank's share first: never counted twice.
+            kept=sum(max(0.0,g[1]-collected.get((lot_id,bid,pid),0.0)) for bid,g in groups.items())
+            kept=min(kept,item['pounds']-taken)
+            out["collected_by_households_lb"]+=taken
+            out["committed_to_food_banks_lb"]+=kept
+            out["produce_wasted_lb"]+=max(0.0,item['pounds']-taken-kept)
+    return out
+
+
 def metrics(fixture, run, records):
     requests=records.all('request')
     collected=[p for p in records.all('pickup') if p['status']=='collected']
     total=sum(p['pounds'] for p in collected)
     offered=sum(i['pounds'] for lot in records.all('lot') for i in lot['draft']['items'])
+    split=produce_split(records)
     arrivals=[e for e in run['events'] if e['kind'] in ('commitment','change_commitment')]
     first=[e for e in arrivals if e['kind']=='commitment']
     start=min((dt(o['reported_at']) for o in fixture['surplus_offers']),default=dt(fixture['clock']['start']))
     checks=run['rule_checks']
     coverage=coverage_by_food_bank(fixture,requests)
-    result={"produce_wasted_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
+    # The old produce_wasted_lb, kept under its own name so the definition change is visible.
+    result={**split,"uncollected_by_scenario_households_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
     if fixture.get('faults'):
         result['cooler_failure']=cooler_failure_report(run)
     return result
@@ -129,7 +206,7 @@ def evaluate(fixture, *, llm_provider=None, repeats=1, output=None):
     methods=[]
     for name in ('first_come_first_served','nearest_food_bank','rules_based','llm'):
         if name=='llm' and llm_provider is None:
-            methods.append({"method":name,"status":"not_run","reason":"No authorized capped LLM provider configured","measured":False,"produce_wasted_lb":None,"worst_served_coverage":None,"households_reached":None,"invalid_commitments":None})
+            methods.append({"method":name,"status":"not_run","reason":"No authorized capped LLM provider configured","measured":False,"produce_wasted_lb":None,"collected_by_households_lb":None,"committed_to_food_banks_lb":None,"uncollected_by_scenario_households_lb":None,"worst_served_coverage":None,"households_reached":None,"invalid_commitments":None})
             continue
         runs=[]
         for repeat in range(repeats if name=='llm' else 1):
@@ -148,7 +225,7 @@ def evaluate(fixture, *, llm_provider=None, repeats=1, output=None):
         methods.append({"method":name,"status":"completed","measured":True,**headline,"runs":runs,"variation":{k:{"mean":mean(r[k] for r in runs),"stddev":pstdev(r[k] for r in runs)} for k in ('produce_wasted_lb','worst_served_coverage','households_reached') if all(r[k] is not None for r in runs)}})
         if name=='llm' and hasattr(llm_provider,'pop_metadata'):
             methods[-1].update(llm_label(runs))
-    note="Calculated from labeled scripted fixtures. produce_wasted_lb counts produce not collected by the scenario end; it is not observed spoilage. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result."
+    note="Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result."
     if fixture.get('faults'):
         note+=" The cooler failure is not known to any method before its time; Workflow 4 runs when it happens, and cooler_failure reports what it did."
     return {"scenario_id":fixture['scenario_id'],"run_mode":fixture['mode'],"synthetic":fixture['synthetic'],"measured":True,"note":note,"methods":methods,"headline":["produce_wasted_lb","worst_served_coverage"]}

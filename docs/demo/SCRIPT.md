@@ -94,8 +94,19 @@ Show: the results strip.
 > We compare against first-come-first-served on the same inputs. These are synthetic scenarios.
 > On the normal afternoon, negotiation reached 4 households instead of 3. In one scenario it does
 > worse on our fairness measure, and we show that too. We report whatever the numbers show.
+> Produce committed to a food bank that can store it and hand it out in time isn't counted as
+> wasted. On the normal afternoon no method wastes any. Waste shows up when storage runs out or
+> the cooler fails.
 
-Read the numbers from the screen. Don't round them up.
+Read the numbers from the screen. Don't round them up. The strip splits every pound once:
+collected by households, committed to food banks, or wasted (no pathway at the scenario end).
+
+## What changed in the waste measure (if asked)
+
+Before October 11, 2026, "produce wasted" counted every pound the scripted households didn't
+collect, so even a good run showed most of the lot as wasted. The team lead decided that produce
+committed to a food bank that can store it and hand it out before it stops being usable is not
+wasted. The old number is still in the results as "not collected by the scripted households".
 
 ## Close (2:45 to 2:50) · slide 16
 
@@ -114,3 +125,5 @@ Read the numbers from the screen. Don't round them up.
 - "We fed X people." We count households that confirmed a pickup.
 - Any number that isn't on a screen. Cost figures in the design are estimates.
 - "The LLM agents beat the baseline." They were not run for these results.
+- "Nothing gets wasted." Wasted means produce with no pathway at the end of a synthetic
+  scenario. It is not observed spoilage, and produce at a food bank still has to be handed out.
