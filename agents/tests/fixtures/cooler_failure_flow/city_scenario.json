@@ -1,0 +1,29 @@
+{
+  "_note": "Recorded Lane B side of the #23 cooler-failure join, paired with lane_c_recorded.json. All numbers are synthetic. 'holding' stands in for the committed version the core (Lane A) would hold; 'travel_minutes' stands in for Lane A's route calculator (#8); 'households' stands in for the core's request records, with each portion as the portion calculator assigns it under the new version (food_bank_id says where it is collected). Answer readings are the Lane C storage and pickup-hours readings named in 'answers'.",
+  "holding": {
+    "event_id": "event-mixed-batch-1",
+    "lot_id": "mixed-batch-1",
+    "current_version": 3,
+    "food_bank_id": "city",
+    "food_bank_name": "City food bank",
+    "timezone": "America/Los_Angeles",
+    "items": [
+      {"produce_id": "romaine", "pounds": 200},
+      {"produce_id": "apples", "pounds": 50}
+    ],
+    "households_pickup": {"start": "2026-10-12T01:00:00Z", "end": "2026-10-12T03:00:00Z"}
+  },
+  "answers": {
+    "rural": {"response": "answered", "name": "Rural food bank", "storage": "rural_storage", "pickup_hours": "rural_pickup_hours"},
+    "eastside": {"response": "answered", "name": "Eastside food bank", "storage": "eastside_storage", "pickup_hours": "eastside_pickup_hours"}
+  },
+  "travel_minutes": {"rural": 40, "eastside": 15},
+  "households": [
+    {"request_code": "K7Q2", "language": "en", "chosen_food_banks": ["city"], "portions": [{"produce_id": "romaine", "pounds": 4, "food_bank_id": "eastside"}]},
+    {"request_code": "M3R8", "language": "es", "chosen_food_banks": ["city", "eastside"], "portions": [{"produce_id": "romaine", "pounds": 6, "food_bank_id": "eastside"}]},
+    {"request_code": "T5W1", "language": "en", "chosen_food_banks": ["city"], "portions": [{"produce_id": "apples", "pounds": 3, "food_bank_id": "city"}]}
+  ],
+  "item_names": {
+    "es": {"romaine": "lechuga romana"}
+  }
+}
