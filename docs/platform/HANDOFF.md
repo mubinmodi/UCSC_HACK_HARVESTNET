@@ -38,10 +38,17 @@ nonfinite Directory capacity queries. The combined Compose configuration and
 regeneration of all four n8n imports pass. Workflow graph checks do not certify an
 actual n8n import/SMS execution, and Compose validation does not run containers.
 
-The shared #1 API contracts/skeleton and #20 real harness/agents have no code in
-the remote branches as last checked. Proposed Lane C interfaces need review with
+The shared #1 API contracts/skeleton and #20 real harness have no code in
+their remote branches as last checked. Lane B's rules now exist at pinned commit
+`f06b14822d4379bc790a2f1d8a4525ac94cb7649`. The Lane C adapter verifies all 25
+recorded rule scenarios over HTTP with exact direct-policy output equality and
+duplicate retries. It supports nonvoting `pass` and explicit donor ID aliasing.
+The production adapter requires Lane A's real calculators; its recorded-calculator
+test adapter is rejected by the real-join CLI. See `JOIN.md`. Proposed interfaces need review with
 Lane A/B. Real-agent fixture equality and actual core rule checks for #21 cannot
 be certified until those adapters exist. Do not replace them with constant checks.
+With the pinned Lane B package and native SDK available, all **39 tests** pass
+locally. CI has a separate pinned-source compatibility job for the new adapter.
 
 Beeceptor is configured at `https://harvestnet.proxy.beeceptor.com` with the
 OpenAPI contract and fixed synthetic examples. All 17 system routes were tested

@@ -77,7 +77,7 @@ def main():
         policy, label = load_policy(args.policy)
     except (ImportError,AttributeError) as exc:
         parser.error(f'Real harness/negotiators not available: {exc}')
-    if policy.__module__ == 'harvestnet_platform.transport':
+    if policy.__module__ == 'harvestnet_platform.transport' or getattr(policy, 'uses_stand_in_calculators', False):
         parser.error('A stand-in is not evidence for the real-agent join')
     endpoints = json.loads(os.environ['AGENT_ENDPOINTS'])
     network = A2ATransport(endpoints,os.environ['TRANSPORT_TOKEN'])

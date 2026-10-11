@@ -1,8 +1,9 @@
 # Join real agents over A2A (#21)
 
 The transport/core seam is ready; **the actual join remains blocked on #20 and
-the shared contracts**. None of the remote branches currently contains Lane A's
-real harness or Lane B's real negotiators. A synthetic seam test is explicitly
+the shared contracts**. Lane B's rules are available at commit
+`f06b14822d4379bc790a2f1d8a4525ac94cb7649`; Lane A's real harness and calculators
+are still absent. A synthetic seam test is explicitly
 not claimed as completion of issue #21.
 
 ## Plug in teammates' code
@@ -47,6 +48,30 @@ and exact identical commitments/pathways. It never creates holds, approves or
 commits. Lane A must run the same rule checks over remote results.
 
 ## Validation so far
+
+`harvestnet_platform.lane_b:real_rules` adapts the published typed Lane B rules.
+Install the reviewed `agents` package alongside this platform package. Supply
+`turn_context: {organization_id, number, now, accepted_by}` with each platform
+input, using the core's clock and turn number. `draft` and `facts` retain Lane B's
+typed JSON shapes. `turn` remains the transport organization string. Configure
+`LANE_B_ORGANIZATION_IDS={"donor":"market"}` only when the actual core donor ID
+is `market`; the default keeps `donor`. Bank/advocate IDs must match the wire IDs.
+No donor facts, allocations, clocks or decisions are invented or rewritten.
+
+Set `LANE_B_CALCULATORS=reviewed_core_module:factory` to a callable returning the
+real calculator implementation. The production adapter refuses missing factories
+or Lane B's `StandInCalculators`. Pass those settings into each container and the
+local comparison process when baking the final reviewed image. `pass` is now an
+allowed nonvoting move; the advocate is restricted to counter/pass, consistent
+with Lane B's interface. The extra move remains proposed pending contract day.
+
+All **25 recorded Lane B scenarios** match direct rule outputs over five actual
+HTTP hosts, including duplicate retries, accept/counter/reject/hold/ask-human/pass
+and the donor alias. The test uses `lane_b:recorded_rules`, which is explicitly
+marked as using stand-in calculators and rejected by the real-join CLI. CI pins
+the source commit rather than tracking a changing teammate branch. This proves
+real rules can travel over our transport with recorded calculator inputs; it
+does not prove commitments/pathways or core rule checks for #21.
 
 Five actual local HTTP endpoints exchanged a synthetic mixed-batch fixture:
 300 lb apples, 200 lb romaine, 400 lb potatoes. Outcomes match the same in-process

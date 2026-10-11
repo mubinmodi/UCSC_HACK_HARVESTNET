@@ -20,6 +20,7 @@ async def main():
     if not token:
         raise ValueError('Transport token required')
     policy, _label = load_policy(os.getenv('AGENT_POLICY'))
+    print(f'Policy: {_label}; transport: native AGNTCY A2A; approvals disabled', flush=True)
     receiver = Receiver(organization, policy, os.getenv('RECEIPTS_DB', ':memory:'))
     if os.getenv('AGNTCY_DIRECTORY_ADDRESS'):
         from .directory import AgntcyDirectory, record_for

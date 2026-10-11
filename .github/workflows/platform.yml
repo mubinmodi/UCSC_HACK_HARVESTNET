@@ -30,3 +30,21 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements-agntcy.txt
       - run: python -m unittest discover -s tests -p test_native_agntcy.py -v
+  lane-b-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mubinmodi/UCSC_HACK_HARVESTNET
+          ref: f06b14822d4379bc790a2f1d8a4525ac94cb7649
+          path: runtime/lane-b
+          sparse-checkout: agents
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify pinned real rules with recorded calculators over HTTP
+        env:
+          PYTHONPATH: runtime/lane-b/agents/src
+          LANE_B_FIXTURES: runtime/lane-b/agents/tests/fixtures/negotiators
+        run: python -m unittest discover -s tests -p test_lane_b.py -v

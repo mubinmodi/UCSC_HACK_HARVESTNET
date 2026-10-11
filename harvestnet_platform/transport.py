@@ -12,7 +12,7 @@ from pathlib import Path
 from .http import JsonHandler, request_json, serve
 
 ORGANIZATIONS = ('donor', 'city', 'rural', 'eastside', 'advocate')
-ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human'}
+ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human', 'pass'}
 
 
 def canonical(value):
@@ -30,7 +30,7 @@ def validate_move(move, organization, version):
         raise ValueError('Move must identify its own organization and the current version')
     if not isinstance(move.get('reason'), str) or not move['reason'].strip():
         raise ValueError('Every move must include a reason')
-    if organization == 'advocate' and move['action'] in ('accept', 'reject', 'request_hold'):
+    if organization == 'advocate' and move['action'] not in ('counter', 'pass'):
         raise ValueError('Advocate proposes but cannot vote or hold others\' resources')
     if move['action'] == 'counter' and not isinstance(move.get('amendment'), dict):
         raise ValueError('A counter requires one structured amendment')
@@ -58,7 +58,8 @@ def load_policy(spec):
     function = getattr(importlib.import_module(module), name)
     if not callable(function):
         raise ValueError('Policy export is not callable')
-    return function, 'real_policy_adapter'
+    label = 'recorded_rules_stand_in_calculators' if getattr(function, 'uses_stand_in_calculators', False) else 'real_policy_adapter'
+    return function, label
 
 
 class Receiver:
