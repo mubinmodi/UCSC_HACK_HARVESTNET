@@ -15,6 +15,8 @@ All example values in these files (codes such as `K7P4`, ids, pounds) are synthe
 ## Files
 
 - `agent-prompt.md`: the first message (English and Spanish), the system prompt, and the Spanish fixed lines.
+- `sync_agent.py`: creates or updates the agent and tools through the API.
+- `agent.json`: the agent and tool ids, written by the script (not present until the first run).
 - `tools.json`: the five server tools (webhooks), with the base address, each tool's method and path,
   its parameters, and the response fields the prompt reads.
 
@@ -68,7 +70,28 @@ A smaller version of the same issue: `create_request` relies on the model copyin
 unchanged. The API re-checks every field, and its response repeats `household_size` and
 `fair_share_lb`, but it can't tell if the model changed a valid value.
 
+## How it's set up
+
+The agent and its tools are created through the ElevenLabs API by one script, so the setup can be repeated:
+
+```bash
+ELEVENLABS_API_KEY=... python3 integrations/elevenlabs/sync_agent.py          # create or update
+python3 integrations/elevenlabs/sync_agent.py --dry-run                       # print what would be sent (no key, no network)
+python3 integrations/elevenlabs/sync_agent.py --simulate "Hi, we are four people near Watsonville"
+```
+
+- **Needs an API key with Agents (ConvAI) read and write access.** `convai_read` and `convai_write` are the permission names the API reports. The restricted key in `deploy/aws/.env` doesn't have them yet (the script's first call returned HTTP 401, "missing the permission convai_read"), so the agent has not been created. Make a key with those two permissions (Voices read helps for picking a voice), then run the script.
+- The script reads `tools.json` and `agent-prompt.md`, finds the five tools by name (`harvestnet_<operation>`) and the agent by name ("HarvestNet front desk"), and updates them if they exist, otherwise creates them. It then writes the ids to `agent.json` (no secrets). Commit that file.
+- **Tools** call the live core API (`live_base_url` in `tools.json`, `https://18-217-110-223.sslip.io/api`). `--skeleton` points them at the example-data skeleton instead.
+- **Agent settings** (constants at the top of the script): LLM `claude-sonnet-5-5`, temperature 0.2, English default with a Spanish preset (Spanish first message), the language detection and end call system tools, TTS model `eleven_flash_v2_5` (multilingual), the API docs' default voice id, 15 minute call limit. A request-code placeholder is set as a dynamic variable until `create_request` returns the real code.
+- **Privacy:** no phone number or caller id is mapped to any tool, and the prompt's "never ask for" list is unchanged. Check the recording and transcript retention settings in the dashboard (Agent, Advanced, Privacy). The script leaves them at the account default.
+- **Live `/voice-intake`:** on the deployed server it currently returns HTTP 503 `voice_unavailable` ("voice extraction is not configured"), so a full call can only get as far as the can't-reach-the-system line until the server is given a transcript-reading model. Checked October 11, 2026.
+- Some fields were written from the API reference and not yet accepted by a live call (the Spanish preset's `language`, the `end_call` tool shape, and the voice id). If the first run answers 422, fix the named field in `sync_agent.py`.
+- `tests/test_elevenlabs_sync.py` checks the payloads offline.
+
 ## Dashboard setup
+
+*(The script above does this for you; use these steps only to set it up by hand.)*
 
 1. **Create an agent:** ElevenLabs → Agents → New agent → Blank template. Name it "HarvestNet voice line".
 2. **Language:** set English as the default. Add Spanish as an additional language and paste the
