@@ -18,6 +18,8 @@ The named calculators:
 - ``capacity_fit``: whether pounds fit a free space or a truck, and by how much.
 - ``pickup_feasibility``: can households collect it after arrival and before it spoils?
 - ``arrival_time``: departure plus recorded travel minutes.
+- ``adjust_pounds``: a share after adding or removing pounds (never below zero), so
+  no negotiator, rules-based or LLM, does arithmetic in its own words.
 - ``to_pounds``: unit conversion through produce profiles (#12).
 """
 
@@ -117,6 +119,7 @@ class Calculators(Protocol):
     def capacity_fit(self, free_lb: float, needed_lb: float) -> CapacityFit: ...
     def pickup_feasibility(self, arrives_at: datetime, pickup_windows: Sequence[TimeWindow], usable_until: datetime) -> PickupCheck: ...
     def arrival_time(self, departs_at: datetime, travel_minutes: float) -> datetime: ...
+    def adjust_pounds(self, current_lb: float, change_lb: float) -> float: ...
     def to_pounds(self, produce_id: str, quantity: float, unit: str, lb_per_unit: float | None = None) -> float: ...
 
 
@@ -181,6 +184,12 @@ class StandInCalculators:
             raise CalculatorError("travel minutes can't be negative")
         result = departs_at + timedelta(minutes=travel_minutes)
         return self._log("arrival_time", {"departs_at": departs_at.isoformat(), "travel_minutes": travel_minutes}, result)
+
+    def adjust_pounds(self, current_lb: float, change_lb: float) -> float:
+        if current_lb < 0:
+            raise CalculatorError("current pounds can't be negative")
+        result = max(0.0, current_lb + change_lb)
+        return self._log("adjust_pounds", {"current_lb": current_lb, "change_lb": change_lb}, result)
 
     def to_pounds(self, produce_id: str, quantity: float, unit: str, lb_per_unit: float | None = None) -> float:
         if produce_id not in self.profiles:

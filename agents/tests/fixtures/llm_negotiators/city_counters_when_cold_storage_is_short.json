@@ -1,0 +1,71 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "city_counters_when_cold_storage_is_short",
+  "role": "food_bank",
+  "responses": [
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01",
+          "name": "adjust_pounds",
+          "input": {
+            "current_lb": 200,
+            "change_lb": -50
+          }
+        }
+      ]
+    },
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 410,
+        "output_tokens": 260,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2900
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "counter",
+            "reason": "We have 150 lb of cold space at 2:20 pm, but our share needs 200 lb, 50 lb over. We can take 150 lb of romaine.",
+            "amendment": {
+              "kind": "set_pounds",
+              "produce_id": "romaine",
+              "food_bank_id": "city",
+              "from_food_bank_id": null,
+              "to_food_bank_id": null,
+              "pounds": 150.0,
+              "mover": null,
+              "departs_at": null,
+              "arrives_at": null
+            },
+            "holds": null
+          }
+        }
+      ]
+    }
+  ]
+}

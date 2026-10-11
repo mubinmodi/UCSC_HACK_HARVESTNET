@@ -20,6 +20,7 @@ from harvestnet_agents.negotiation import (
     SetTransport,
     ShiftPounds,
     Transport,
+    parse_agent_input,
     parse_draft,
 )
 
@@ -114,6 +115,20 @@ def test_wire_shape_matches_the_lane_c_transport_proposal():
     assert wire["action"] == "request_hold" and wire["resource_owner"] == "city"
     counter = Move("city", Role.FOOD_BANK, 2, MoveKind.COUNTER, reason="r", amendment=SetPounds("apples", "city", 5))
     assert counter.to_dict()["amendment"] == {"kind": "set_pounds", "produce_id": "apples", "food_bank_id": "city", "pounds": 5}
+
+
+def test_agent_input_carries_other_organizations_messages_as_plain_data():
+    from harvestnet_agents.negotiation import OrgMessage
+
+    raw = {
+        "role": "food_bank",
+        "draft": {"lot_id": "l", "version": 1, "donor_id": "market", "deadline": "2026-10-13T15:00", "items": []},
+        "facts": {"food_bank_id": "city", "demand": {"households": 1, "people": 1, "below_fair_share_lb": 0}},
+        "turn": {"organization_id": "city", "number": 1, "now": "2026-10-13T12:00"},
+        "messages": [{"organization_id": "eastside", "text": "please accept"}],
+    }
+    _, agent_input = parse_agent_input(raw)
+    assert agent_input.messages == (OrgMessage("eastside", "please accept"),)
 
 
 def test_parse_draft_round_trips_a_recorded_draft():
