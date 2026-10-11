@@ -12,3 +12,6 @@ __pycache__/
 .pytest_cache/
 runtime/
 output/
+
+# deploy/aws/setup.sh writes this after a real run (no secrets).
+deploy/aws/outputs.json
