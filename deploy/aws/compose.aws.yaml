@@ -23,19 +23,34 @@ x-agent-env: &agent-env
   CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
   CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
 
+# The three food bank hosts also run their own cooler watcher (harvestnet_core.cooler_watch,
+# #23): it polls that food bank's own cooler reading from the systems service and, when it
+# fails, proposes the new version and asks the approval bridge for review emails. Each host
+# gets the core credential map but reads only its own organization's entry. Nobody commits
+# for a food bank; only its human, on the review link, does.
+x-bank-env: &bank-env
+  <<: *agent-env
+  COOLER_WATCH: '1'
+  COOLER_WATCH_INTERVAL_SECONDS: ${COOLER_WATCH_INTERVAL_SECONDS:-10}
+  SYSTEMS_URL: http://systems:8010
+  CORE_API_URL: ${CORE_API_URL:-http://core:8000}
+  APPROVALS_URL: http://approvals:8030
+  HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
+  API_EVENTS_TOKEN: ${API_EVENTS_TOKEN:?set API_EVENTS_TOKEN}
+
 services:
   donor:
     <<: *app-image
     environment: *agent-env
   city:
     <<: *app-image
-    environment: *agent-env
+    environment: *bank-env
   rural:
     <<: *app-image
-    environment: *agent-env
+    environment: *bank-env
   eastside:
     <<: *app-image
-    environment: *agent-env
+    environment: *bank-env
   advocate:
     <<: *app-image
     environment: *agent-env

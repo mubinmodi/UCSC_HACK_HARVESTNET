@@ -125,7 +125,7 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
       <li><input type="checkbox" id="c2"><label for="c2"><a href="https://18-217-110-223.sslip.io/platform/health" target="_blank" rel="noopener">/platform/health</a> answers. This is the approvals service; if it's down, review links and emails won't work.</label></li>
       <li><input type="checkbox" id="c3"><label for="c3">The results strip shows numbers, each labeled <b>Synthetic</b>.</label></li>
       <li><input type="checkbox" id="c4"><label for="c4">Every approver can open their inbox (see "Who gets which email"). Check spam once for <code>calebdburnham@gmail.com</code>.</label></li>
-      <li><input type="checkbox" id="c5"><label for="c5">The cooler switch is back on "working" from the last run, and the scenario is fresh.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">The cooler switch is back on "working" (reset command in moment 5), the scenario is fresh, and <code>$DEMO_SWITCH_TOKEN</code> is set in the Operator's terminal.</label></li>
       <li><input type="checkbox" id="c6"><label for="c6">The replay is current: <code>python -m harvestnet_core.demo_replay --check</code> prints "recording matches the code".</label></li>
       <li><input type="checkbox" id="c7"><label for="c7">The phone for the Spanish voice call is charged. If the voice line isn't live yet, the Caller uses the household page instead.</label></li>
       <li><input type="checkbox" id="c8"><label for="c8">Everyone knows their role and has the tab they need open.</label></li>
@@ -190,7 +190,14 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
       <div class="moment"><div class="mark">1:40<small>slide 9</small></div><div class="body">
         <span class="tag l2">Level 2</span>
         <h3>5. The cooler fails</h3>
-        <p class="do"><b>Operator:</b> flip the city food bank's cooler switch, then open the city dashboard. Reason cards for every candidate appear under the cooler failure.</p>
+        <p class="do"><b>Operator:</b> flip the city food bank's cooler switch with the command below, wait about 15 seconds, then open the city dashboard. The city food bank's own agent notices the failed reading, proposes a new version, and the review emails go out. Reason cards for every candidate appear under the cooler failure.</p>
+        <pre>curl -sS -X POST -H "Authorization: Bearer $DEMO_SWITCH_TOKEN" -H "Content-Type: application/json" \
+  https://18-217-110-223.sslip.io/systems/demo/city/cooler -d '{"failed": true}'</pre>
+        <p class="do">The reply shows <code>"status": "failed"</code> and <code>"synthetic": true</code>. A <code>401</code> means the token is wrong or missing. Read the token once, before the run (it is a secret, so don't put it on screen):</p>
+        <pre>export DEMO_SWITCH_TOKEN=$(aws secretsmanager get-secret-value --profile incubator --region us-east-2 \
+  --secret-id harvestnet/platform --query SecretString --output text \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["DEMO_SWITCH_TOKEN"])')</pre>
+        <p class="do"><b>To reset</b> (after the run, and before the next one), send the same command with <code>{"failed": false}</code>. The reading goes back to working and the watcher records it. The switch only changes the reading; a change both managers approved stays in the plan. To run moment 5 again, start from a fresh offer (moments 2–4). A version a manager declined is not proposed again.</p>
         <p class="say">Now the city's walk-in cooler fails. Its agent checks the produce profiles: romaine must stay cold, apples are fine. It searches the Directory for food banks with cold space and writes a reason card for each one. It's a new version, so both managers approve again.</p>
         <p class="if"><b>If the switch or Directory fails:</b> open the replay at the cooler step and say "This is a recorded replay of the same scenario, made from our code."</p>
       </div></div>
@@ -242,6 +249,7 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
       <tbody>
         <tr><td>Voice line (ElevenLabs)</td><td>Household page, same questions and read-back</td><td>"Voice is down, so we use the web page."</td></tr>
         <tr><td>Email (n8n or SES)</td><td>Dashboard Accept, or the local review link; show the pickup screen</td><td>"This is the local approval page."</td></tr>
+        <tr><td>Cooler switch command (401, or no change after 30 seconds)</td><td>Check the token; if it still fails, open the replay at the cooler step</td><td>"This is a recorded replay of the same scenario, made from our code."</td></tr>
         <tr><td>Organization systems (Beeceptor)</td><td>Recorded readings, labeled replay</td><td>"These readings are a recorded copy."</td></tr>
         <tr><td>Directory (AGNTCY)</td><td>Local Directory, flagged on the dashboard</td><td>"Discovery is running locally today."</td></tr>
         <tr><td>Claude (cap or outage)</td><td>Rules-based negotiators, automatically</td><td>"These moves come from the rules-based negotiators."</td></tr>
@@ -263,7 +271,7 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
   <section>
     <h2>After each run</h2>
     <ul class="checks">
-      <li><input type="checkbox" id="a1"><label for="a1">Switch the city cooler back to working.</label></li>
+      <li><input type="checkbox" id="a1"><label for="a1">Switch the city cooler back to working (the reset command in moment 5).</label></li>
       <li><input type="checkbox" id="a2"><label for="a2">Write the run in the rehearsal record in <code>docs/demo/REHEARSAL.md</code>: total time, moments that ran over, fallbacks used and whether they worked.</label></li>
       <li><input type="checkbox" id="a3"><label for="a3">Tell Mubin about anything broken so it's fixed before the next run.</label></li>
     </ul>
