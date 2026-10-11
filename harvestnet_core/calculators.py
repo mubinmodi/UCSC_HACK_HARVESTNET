@@ -103,7 +103,8 @@ class Calculators:
     def adjust_pounds(self, current_lb, change_lb):
         # change_lb may be negative (removing pounds); the result never goes below zero.
         current, change = number(current_lb), finite(change_lb)
-        return self.log("adjust_pounds", {"current_lb": current, "change_lb": change}, max(0.0, current + change))
+        result=number(max(0.0,current+change))
+        return self.log("adjust_pounds", {"current_lb": current, "change_lb": change}, result)
 
     def arrival_time(self, departs_at, travel_minutes):
         return self.log("arrival_time", {"departs_at": departs_at.isoformat(), "travel_minutes": number(travel_minutes)}, departs_at + timedelta(minutes=travel_minutes))

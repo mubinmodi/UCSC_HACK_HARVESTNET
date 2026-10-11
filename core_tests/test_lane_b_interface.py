@@ -56,7 +56,7 @@ class CalculatorInterfaceTests(unittest.TestCase):
         self.assertEqual(calc.adjust_pounds(10, -4), 6)
         self.assertEqual(calc.adjust_pounds(10, -40), 0)
         self.assertEqual(calc.adjust_pounds(10, 5), 15)
-        for current, change in ((-1, 0), (10, float('nan')), (10, True)):
+        for current, change in ((-1, 0), (10, float('nan')), (10, True), (1e308, 1e308)):
             with self.assertRaises(AgentsCalculatorError):
                 calc.adjust_pounds(current, change)
 
