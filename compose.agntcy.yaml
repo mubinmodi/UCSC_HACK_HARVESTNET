@@ -1,0 +1,28 @@
+x-native: &native
+  build:
+    context: .
+    dockerfile: Dockerfile.platform
+    args:
+      INSTALL_AGNTCY: '1'
+  command: [python, -m, harvestnet_platform.agntcy_server]
+services:
+  donor:
+    <<: *native
+    environment:
+      ORGANIZATION_ID: donor
+  city:
+    <<: *native
+    environment:
+      ORGANIZATION_ID: city
+  rural:
+    <<: *native
+    environment:
+      ORGANIZATION_ID: rural
+  eastside:
+    <<: *native
+    environment:
+      ORGANIZATION_ID: eastside
+  advocate:
+    <<: *native
+    environment:
+      ORGANIZATION_ID: advocate
