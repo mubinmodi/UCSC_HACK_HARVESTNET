@@ -1052,6 +1052,10 @@ The user asked Claude to "do everything that is required for the Mac mini." Clau
 - Mac mini: #12, then #15, and #14. MacBook Air: #11, then #13, then joins #20 and #23.
 - Every Lane B ticket waits on #1 (contract day), which is still open. Nothing has been built yet. Lane C's #16–#19 branches already have code against proposed, not agreed, contracts.
 
+## User direction (October 11, 2026): the contracts are agreed, recorded by Claude
+
+The user, as team lead, said the team has already discussed and agreed the four contracts for ticket #1. `docs/contracts/` marks them **Agreed**, and its "Decisions made" list records where Lane B and Lane C shapes were reconciled. The example-data API skeleton is live on AWS Lambda (address in `docs/contracts/public-api.md`). Lane B tickets #11–#15 and the Lane B side of #23 were built ahead of contract day against proposed shapes, and now follow these contracts.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*

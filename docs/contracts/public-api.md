@@ -9,7 +9,8 @@ Every operation has one example file in [`examples/public-api/`](examples/public
 ## How to call it
 
 - JSON in and out, UTF-8. Send `Content-Type: application/json` with a body.
-- Base address: run the skeleton locally with `cd api_skeleton && uv run python -m harvestnet_api_skeleton.server`, then call `http://127.0.0.1:8040`. The AWS Lambda address is added here once it's deployed ([`api_skeleton/DEPLOY.md`](../../api_skeleton/DEPLOY.md)).
+- Base address (live on AWS): **`https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`**. Lambda function `harvestnet-api-skeleton` in `us-east-2`, Function URL with open CORS, capped at 5 concurrent runs. Deployed October 11, 2026; every operation below was called there and returned its example, including from a browser page on another origin. See [`api_skeleton/DEPLOY.md`](../../api_skeleton/DEPLOY.md).
+- Local: `cd api_skeleton && uv run python -m harvestnet_api_skeleton.server`, then call `http://127.0.0.1:8040`.
 - Browsers can call it from any origin during development (CORS is open).
 - Every response says `"mode"`: `example` from the skeleton, then `live`, `replay`, or `synthetic` from real logic. Example responses also say `"synthetic": true`.
 - Errors look like `{"error": {"code": "not_found", "message": "..."}}`, with status 400 (bad input), 404 (unknown route or record), 409 (stale version), or 503 (try again).
