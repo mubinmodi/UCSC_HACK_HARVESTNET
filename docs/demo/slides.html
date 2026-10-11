@@ -273,33 +273,33 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 {
   "source": "python -m harvestnet_core evaluate core_fixtures/*.json",
   "run_mode": "synthetic",
-  "note": "Calculated from labeled scripted fixtures with 8 scripted households each. Produce wasted counts produce not collected by the scenario end; it is not observed spoilage. Worst-served coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM negotiators were not run.",
+  "note": "Calculated from labeled scripted fixtures with 8 scripted households each. Every offered pound counts once: collected by a household, else committed to a food bank that can store it and hand it out before it stops being usable, else wasted (no pathway at the scenario end). Produce wasted is not observed spoilage. Not collected by the scripted households is the earlier measure, shown for comparison. Worst-served coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM negotiators were not run.",
   "scenarios": [
     {"scenario_id": "normal-afternoon", "run_mode": "synthetic", "synthetic": true, "methods": [
-      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 877.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 3, "invalid_commitments": 0},
-      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+      {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 23.0, "committed_to_food_banks_lb": 877.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 877.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 3, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 31.0, "committed_to_food_banks_lb": 869.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 31.0, "committed_to_food_banks_lb": 869.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 869.0, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
     {"scenario_id": "more-produce-than-storage", "run_mode": "synthetic", "synthetic": true, "methods": [
-      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 882.6666666666666, "worst_served_coverage": 0.3148809523809524, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+      {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 17.11111111111111, "committed_to_food_banks_lb": 2.88888888888889, "produce_wasted_lb": 880.0, "uncollected_by_scenario_households_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 17.11111111111111, "committed_to_food_banks_lb": 2.88888888888889, "produce_wasted_lb": 880.0, "uncollected_by_scenario_households_lb": 882.8888888888889, "worst_served_coverage": 0.2930555555555555, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 17.333333333333336, "committed_to_food_banks_lb": 2.6666666666666665, "produce_wasted_lb": 880.0, "uncollected_by_scenario_households_lb": 882.6666666666666, "worst_served_coverage": 0.3148809523809524, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
     {"scenario_id": "more-households-than-produce", "run_mode": "synthetic", "synthetic": true, "methods": [
-      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
-      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 32.0, "worst_served_coverage": 0.3208333333333333, "households_reached": 4, "invalid_commitments": 0},
-      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+      {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 19.0, "committed_to_food_banks_lb": 33.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 19.0, "committed_to_food_banks_lb": 33.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 20.0, "committed_to_food_banks_lb": 32.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 32.0, "worst_served_coverage": 0.3208333333333333, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
     {"scenario_id": "cooler-failure", "run_mode": "synthetic", "synthetic": true, "methods": [
-      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 896.0, "worst_served_coverage": 0.05, "households_reached": 1, "invalid_commitments": 0},
-      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
-      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
+      {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 4.0, "committed_to_food_banks_lb": 696.0, "produce_wasted_lb": 200.0, "uncollected_by_scenario_households_lb": 896.0, "worst_served_coverage": 0.05, "households_reached": 1, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 12.0, "committed_to_food_banks_lb": 688.0, "produce_wasted_lb": 200.0, "uncollected_by_scenario_households_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 12.0, "committed_to_food_banks_lb": 688.0, "produce_wasted_lb": 200.0, "uncollected_by_scenario_households_lb": 888.0, "worst_served_coverage": 0.05, "households_reached": 2, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
     {"scenario_id": "condition-doubt", "run_mode": "synthetic", "synthetic": true, "methods": [
-      {"method": "first_come_first_served", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
-      {"method": "nearest_food_bank", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "produce_wasted_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
-      {"method": "llm", "status": "not_run", "produce_wasted_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]}
+      {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 0.0, "committed_to_food_banks_lb": 0.0, "produce_wasted_lb": 900.0, "uncollected_by_scenario_households_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 0.0, "committed_to_food_banks_lb": 0.0, "produce_wasted_lb": 900.0, "uncollected_by_scenario_households_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 0.0, "committed_to_food_banks_lb": 0.0, "produce_wasted_lb": 900.0, "uncollected_by_scenario_households_lb": 900.0, "worst_served_coverage": 0.05, "households_reached": 0, "invalid_commitments": 0},
+      {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]}
   ]
 }
 </script>
@@ -322,17 +322,19 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   var normal = data.scenarios.filter(function (s) { return s.scenario_id === 'normal-afternoon'; })[0];
   var rows = normal.methods.map(function (m) {
     return '<tr><td>' + METHOD[m.method] + (m.status === 'not_run' ? ' <span class="label">Not run</span>' : '') + '</td>' +
-      cell(lb(m.produce_wasted_lb)) + cell(pct(m.worst_served_coverage)) + cell(m.households_reached) + cell(m.invalid_commitments) + '</tr>';
+      cell(lb(m.collected_by_households_lb)) + cell(lb(m.committed_to_food_banks_lb)) + cell(lb(m.produce_wasted_lb)) +
+      cell(pct(m.worst_served_coverage)) + cell(m.households_reached) + cell(m.invalid_commitments) + '</tr>';
   }).join('');
   document.getElementById('results-normal').innerHTML = '<p>' + label(normal) + ' 900 lb offered, 8 scripted households.</p>' +
-    '<table style="font-size:.66em"><tr><th>Method</th><th>Produce not collected</th><th>Worst-served coverage</th><th>Households reached</th><th>Invalid commitments</th></tr>' + rows + '</table>';
-  document.getElementById('results-normal-note').textContent = 'Not collected = produce not picked up by the scenario end, not observed spoilage. ' +
+    '<table style="font-size:.6em"><tr><th>Method</th><th>Collected by households</th><th>Committed to food banks</th><th>Produce wasted</th><th>Worst-served coverage</th><th>Households reached</th><th>Invalid commitments</th></tr>' + rows + '</table>';
+  document.getElementById('results-normal-note').textContent = 'Each pound counts once. Committed to food banks = beyond the scripted households’ pickups, with storage and pickup hours before it stops being usable. ' +
+    'Wasted = no pathway at the scenario end, not observed spoilage. ' +
     'Worst-served coverage = the lowest food bank average of its households’ share of fair share received. Source: ' + data.source + '.';
 
   // One row per scenario: first-come-first-served (the baseline) next to rules-based negotiators.
   function pick(s, method) { return s.methods.filter(function (m) { return m.method === method; })[0]; }
   function pair(a, b, f) { return '<td class="num">' + f(a) + ' → ' + f(b) + '</td>'; }
-  var all = '<table style="font-size:.62em"><tr><th>Scenario</th><th>Not collected</th><th>Worst-served coverage</th><th>Households reached</th></tr>';
+  var all = '<table style="font-size:.62em"><tr><th>Scenario</th><th>Produce wasted</th><th>Worst-served coverage</th><th>Households reached</th></tr>';
   data.scenarios.forEach(function (s) {
     var a = pick(s, 'first_come_first_served'), b = pick(s, 'rules_based');
     all += '<tr><td>' + SCENARIO[s.scenario_id] + '</td>' +

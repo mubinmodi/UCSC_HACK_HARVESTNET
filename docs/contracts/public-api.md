@@ -92,6 +92,7 @@ n8n carries a human's decision and never makes one (ADR 0004). No reply means no
 ## Results
 
 - **`get_results`**: `?scenario_id=normal-afternoon`. For each method (first-come-first-served, nearest food bank, rules-based, LLM): pounds of produce wasted, worst-served fair-share coverage, households reached, and invalid commitments. `run_mode` says whether it was live, replay, or synthetic, and `measured` says whether the numbers come from an actual run. The skeleton's values are made up for building the strip. [Example](examples/public-api/get_results.json)
+  - **Where every pound went (added October 11, 2026, additive).** Each offered pound counts once in `collected_by_households_lb` (collected by a household), `committed_to_food_banks_lb` (beyond households' pickups, committed to a food bank whose held storage and pickup hours let it hand the produce out before it stops being usable), or `produce_wasted_lb` (no pathway at the scenario end, including a commitment that spoils before it could be handed out). This is the user's decided definition (`docs/MVP_DESIGN.md` §16). **`produce_wasted_lb` changed meaning:** it used to count every pound the scenario's households didn't collect. That number is still sent as `uncollected_by_scenario_households_lb`. No field was removed. A method that wasn't run sends `null` for all four.
 
 ## How this lines up with Lane C
 
