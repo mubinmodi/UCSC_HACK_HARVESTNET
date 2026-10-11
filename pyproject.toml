@@ -14,3 +14,6 @@ include = ["harvestnet_platform*"]
 
 [tool.setuptools.package-data]
 harvestnet_platform = ["fixtures/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
