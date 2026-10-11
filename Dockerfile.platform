@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY pyproject.toml requirements-agntcy.txt ./
+COPY harvestnet_platform ./harvestnet_platform
+RUN pip install --no-cache-dir .
+ARG INSTALL_AGNTCY=0
+RUN if [ "$INSTALL_AGNTCY" = "1" ]; then pip install --no-cache-dir -r requirements-agntcy.txt; fi
+RUN useradd --uid 10001 --create-home harvestnet && mkdir /app/runtime /app/budget && chown harvestnet /app/runtime /app/budget
+USER harvestnet
+CMD ["python", "-m", "harvestnet_platform.transport", "--organization", "donor", "--host", "0.0.0.0"]
