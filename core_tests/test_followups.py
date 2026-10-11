@@ -531,7 +531,8 @@ class VoiceIntakeLimitTests(unittest.TestCase):
         status, body = api.call('POST', '/voice-intake', self.body)
         self.assertEqual(status, 200, body)
         self.assertEqual(len(calls), 1)
-        self.assertGreater(capped.cap.spent_usd, 0)
+        self.assertEqual(len(capped.cap.entries), 1)  # one call logged against the shared cap (actual usage)
+        self.assertIs(claude.cap, capped.cap)
         self.assertLessEqual(capped.cap.spent_usd, 1)
         # Once the next call's worst case no longer fits, no call is made.
         capped.cap.limit_usd = capped.cap.spent_usd

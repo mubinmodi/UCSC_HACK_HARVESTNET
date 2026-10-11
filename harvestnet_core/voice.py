@@ -10,7 +10,7 @@ pointing the caller to the text form.
 """
 import json
 from harvestnet_agents.front_desk import EXTRACTION_PROMPT, EXTRACTION_SCHEMA
-from harvestnet_agents.llm_negotiators import PRICES_USD_PER_MTOK, CostEntry, SpendingCap
+from harvestnet_agents.llm_negotiators import SpendingCapReached, PRICES_USD_PER_MTOK, CostEntry, SpendingCap
 from .protocol import number
 
 # Message framing and tool overhead, counted generously, in tokens.
@@ -28,6 +28,11 @@ class CappedExtractor:
             raise ValueError('paid calls require explicit authorization')
         self.extractor = extractor
         self.cap = SpendingCap(limit_usd)
+        # An extractor with its own spending cap (Lane B's ClaudeExtractor) shares this one
+        # and charges actual usage itself, so this wrapper doesn't charge twice.
+        self.shares_cap = hasattr(extractor, 'cap')
+        if self.shares_cap:
+            extractor.cap = self.cap
 
     def worst_case_usd(self, transcript):
         chars = len(EXTRACTION_PROMPT) + len(json.dumps(EXTRACTION_SCHEMA)) + len(transcript.render())
@@ -35,6 +40,13 @@ class CappedExtractor:
         return ((chars + OVERHEAD_TOKENS) * rate['input'] + self.extractor.max_tokens * rate['output']) / 1_000_000
 
     def __call__(self, transcript):
+        if self.shares_cap:
+            try:
+                return self.extractor(transcript)
+            except Exception as exc:
+                if isinstance(exc.__cause__, SpendingCapReached):
+                    raise exc.__cause__ from None  # report the cap, not a generic voice failure
+                raise
         worst = self.worst_case_usd(transcript)
         self.cap.reserve(worst)  # raises SpendingCapReached before any call
         try:
