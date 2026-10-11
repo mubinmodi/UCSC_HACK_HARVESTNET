@@ -1,0 +1,57 @@
+x-agent: &agent
+  build:
+    context: .
+    dockerfile: Dockerfile.platform
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  networks: [platform]
+  environment: &agent-env
+    TRANSPORT_TOKEN: ${TRANSPORT_TOKEN:?set TRANSPORT_TOKEN}
+    ALLOW_INTERNAL_HTTP: '1'
+    RECEIPTS_DB: /app/runtime/receipts.sqlite
+services:
+  donor:
+    <<: *agent
+    command: [python, -m, harvestnet_platform.transport, --organization, donor, --host, 0.0.0.0]
+    environment:
+      <<: *agent-env
+      AGENT_PUBLIC_URL: http://donor:8020
+    volumes: [donor-data:/app/runtime]
+  city:
+    <<: *agent
+    command: [python, -m, harvestnet_platform.transport, --organization, city, --host, 0.0.0.0]
+    environment:
+      <<: *agent-env
+      AGENT_PUBLIC_URL: http://city:8020
+    volumes: [city-data:/app/runtime]
+  rural:
+    <<: *agent
+    command: [python, -m, harvestnet_platform.transport, --organization, rural, --host, 0.0.0.0]
+    environment:
+      <<: *agent-env
+      AGENT_PUBLIC_URL: http://rural:8020
+    volumes: [rural-data:/app/runtime]
+  eastside:
+    <<: *agent
+    command: [python, -m, harvestnet_platform.transport, --organization, eastside, --host, 0.0.0.0]
+    environment:
+      <<: *agent-env
+      AGENT_PUBLIC_URL: http://eastside:8020
+    volumes: [eastside-data:/app/runtime]
+  advocate:
+    <<: *agent
+    command: [python, -m, harvestnet_platform.transport, --organization, advocate, --host, 0.0.0.0]
+    environment:
+      <<: *agent-env
+      AGENT_PUBLIC_URL: http://advocate:8020
+    volumes: [advocate-data:/app/runtime]
+networks:
+  platform:
+    internal: true
+volumes:
+  donor-data:
+  city-data:
+  rural-data:
+  eastside-data:
+  advocate-data:

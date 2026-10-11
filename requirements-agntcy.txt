@@ -1,0 +1,3 @@
+# Optional Linux/native AGNTCY host. Base tests/fallback need only Python.
+agntcy-app-sdk==0.5.5
+agntcy-dir==1.0.0
