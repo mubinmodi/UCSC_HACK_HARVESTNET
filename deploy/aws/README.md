@@ -18,7 +18,7 @@ ALERT_EMAIL=you@example.org deploy/aws/setup.sh --dry-run   # see the plan first
 ALERT_EMAIL=you@example.org deploy/aws/setup.sh
 ```
 
-`ALERT_EMAIL` is required: it gets the budget alerts. Until this setup is merged, add `GIT_REF=mubinmodi/aws-setup`, because the ref you deploy must contain `deploy/aws/`.
+`ALERT_EMAIL` is required: it gets the budget alerts. The git ref you deploy must contain `deploy/aws/`.
 
 The first run takes about 15 to 25 minutes, mostly the machine installing Docker. At the end it prints the URLs, the monthly cost estimate and the teardown command, and writes them to `deploy/aws/outputs.json` (no secrets; ignored by Git).
 
@@ -42,7 +42,8 @@ It does not create a NAT gateway, load balancer, RDS database, CloudFront distri
 
 ## How it runs
 
-- **Containers:** the five organization hosts from `compose.platform.yaml` (real policy adapter), plus `systems`, `approvals`, the core API (`python -m harvestnet_core.server`) and Caddy. All Python services use one image, `deploy/aws/Dockerfile`. See `deploy/aws/compose.aws.yaml`.
+- **Containers:** the five organization hosts from `compose.platform.yaml` (real policy adapter), plus `systems`, `approvals`, the core API (`python -m harvestnet_core.server`), Caddy, and a private AGNTCY Directory. All Python services use one image, `deploy/aws/Dockerfile`. See `deploy/aws/compose.aws.yaml` and `deploy/aws/compose.directory.yaml`.
+- **Directory:** the pinned official `dirctl` v1.7.1 image runs the gRPC server and search indexer with SQLite and a local OCI store on one persistent Docker volume. Only the organization hosts can reach `directory:8888`; no Directory port is published. Each host registers its own OASF record and refreshes changed capabilities every 30 seconds. Its Directory SDK is pinned in `requirements-agntcy.txt`. If the Directory is unavailable, host moves continue and the diagnostic CLI labels its local registry fallback. A Directory record is a capability snapshot; owners recheck resources before commitments. This shares the existing EC2 instance, with no additional AWS resource or separate service charge. The [AGNTCY local deployment guide](https://docs.agntcy.org/dir/dir-deployment-local/) explains why the full daemon includes a reconciler and the standalone apiserver does not.
 - **Data:** the core uses SQLite on the instance's disk (`DATABASE_URL`), which the core supports. There is no Postgres: RDS would cost more than the rest of the setup together, and the core reads no Postgres settings in Lane C's `compose.deployment.yaml`. Data lives in Docker volumes and is lost on teardown.
 - **HTTPS:** Caddy gets a free certificate for `<elastic-ip-with-dashes>.sslip.io`, a public name that resolves to the IP inside it. To use your own domain, point its A record at the Elastic IP and set `HARVESTNET_DOMAIN`.
 - **URLs:** core API `https://<host>/api/` (health at `/api/health`), review pages `/human/...`, platform adapters `/platform/...`, and each frontend at `/<app>/` (list at `/apps.txt`). The frontends are built with `VITE_API_BASE_URL=https://<host>/api` and served by Caddy on the same origin, so CloudFront isn't needed.
@@ -82,9 +83,10 @@ A branch name means the pushed branch on `origin` (the script runs `git fetch or
 ```sh
 deploy/aws/logs.sh              # status of every service, then the last 50 lines of each
 deploy/aws/logs.sh core 200     # one service
+deploy/aws/check_directory.sh   # registrations, cold-space search, memory use
 ```
 
-This uses SSM Run Command, so it needs no plugin. For a shell on the machine, install the Session Manager plugin, then run `aws ssm start-session --profile incubator --region us-east-2 --target <instance-id>`. Container logs stay on the machine, capped at 30 MB per container. The machine's first-boot log is `/var/log/harvestnet-bootstrap.log`.
+These use SSM Run Command, so they need no plugin. `check_directory.sh` does not change records: it exits successfully only when both its registration list and capability search came from the AGNTCY Directory. It prints a labeled fallback and exits with a failure otherwise. Use `deploy/aws/check_directory.sh 250 2026-10-13T17:30:00-07:00` for another cold-space threshold and pickup time. A successful check verifies the daemon's current response, not that cooler changes or human approvals work end to end. For a shell on the machine, install the Session Manager plugin, then run `aws ssm start-session --profile incubator --region us-east-2 --target <instance-id>`. Container logs stay on the machine, capped at 30 MB per container. The machine's first-boot log is `/var/log/harvestnet-bootstrap.log`.
 
 ## Staff tokens
 
@@ -113,4 +115,4 @@ It deletes the instance with its disk and data, the Elastic IP, the security gro
 
 - `sslip.io` certificates depend on a free public DNS service and on Let's Encrypt rate limits. If Caddy can't get a certificate, use a real domain.
 - The approvals service relays human decisions to the core with one `CORE_API_TOKEN`, but the core accepts each organization's own staff token. With one token, only that organization's decisions commit through the relay. This setup doesn't change that seam.
-- A t4g.micro has 1 GB of memory. Nine small Python services use about 35 MB each when idle (measured locally). If the machine runs short, use `INSTANCE_TYPE=t4g.small`.
+- A t4g.micro has 1 GB of memory. Nine small Python services use about 35 MB each when idle (measured locally); the Directory daemon adds another process with a 256 MB memory ceiling. Actual full-stack memory use has not been measured on the instance. If it runs short, use `INSTANCE_TYPE=t4g.small`.

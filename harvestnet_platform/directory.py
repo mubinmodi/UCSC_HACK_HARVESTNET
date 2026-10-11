@@ -6,7 +6,7 @@ import math
 import os
 import threading
 from datetime import datetime, timezone
-from .systems import Systems, BANKS
+from .systems import Systems, BANKS, organization_systems
 from .transport import ORGANIZATIONS, agent_card, role_of
 
 
@@ -106,15 +106,19 @@ class AgntcyDirectory:
         from agntcy.dir_sdk.models import core_v1
         self.client.delete([core_v1.RecordRef(cid=cid)])
 
-    def search(self, **query):
+    def records(self):
+        """The newest HarvestNet record of each registered organization."""
         from agntcy.dir_sdk.models import search_v1
         from google.protobuf.json_format import MessageToDict
         request = search_v1.SearchRecordsRequest(queries=[search_v1.RecordQuery(
             type=search_v1.RecordQueryType.RECORD_QUERY_TYPE_NAME, value='harvestnet.org/agents/*')], limit=100)
         records = [MessageToDict(response.record.data, preserving_proto_field_name=True)
                    for response in self.client.search_records(request)]
+        return latest_per_organization(records)
+
+    def search(self, **query):
         # Search returns records; exact current capacity/time is checked locally.
-        return {'mode': self.mode, 'records': search_capability(latest_per_organization(records), **query)}
+        return {'mode': self.mode, 'records': search_capability(self.records(), **query)}
 
 
 class DirectoryPublisher:
@@ -156,22 +160,91 @@ class DirectoryPublisher:
             stop.wait(interval_seconds)
 
 
+def start_publisher(organization, endpoint, address, systems, interval_seconds, stop=None):
+    """Keep this organization's record current in the AGNTCY Directory at ``address``.
+
+    For the A2A JSON-RPC hosts. Unlike the native host, a Directory that is down at
+    startup does not stop the organization from serving moves: the background thread
+    logs each failed refresh and retries every ``interval_seconds``.
+    """
+    publisher = DirectoryPublisher(AgntcyDirectory(address), organization, endpoint, systems)
+    thread = threading.Thread(target=publisher.run_forever, args=(interval_seconds, stop), daemon=True,
+                              name=f'directory-{organization}')
+    thread.start()
+    return publisher, thread
+
+
+def registered(records):
+    """Who is registered, and with what: one line of facts per organization record."""
+    rows = []
+    for record in records:
+        info = record_info(record)
+        caps = info.get('capabilities', {})
+        rows.append({'organization_id': info.get('organization_id'), 'role': caps.get('role'),
+                     'cold_space_lb': caps.get('cold_space_lb'), 'pickup_hours': caps.get('pickup_hours'),
+                     'published_at': info.get('published_at'), 'synthetic': caps.get('synthetic')})
+    return rows
+
+
+def grpc_status(exc):
+    """A short reason for a failed Directory call, such as UNAVAILABLE."""
+    code = getattr(exc, 'code', None)
+    try:
+        return code().name if callable(code) else type(exc).__name__
+    except Exception:
+        return type(exc).__name__
+
+
+def endpoints_from_env():
+    return json.loads(os.environ['AGENT_ENDPOINTS'])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--register', action='store_true')
+    parser.add_argument('--list', action='store_true', help='list the registered organizations')
+    parser.add_argument('--brief', action='store_true', help='print matching organizations, not whole records')
     parser.add_argument('--cold-lb', type=float, default=0)
     parser.add_argument('--pickup-at')
     args = parser.parse_args()
-    endpoints = json.loads(os.environ['AGENT_ENDPOINTS'])
-    systems = Systems(os.getenv('BEECEPTOR_BASE_URL'), os.getenv('COOLER_STATE_PATH'))
-    endpoint = os.getenv('AGNTCY_DIRECTORY_ADDRESS')
-    directory = AgntcyDirectory(endpoint) if endpoint else LocalDirectory(systems, endpoints)
-    if args.register and endpoint:
-        result = {'mode': directory.mode, 'records': {org: directory.register(record_for(org, endpoints[org], systems)) for org in ORGANIZATIONS}}
-    else:
-        result = directory.search(min_cold_lb=args.cold_lb, pickup_at=args.pickup_at)
+    # Inside an organization host, read systems the way the host does (with the demo switch).
+    systems = organization_systems() if os.getenv('SYSTEMS_URL') else Systems(os.getenv('BEECEPTOR_BASE_URL'), os.getenv('COOLER_STATE_PATH'))
+    address = os.getenv('AGNTCY_DIRECTORY_ADDRESS')
+    query = {'min_cold_lb': args.cold_lb, 'pickup_at': args.pickup_at}
+
+    def answer(directory, extra):
+        if args.list:
+            return {'mode': directory.mode, **extra, 'registered': registered(directory.records())}
+        found = directory.search(**query)
+        records = registered(found['records']) if args.brief else found['records']
+        return {'mode': directory.mode, **extra, 'query': query, ('matches' if args.brief else 'records'): records}
+
+    if args.register:
+        if not address:
+            parser.error('--register needs AGNTCY_DIRECTORY_ADDRESS')
+        endpoints = endpoints_from_env()
+        directory = AgntcyDirectory(address)
+        print(json.dumps({'mode': directory.mode, 'records': {
+            org: directory.register(record_for(org, endpoints[org], systems)) for org in ORGANIZATIONS}}, indent=2))
+        return 0
+    if not address:
+        print(json.dumps(answer(LocalDirectory(systems, endpoints_from_env()), {'synthetic': True}), indent=2))
+        return 0
+    try:
+        result = answer(AgntcyDirectory(address), {'address': address})
+    except ValueError:  # a bad query, not an outage
+        raise
+    except Exception as exc:  # gRPC errors: the Directory is down or refused the call
+        if 'AGENT_ENDPOINTS' not in os.environ:
+            raise
+        # Labeled fallback, never presented as AGNTCY results. Exit 2 so scripts notice.
+        fallback = answer(LocalDirectory(systems, endpoints_from_env()),
+                          {'synthetic': True, 'agntcy_unreachable': f'{address}: {grpc_status(exc)}'})
+        print(json.dumps(fallback, indent=2))
+        return 2
     print(json.dumps(result, indent=2))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

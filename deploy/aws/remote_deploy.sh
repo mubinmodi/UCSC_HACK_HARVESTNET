@@ -26,7 +26,7 @@ docker build --quiet --tag "harvestnet-app:$release" --file deploy/aws/Dockerfil
 
 export HARVESTNET_RELEASE="$release"
 compose=(docker compose --project-name harvestnet --env-file "$env_file"
-         -f compose.platform.yaml -f deploy/aws/compose.aws.yaml)
+         -f compose.platform.yaml -f deploy/aws/compose.aws.yaml -f deploy/aws/compose.directory.yaml)
 # config --quiet validates without printing interpolated secrets.
 "${compose[@]}" config --quiet
 "${compose[@]}" up --detach --no-build --remove-orphans --wait --wait-timeout 300

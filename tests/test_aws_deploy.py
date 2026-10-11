@@ -13,7 +13,7 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 AWS = ROOT / 'deploy' / 'aws'
-SCRIPTS = ['lib.sh', 'setup.sh', 'teardown.sh', 'remote_deploy.sh', 'user-data.sh', 'logs.sh']
+SCRIPTS = ['lib.sh', 'setup.sh', 'teardown.sh', 'remote_deploy.sh', 'user-data.sh', 'logs.sh', 'check_directory.sh']
 SECRET_ENV = {
     'ANTHROPIC_API_KEY': 'sk-ant-SENTINEL-anthropic',
     'ELEVENLABS_API_KEY': 'SENTINEL-elevenlabs',
@@ -137,7 +137,7 @@ class AwsScriptsParse(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_entry_scripts_are_executable(self):
-        for name in ('setup.sh', 'teardown.sh', 'remote_deploy.sh', 'logs.sh'):
+        for name in ('setup.sh', 'teardown.sh', 'remote_deploy.sh', 'logs.sh', 'check_directory.sh'):
             self.assertTrue((AWS / name).stat().st_mode & stat.S_IXUSR, name)
 
 
@@ -169,7 +169,7 @@ class AwsScriptsStructure(unittest.TestCase):
                     self.assertRegex(command, r'tag_spec|tags_kv', f'{name}: {verb} has no project tag')
 
     def test_all_aws_calls_go_through_the_helpers(self):
-        for script in (self.setup, self.teardown, (AWS / 'logs.sh').read_text()):
+        for script in (self.setup, self.teardown, (AWS / 'logs.sh').read_text(), (AWS / 'check_directory.sh').read_text()):
             for line in script.splitlines():
                 if line.lstrip().startswith('#'):
                     continue

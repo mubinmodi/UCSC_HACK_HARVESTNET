@@ -20,7 +20,7 @@ instance="$(lookup ec2 describe-instances --filters "Name=tag:Name,Values=$INSTA
              --query 'Reservations[0].Instances[0].InstanceId' --output text)"
 [ -n "$instance" ] || die "no running $INSTANCE_NAME instance"
 
-compose='docker compose -p harvestnet --env-file /opt/harvestnet/deploy.env -f compose.platform.yaml -f deploy/aws/compose.aws.yaml'
+compose='docker compose -p harvestnet --env-file /opt/harvestnet/deploy.env -f compose.platform.yaml -f deploy/aws/compose.aws.yaml -f deploy/aws/compose.directory.yaml'
 script="cd /opt/harvestnet/current && export HARVESTNET_RELEASE=\$(cat /opt/harvestnet/current-release) && $compose ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}' && $compose logs --no-color --tail $lines $service"
 make_tmp
 jq -n --arg s "$script" '{commands: [$s]}' > "$TMP_DIR/params.json"

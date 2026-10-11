@@ -20,8 +20,18 @@ The Lane C code is merged into `main` and follows the agreed contracts in
 - One setting, `CLAUDE_RUN_CAP_USD` (default 0), caps the LLM negotiators and the
   voice extractor.
 
+An AWS Compose overlay now prepares a private AGNTCY `dirctl daemon` with SQLite,
+the local OCI store, and the search indexer in one container. Each of the five
+organization hosts publishes its own record through the pinned Directory SDK.
+`deploy/aws/check_directory.sh` lists registrations and searches cold capacity
+and pickup time from inside the city host; it reports whether both answers came
+from AGNTCY or from the labeled local fallback. Unit tests and merged Compose
+configuration pass. This is a candidate deployment: an actual daemon push/search,
+cooler-change republish, and resource use on the AWS instance have not been
+verified. See `docs/platform/TRANSPORT.md` and `deploy/aws/README.md`.
+
 Still open, because they need deployment or accounts: re-importing the
-`synthetic-v2` Beeceptor mock, a live AGNTCY Directory daemon, published n8n
+`synthetic-v2` Beeceptor mock, live AGNTCY Directory verification, published n8n
 workflows with credentials and a real SMS provider (including Twilio signature
 checking in front of the reply webhook), and Secrets Manager plus HTTPS hosting.
 

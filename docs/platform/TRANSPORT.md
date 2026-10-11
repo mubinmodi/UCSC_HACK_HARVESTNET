@@ -54,23 +54,31 @@ uses the labeled local registry when no native address is configured. Reads incl
 synthetic source, timestamp, cold pounds and pickup hours from systems fixtures.
 The registry is not a reservation; a candidate must recheck facts and approve.
 
-With an AGNTCY Directory gRPC daemon, set `AGNTCY_DIRECTORY_ADDRESS=directory:8888`,
-install the optional requirements, and run `python -m harvestnet_platform.directory --register`.
-All five records use the official OASF A2A module envelope plus HarvestNet
-capabilities in annotations. Search reads Directory records, then filters exact
-cold capacity and pickup time. Each native host keeps its own record current:
-it re-reads its own systems (through `SYSTEMS_URL`, which applies the demo cooler
-switch) every `DIRECTORY_REFRESH_SECONDS` (default 30), publishes a new record when
-its capabilities change (a failed cooler drops cold space to zero), and deletes
-the old one. If a stale record survives, search keeps only each organization's
-newest. Local fallback refreshes immediately; native records are still snapshots
-and require owner rechecks. A live Directory outage fails visibly rather than claiming local results
-came from AGNTCY.
+On AWS, `deploy/aws/compose.directory.yaml` adds a private AGNTCY Directory
+daemon at `directory:8888`. The five A2A JSON-RPC hosts install the Directory SDK;
+each host registers its own OASF A2A record at startup and re-reads its own systems
+(through `SYSTEMS_URL`, including the demo cooler switch) every
+`DIRECTORY_REFRESH_SECONDS` (default 30). Changed capabilities publish a new
+record and remove the old one. Search keeps the newest record per Organization and
+filters cold capacity and pickup time. These are snapshots, so the owner still
+rechecks current facts and reservations before any commitment.
+
+For a manually configured Directory, set `AGNTCY_DIRECTORY_ADDRESS` and install
+the Directory SDK from `requirements-agntcy.txt`. `python -m
+harvestnet_platform.directory --register` remains a manual way to seed all five
+synthetic records; the AWS hosts do not need it. Use `--list` to see registrations
+or `--brief --cold-lb 100 --pickup-at 2026-10-13T19:00:00-07:00` to query matches.
+If the gRPC Directory is unreachable and `AGENT_ENDPOINTS` is available, the CLI
+prints a labeled `local_directory_fallback` and exits 2. It never presents those
+local results as AGNTCY records.
 
 Reference implementation inspected at AGNTCY app-sdk 0.5.5:
 [factory and server examples](https://github.com/agntcy/app-sdk),
 [Directory SDK](https://docs.agntcy.org/dir/directory-sdk/).
 The native App SDK process was also started successfully and exchanged an
-authenticated A2A message in a subprocess test. Docker/native Directory execution
-still needs Docker Engine and a configured Directory daemon; neither is available
-on this development machine. Compose syntax is validated separately.
+authenticated A2A message in a subprocess test. The AWS overlay uses the official
+`dirctl daemon`, which includes the gRPC server and search indexer; the standalone
+apiserver needs a separate reconciler ([AGNTCY local deployment](https://docs.agntcy.org/dir/dir-deployment-local/)).
+Compose syntax and mock SDK behavior are tested. Live Directory push/search on the
+AWS instance is still unverified because this session has no Docker daemon or AWS
+deployment access. `deploy/aws/check_directory.sh` is the post-deploy check.
