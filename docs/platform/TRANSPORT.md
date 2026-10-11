@@ -79,6 +79,9 @@ The native App SDK process was also started successfully and exchanged an
 authenticated A2A message in a subprocess test. The AWS overlay uses the official
 `dirctl daemon`, which includes the gRPC server and search indexer; the standalone
 apiserver needs a separate reconciler ([AGNTCY local deployment](https://docs.agntcy.org/dir/dir-deployment-local/)).
-Compose syntax and mock SDK behavior are tested. Live Directory push/search on the
-AWS instance is still unverified because this session has no Docker daemon or AWS
-deployment access. `deploy/aws/check_directory.sh` is the post-deploy check.
+Compose syntax and mock SDK behavior are tested. A local container smoke test
+registered the city host with the real `dirctl` daemon and returned that host in
+a capability search, labeled `agntcy_directory`; the data was synthetic. The
+five-host deployment, cooler-change republish, memory use and live Directory
+push/search on AWS remain unverified. `deploy/aws/check_directory.sh` is the
+post-deploy check.

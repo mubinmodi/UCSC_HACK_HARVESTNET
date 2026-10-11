@@ -26,9 +26,11 @@ organization hosts publishes its own record through the pinned Directory SDK.
 `deploy/aws/check_directory.sh` lists registrations and searches cold capacity
 and pickup time from inside the city host; it reports whether both answers came
 from AGNTCY or from the labeled local fallback. Unit tests and merged Compose
-configuration pass. This is a candidate deployment: an actual daemon push/search,
-cooler-change republish, and resource use on the AWS instance have not been
-verified. See `docs/platform/TRANSPORT.md` and `deploy/aws/README.md`.
+configuration pass. A local container smoke test registered and found one city
+host through the real daemon using synthetic data. This is a candidate AWS
+deployment: all five hosts, cooler-change republish, and resource use on the
+instance have not been verified. See `docs/platform/TRANSPORT.md` and
+`deploy/aws/README.md`.
 
 Still open, because they need deployment or accounts: re-importing the
 `synthetic-v2` Beeceptor mock, live AGNTCY Directory verification, published n8n
