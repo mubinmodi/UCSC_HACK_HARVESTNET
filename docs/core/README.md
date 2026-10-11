@@ -148,6 +148,10 @@ request releases, retries, reassignment and fair-share conservation. Live
 ElevenLabs calls, n8n publication, SMS delivery and the actual frontend screens
 still require their configuration/deployment. No real SMS was sent.
 
+## #23: join, cooler failure end to end (local only)
+
+Cooler failure end to end. `harvestnet_core/cooler_join.py` runs the cooler-failure fixture to its commitment, then fails the city cooler mid-run through Lane C's demo switch. The city's agent reads its own organization systems, gets its holding from `GET /lots/{lot_id}/holding`, rediscovers food banks through Lane C's Directory, and runs Lane B's cooler-failure flow. It records the failed cooler with `PUT /food-banks/{id}/status` and proposes the new version with `POST /lots/{lot_id}/changes`. `harvestnet_core/changes.py` records that version. Each named human decides on it through Lane C's review links and `/approvals`. Only when every named organization approves does the core place the owners' holds, move the commitments, and move the affected pickups. Lane B writes the household texts, and the core adds `to`, `pickup_id` and `release_url`. The reason cards appear under `disruptions` on the food bank dashboard. The new routes and the change record are proposed, pending #1. Test: `python -m unittest core_tests.test_cooler_failure_join -v`, with `PYTHONPATH=agents/src` and `HARVESTNET_PLATFORM_SOURCE=.`. Nothing is deployed. Beeceptor data for the scenario's day: `python -m harvestnet_core.cooler_join --export-systems runtime/cooler-systems.json --export-openapi runtime/cooler-openapi.json`.
+
 ## #24: real evaluation join
 
 `live_evaluation.py` connects existing Lane B LLM negotiators to the same real
