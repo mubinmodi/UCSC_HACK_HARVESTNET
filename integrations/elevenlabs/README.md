@@ -31,9 +31,9 @@ All example values in these files (codes such as `K7P4`, ids, pounds) are synthe
 | 7 | The agent reads the `request_code` out **twice**, one character at a time. The household shows it at pickup; there's no separate pickup code (contracts README, decision 11). | none |
 | Any time | A caller who already has a code can hear this week's balance and committed pickups. | `get_request` (`GET /requests/{request_code}`) |
 
-The voice line collects **no phone number**, so it never says "we'll text you." It says the food
-bank will tell them when produce is ready, and that they can call back with their code. Texts are
-opt-in on the web page only (`docs/MVP_DESIGN.md` §12).
+The voice line collects **no email address or phone number**. It says the food
+bank will tell the household when produce is ready, and that they can call back
+with their code. Pickup emails are opt-in on the web page only (`docs/MVP_DESIGN.md` §12).
 
 ## Which API it calls
 

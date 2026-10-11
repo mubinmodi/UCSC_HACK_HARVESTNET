@@ -26,7 +26,7 @@
           "city"
         ],
         "status": "waiting",
-        "message": "You are on the list. We will text you when produce is ready at a food bank you chose."
+        "message": "You are on the list. If you gave an email address, we can email you when produce is ready at a food bank you chose."
       }
     }
   }

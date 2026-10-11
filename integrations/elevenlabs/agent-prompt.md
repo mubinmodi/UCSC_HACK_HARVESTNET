@@ -76,7 +76,7 @@ STEP 3: CHOOSE FOOD BANKS (tools: list_food_banks, then choose_food_banks)
 - Ask which of these food banks they can get to. They may choose more than one.
 - Call choose_food_banks with the food_bank_id of each one they chose.
 - Say: "You're on the list for [the names they chose]." Don't read the message field from this
-  response aloud: the voice line takes no phone number, so nobody will text this caller.
+  response aloud: the voice line takes no email address, so no pickup email is sent from this call.
 
 STEP 4: THE CODE, READ TWICE
 - At the end, read the request_code from the create_request response TWICE, slowly, one

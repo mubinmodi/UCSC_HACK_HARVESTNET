@@ -1,6 +1,6 @@
 # HarvestNet contracts (ticket #1)
 
-**Status: Agreed (team, October 11, 2026; recorded by Claude at the leader's direction).** Drafted by Claude from the design (`docs/MVP_DESIGN.md`), the ADRs, and the code already written in Lanes B and C. To change a contract now, raise it on ticket #1 or in a PR, and update the examples and tests with it.
+**Status: Agreed (team, October 11, 2026; recorded by Claude at the leader's direction).** The public API is now `contract-v0.2` (decision 14); the other three contracts are still `contract-v0.1`. Drafted by Claude from the design (`docs/MVP_DESIGN.md`), the ADRs, and the code already written in Lanes B and C. To change a contract now, raise it on ticket #1 or in a PR, and update the examples and tests with it.
 
 These are the four shared interfaces. Every lane builds and tests against them and nobody waits on anybody (`.scratch/harvestnet-mvp/lanes.md`).
 
@@ -22,7 +22,7 @@ The **API skeleton** in `api_skeleton/` serves the public API examples at their 
 - **Times** are ISO 8601 with a UTC offset, for example `2026-10-13T15:00:00-07:00`. A household's pickup windows are the one exception: they repeat weekly, so they use days plus local clock times (`"18:00"`).
 - **Pounds** are plain numbers in fields named `pounds` or ending in `_lb`. Other units are converted by the unit calculator.
 - **IDs.** Organizations use short lowercase IDs (`market`, `city`, `rural`, `eastside`, `advocate`). A role (`donor`, `food_bank`, `advocate`) is a separate field, never the ID. Produce uses its profile ID (`apples`, `romaine`). A request uses a short code (`K7P4`).
-- **Privacy.** No names, addresses, or income. A phone number is optional, write-only, and never returned. Agents and food banks see households only as counts (`docs/MVP_DESIGN.md` §12).
+- **Privacy.** No names, addresses, or income. An email address is optional, write-only, used only for pickup emails, never returned or logged, and deleted with the request after 7 days. Agents and food banks see households only as counts (`docs/MVP_DESIGN.md` §12).
 - **Labels.** Every API response carries `mode`: `example` (the skeleton), `live`, `replay`, or `synthetic`, so nobody mistakes example data for a real run.
 
 ## Decisions made
@@ -42,6 +42,7 @@ The existing code disagreed in a few places. The team agreed these choices with 
 11. **The household shows its request code at pickup.** There's no separate pickup code. Staff enter the request code, and the API finds that household's open pickup at their food bank.
 12. **Auth is deferred.** The skeleton has no login. The real API needs staff sign-in for dashboards and approvals, and a pickup-bound token for releases (Lane C's design). That's for #9 and #19.
 13. **No expected winner in fixtures.** A scenario lists the rule checks to run but no expected split (ADR 0005). The split follows the run.
+14. **Pickup messages go by email, not SMS (`contract-v0.2`).** **Decided (user, October 11, 2026).** SMS needed Twilio and US carrier (A2P 10DLC) registration. Email goes out through n8n's Send Email (SMTP) node with Amazon SES in the team's AWS account. `create_request` takes an optional `email` instead of `phone` (`phone` is refused with 400) and returns `emails` instead of `texts`. Pickup emails carry a *Can't make it* link to the household page, which calls `release_pickup` unchanged; the SMS reply path is gone. The voice line still collects no contact. `get_health` reports `contract-v0.2`.
 
 ## What's left for ticket #1
 

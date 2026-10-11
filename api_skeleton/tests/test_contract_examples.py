@@ -146,7 +146,7 @@ def test_scenario_uses_real_profiles_and_the_fair_share_table(scenario):
 
 def test_scenario_requests_hold_no_identity(scenario):
     for r in scenario["requests"]:
-        assert not {"name", "address", "phone", "income"} & set(r)
+        assert not {"name", "address", "phone", "email", "income"} & set(r)
         assert r["consent"] is True
         assert r["snap"] in {"yes", "no", "not_said"}
 
@@ -306,10 +306,24 @@ def test_api_example_shape(path):
 
 
 @pytest.mark.parametrize("path", api_example_files(), ids=lambda p: p.stem)
-def test_api_responses_never_return_a_phone_number_or_name(path):
+def test_api_responses_never_return_contact_details_or_a_name(path):
     body = load(path)["example"]["response"]["body"]
     keys = {k for _, k, _ in walk(body)}
-    assert not {"phone", "name_of_person", "address", "income"} & keys
+    assert not {"phone", "email", "name_of_person", "address", "income"} & keys
+    assert not any("@" in s for s in strings(body))
+
+
+def test_contract_v0_2_households_give_an_optional_email_not_a_phone():
+    """User decision, October 11, 2026: pickup messages go by email through Amazon SES."""
+    create = load(API_EXAMPLES / "create_request.json")["example"]
+    assert "phone" not in create["request"]["body"]
+    assert create["request"]["body"]["email"].endswith("@example.invalid")
+    assert create["response"]["body"]["emails"] is True and "texts" not in create["response"]["body"]
+    health = load(API_EXAMPLES / "get_health.json")["example"]["response"]["body"]
+    assert health["contract_version"] == "contract-v0.2"
+    text = doc("public-api.md")
+    assert "contract-v0.2" in text and "Optional `email`" in text and "Optional `phone`" not in text
+    assert "contract-v0.2" in doc("README.md")
 
 
 def test_food_bank_views_show_snap_only_as_counts(api_examples):

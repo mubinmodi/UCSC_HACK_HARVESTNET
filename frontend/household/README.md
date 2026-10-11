@@ -5,15 +5,17 @@ produce, in English and Spanish, following the three screens in `docs/MVP_DESIGN
 
 1. **About your household.** Household size (the page shows the fair share the API sends), pickup days
    and time, limited fridge space, neighborhood, anything it can't eat, an optional SNAP/CalFresh
-   question (Yes / No / Prefer not to say), language, and an optional phone number for texts. Then a
+   question (Yes / No / Prefer not to say), language, and an optional email address for pickup updates. Then a
    read-back and the consent question. Nothing is saved until the household says yes.
 2. **Choose your food banks.** Nearby food banks, their pickup hours, whether those fit, and the produce
    committed there now, with badges such as *Keep cold*.
 3. **Your pickup.** The request code (shown at pickup; there's no separate pickup code), this week's
    balance, committed pickups only, and a *Can't make it* button.
 
-It never asks for a name, address, income, or immigration status, and stores nothing in the browser:
-answers live in memory for the visit, and the phone number is dropped once it's sent.
+It never asks for a name, address, income, or immigration status. Form answers live in memory for the
+visit, and the email address is dropped once it's sent. A pickup email's
+`#pickup=<pickup_id>&code=<request_code>&lang=<language>` link opens that pickup on this page. Opening
+the link only loads its status; the household must tap *Can't make it* and confirm before release.
 
 ## Run locally
 
@@ -32,8 +34,8 @@ npm run build      # type-checks, then builds dist/
 
 - The address comes from `VITE_API_BASE_URL` (see `.env.example`). Unset, the page calls the live API
   skeleton, `https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`.
-- `src/api.ts` is the only place that talks to the API. It uses the household operations in
-  `docs/contracts/public-api.md` with their exact shapes: `get_fair_share`, `preview_request`,
+- `src/api.ts` is the only place that talks to the API. It uses the `contract-v0.2` household operations
+  in `docs/contracts/public-api.md` with their exact shapes: `get_fair_share`, `preview_request`,
   `create_request`, `list_food_banks`, `choose_food_banks`, `get_request`, `release_pickup`.
 - **The page calculates nothing.** The fair share, balance, pounds, read-back, consent question, and
   pickup sentence are shown as the API sends them (ADR-0002). The page only formats dates.

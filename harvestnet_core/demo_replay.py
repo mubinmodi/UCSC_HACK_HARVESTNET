@@ -16,7 +16,7 @@ front-desk read-back and consent question (``POST /requests/preview``), the fair
 (``GET /fair-share``), the rules-based negotiation, holds, scripted approvals and the
 commitment (``run_fixture``), the household's pickup page (``GET /requests/{code}``),
 Workflow 4 (``cooler_join.apply_fault``: Lane C's switch and local Directory, Lane B's flow and
-reason cards), the households' new texts (``cooler_join.household_texts``), and the metrics.
+reason cards), the households' new email notices (``cooler_join.household_texts``), and the metrics.
 
 **One labeled variant.** In the shipped fixture the eastside manager answers 15 minutes after
 being asked, which is exactly when the planned trip arrives, so the core refuses the late answer
@@ -159,7 +159,7 @@ def record():
         fault = faults[0]
         workflow_4 = cooler_join.apply_fault(engine, LOT, fault)
         change = changes.find(engine.records, LOT, workflow_4['version'])
-        texts = cooler_join.household_texts(engine, LOT, change['version'], household_page_url=HOUSEHOLD_PAGE)
+        emails = cooler_join.household_texts(engine, LOT, change['version'], household_page_url=HOUSEHOLD_PAGE)
         after = _pickup_page(API(engine, clock=lambda: change['committed_at']), HOUSEHOLD) if change.get('committed_at') else None
     finally:
         engine.records.close()
@@ -212,7 +212,7 @@ def record():
             'moved_pickups': change.get('moved_pickups', []),
             'summary': workflow_4,
         },
-        'household_texts': texts,
+        'household_emails': emails,
         'household_page_after': after,
         'pickup_outcomes': _kinds(events, 'pickup_confirmation', 'pickup_released'),
         'metrics': run_metrics,

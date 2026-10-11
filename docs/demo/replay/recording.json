@@ -1861,7 +1861,7 @@
       "version": 15
     }
   },
-  "household_texts": [
+  "household_emails": [
     {
       "committed": true,
       "event_id": "lot-market-1013",
@@ -1882,18 +1882,11 @@
         "end": "2026-10-14T03:00:00Z"
       },
       "reply_expected": true,
-      "decline_replies": [
-        "can't make it",
-        "cant make it",
-        "cannot make it"
-      ],
-      "accept_replies": [
-        "yes"
-      ],
-      "message": "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 8 lb romaine lettuce. Your code is C4N6. Please wash produce before eating. Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another family.",
+      "message": "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 8 lb romaine lettuce. Your code is C4N6. Please wash produce before eating. This isn't a food bank you chose. If you can't go there, use the Can't make it link and your portion goes to another family.",
+      "kind": "pickup_changed",
       "pickup_id": "pk-lot-market-1013-1",
       "to": null,
-      "release_url": "https://households.example.invalid/pickups/pk-lot-market-1013-1"
+      "release_url": "https://households.example.invalid/#pickup=pk-lot-market-1013-1&code=C4N6&lang=en"
     },
     {
       "committed": true,
@@ -1915,16 +1908,11 @@
         "end": "2026-10-14T03:00:00Z"
       },
       "reply_expected": false,
-      "decline_replies": [
-        "can't make it",
-        "cant make it",
-        "cannot make it"
-      ],
-      "accept_replies": [],
-      "message": "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 7 lb romaine lettuce. Your code is D9H3. Please wash produce before eating. Can't make it? Reply CAN'T MAKE IT and your portion goes to another family.",
+      "message": "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 7 lb romaine lettuce. Your code is D9H3. Please wash produce before eating. Can't make it? Use the Can't make it link and your portion goes to another family.",
+      "kind": "pickup_changed",
       "pickup_id": "pk-lot-market-1013-2",
       "to": null,
-      "release_url": "https://households.example.invalid/pickups/pk-lot-market-1013-2"
+      "release_url": "https://households.example.invalid/#pickup=pk-lot-market-1013-2&code=D9H3&lang=en"
     },
     {
       "committed": true,
@@ -1946,14 +1934,11 @@
         "end": "2026-10-14T03:00:00Z"
       },
       "reply_expected": false,
-      "decline_replies": [
-        "no puedo ir"
-      ],
-      "accept_replies": [],
-      "message": "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 4 lb de lechuga romana. Su código es G1L7. Por favor lave los productos antes de comerlos. ¿No puede ir? Responda NO PUEDO IR y su porción pasa a otra familia.",
+      "message": "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 4 lb de lechuga romana. Su código es G1L7. Por favor lave los productos antes de comerlos. ¿No puede ir? Use el enlace No puedo ir y su porción pasa a otra familia.",
+      "kind": "pickup_changed",
       "pickup_id": "pk-lot-market-1013-3",
       "to": null,
-      "release_url": "https://households.example.invalid/pickups/pk-lot-market-1013-3"
+      "release_url": "https://households.example.invalid/#pickup=pk-lot-market-1013-3&code=G1L7&lang=es"
     },
     {
       "committed": true,
@@ -1975,17 +1960,11 @@
         "end": "2026-10-14T03:00:00Z"
       },
       "reply_expected": true,
-      "decline_replies": [
-        "no puedo ir"
-      ],
-      "accept_replies": [
-        "sí",
-        "si"
-      ],
-      "message": "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 12 lb de lechuga romana. Su código es K7P4. Por favor lave los productos antes de comerlos. Responda SÍ para conservarla, o NO PUEDO IR para rechazarla. Si la rechaza, su porción pasa a otra familia.",
+      "message": "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 12 lb de lechuga romana. Su código es K7P4. Por favor lave los productos antes de comerlos. Este no es un banco de alimentos que eligió. Si no puede ir, use el enlace No puedo ir y su porción pasa a otra familia.",
+      "kind": "pickup_changed",
       "pickup_id": "pk-lot-market-1013-4",
       "to": null,
-      "release_url": "https://households.example.invalid/pickups/pk-lot-market-1013-4"
+      "release_url": "https://households.example.invalid/#pickup=pk-lot-market-1013-4&code=K7P4&lang=es"
     }
   ],
   "household_page_after": {
@@ -2061,7 +2040,8 @@
       "kind": "pickup_released",
       "data": {
         "pickup_id": "pk-lot-market-1013-1",
-        "pounds": 8.0
+        "pounds": 8.0,
+        "source": "household"
       }
     },
     {

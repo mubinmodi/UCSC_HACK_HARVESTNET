@@ -1,17 +1,17 @@
-"""Version-bound human decisions. Neither n8n nor this store commits produce."""
+"""Version-bound human decisions and household pickup emails. Neither n8n nor this store commits produce."""
 import hashlib
-import hmac
 import html
 import math
 import json
 import os
+import re
 import secrets
 import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit, parse_qs, quote
+from urllib.parse import urlsplit, parse_qs
 from urllib.error import HTTPError, URLError
 from .transport import canonical, terms_hash
 from .http import JsonHandler, request_json, serve
@@ -20,8 +20,6 @@ APPROVERS = ('market', 'city', 'rural', 'eastside')
 # The core's tests still invite the donor by role; the core maps it to the lot's donor.
 LEGACY_APPROVERS = ('donor',)
 MAX_LINK_TTL_SECONDS = 86400
-CANT_MAKE_IT = ("can't make it", 'cant make it', 'cannot make it', "can't go", 'no puedo ir', 'no puedo')
-YES = ('yes', 'y', 'si', 'sí', 'confirm', 'ok')
 
 
 class StaleApproval(ValueError):
@@ -53,32 +51,20 @@ def same_hash(given, expected):
     return given == expected
 
 
-def phone_digits(phone):
-    digits = ''.join(c for c in str(phone or '') if c.isdigit())
-    if len(digits) == 10:  # a US number without its country code
-        digits = '1' + digits
-    if not 8 <= len(digits) <= 15:
-        raise ValueError('A phone number is required')
-    return digits
-
-
 class ApprovalStore:
-    def __init__(self, path=':memory:', clock=time.time, reply_key=None):
+    def __init__(self, path=':memory:', clock=time.time):
         if path != ':memory:':
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.lock, self.clock = threading.RLock(), clock
-        # Phones are never stored: a reply is matched on a keyed hash of its number.
-        # Without a configured key, bindings last only as long as this process.
-        self.reply_key = (reply_key.encode() if isinstance(reply_key, str) else reply_key) or secrets.token_bytes(32)
         self.db.executescript('''
             CREATE TABLE IF NOT EXISTS drafts(event TEXT PRIMARY KEY, version INTEGER, terms TEXT, digest TEXT);
             CREATE TABLE IF NOT EXISTS links(token_hash TEXT PRIMARY KEY, event TEXT, version INTEGER,
                 organization TEXT, digest TEXT, expires REAL, decision TEXT, receipt_id TEXT);
-            CREATE TABLE IF NOT EXISTS reply_bindings(phone_key TEXT, pickup_id TEXT, request_code TEXT,
-                release_token TEXT, food_bank TEXT, window_start TEXT, window_end TEXT, created REAL, expires REAL,
-                PRIMARY KEY(phone_key, pickup_id));
         ''')
+        # SMS replies are retired (pickup messages are emails with links): drop any old
+        # reply bindings, which held keyed hashes of household phone numbers.
+        self.db.execute('DROP TABLE IF EXISTS reply_bindings')
 
     @staticmethod
     def token_hash(token):
@@ -180,36 +166,6 @@ class ApprovalStore:
             rows = self.db.execute("SELECT organization FROM links l JOIN drafts d ON l.event=d.event AND l.version=d.version AND l.digest=d.digest WHERE l.event=? AND decision='approve' AND expires>?", (event,self.clock()))
             return sorted({row[0] for row in rows})
 
-    # SMS replies: which pickup a text to this phone was about.
-
-    def phone_key(self, phone):
-        return hmac.new(self.reply_key, phone_digits(phone).encode(), hashlib.sha256).hexdigest()
-
-    def bind_reply(self, notice, ttl=None):
-        """Remember the pickup a text to this phone is about, so its reply acts on it."""
-        ttl = int(os.getenv('REPLY_BINDING_TTL_SECONDS', '604800') if ttl is None else ttl)
-        now = self.clock()
-        with self.lock:
-            self.db.execute('INSERT OR REPLACE INTO reply_bindings VALUES (?,?,?,?,?,?,?,?,?)', (
-                self.phone_key(notice['to']), notice['pickup_id'], notice['request_code'], notice.get('release_token'),
-                notice['food_bank'], notice['window']['start'], notice['window']['end'], now, now + ttl))
-            self.db.commit()
-
-    def reply_binding(self, phone):
-        """The pickup in the last text sent to this phone, if it is still open."""
-        with self.lock:
-            row = self.db.execute('SELECT pickup_id,request_code,release_token,food_bank,window_start,window_end FROM reply_bindings '
-                                  'WHERE phone_key=? AND expires>? ORDER BY created DESC, rowid DESC LIMIT 1',
-                                  (self.phone_key(phone), self.clock())).fetchone()
-        if not row:
-            return None
-        return dict(zip(('pickup_id', 'request_code', 'release_token', 'food_bank', 'window_start', 'window_end'), row))
-
-    def unbind_reply(self, phone, pickup_id):
-        with self.lock:
-            self.db.execute('DELETE FROM reply_bindings WHERE phone_key=? AND pickup_id=?', (self.phone_key(phone), pickup_id))
-            self.db.commit()
-
 
 class CoreAPI:
     """The core's approval and release operations.
@@ -267,15 +223,6 @@ class CoreAPI:
             return request_json(self.decision_webhook, payload, token=self.webhook_token)
         return request_json(self.base_url + '/approvals', payload, token=self.token_for(record['organization_id']))
 
-    def release(self, code, pickup_id, release_token=None):
-        if not self.base_url:
-            return {'mode': 'text_fallback', 'status': 'release_pending', 'released': False,
-                    'reason': 'Core API unavailable; household portion has not been released'}
-        # release_pickup: the request code ties the reply to its own pickup (README decision 9).
-        # A pickup-scoped token is sent when the core issued one; never a staff token.
-        return request_json(self.base_url + '/pickups/' + quote(pickup_id, safe='') + '/release',
-                            {'request_code': code}, token=release_token)
-
 
 def core_error(exc):
     """The core's own status and error, passed through rather than reported as an outage."""
@@ -294,7 +241,154 @@ def approval_message(link):
             f"Review and choose Approve or Decline: {link['decision_url']}. No reply means no approval.")
 
 
-def pickup_message(notice, *, now=None):
+def approval_subject(link):
+    return f"HarvestNet: review draft version {link['version']} for lot {link['lot_id']}"
+
+
+# --- Household pickup emails ---------------------------------------------------------------
+# Decided (user, October 11, 2026): pickup messages go by email through n8n's Send Email
+# (SMTP) node and Amazon SES, not SMS. Each email has a subject and a plain-text body, and a
+# "Can't make it" link to the household page, which calls the core's release_pickup. There
+# is nothing to reply to, so no phone number, reply binding or inbound message is kept here.
+
+_LOCAL = re.compile(r"^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]{1,64}$")
+_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_TLD = re.compile(r"^[A-Za-z]{2,63}$")
+
+
+def email_address(raw):
+    """A plain address, or ``ValueError`` that never repeats it (so it never reaches a log)."""
+    value = raw.strip() if isinstance(raw, str) else ''
+    if not value or len(value) > 254 or value.count('@') != 1:
+        raise ValueError('A pickup email needs a valid "to" address')
+    local, domain = value.split('@')
+    labels = domain.split('.')
+    if (not _LOCAL.match(local) or local.startswith('.') or local.endswith('.') or '..' in local
+            or len(labels) < 2 or not all(_LABEL.match(label) for label in labels) or not _TLD.match(labels[-1])):
+        raise ValueError('A pickup email needs a valid "to" address')
+    return f'{local}@{domain.lower()}'
+
+
+def one_line(value, field):
+    """A value for a subject or a line of its own: no line breaks, so no header injection."""
+    if not isinstance(value, str) or not value.strip() or any(c in value for c in '\r\n\x00'):
+        raise ValueError(f'Pickup notice requires a one-line {field}')
+    return value.strip()
+
+
+# The household's pickup email, in its own language (ticket #6). Numbers, names, times and
+# the code come only from the core's notice.
+PICKUP_EMAIL = {
+    'en': {
+        'item': '{lb} lb {name}', 'and': 'and',
+        'subject': {'pickup_ready': 'HarvestNet: your produce is ready at {food_bank}',
+                    'pickup_changed': 'HarvestNet: your pickup changed',
+                    'pickup_released': 'HarvestNet: thanks for telling us'},
+        'opening': {'pickup_ready': 'Your produce is ready at {food_bank}.',
+                    'pickup_changed': 'Your pickup changed. It is now at {food_bank}.'},
+        'not_chosen': "This isn't a food bank you chose. If you can't go there, use the link below and your portion goes to another family.",
+        'what': 'What: {items}', 'when': 'When: {when}', 'code': 'Your code: {code} (show it at pickup)',
+        'wash': 'Please wash produce before eating.',
+        'release': "Can't make it? Open this link and tap \"Can't make it\". Your portion goes to another family:",
+        'coming': "If you're coming, you don't need to do anything.",
+        'released': 'Thanks for telling us. Your portion will go to another family.',
+        'tip': 'Market Match tip: ask {market} about its verified CalFresh produce match. {url}',
+        'footer': ('HarvestNet. This address is used only for pickup messages and is deleted with your request '
+                   'after 7 days. Replies to this email are not read.'),
+        'range': '{start} to {end}', 'dated': '{day}, {range}', 'am': 'am', 'pm': 'pm',
+        'weekdays': ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+        'months': ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+                   'October', 'November', 'December'),
+        'day': '{weekday}, {month} {date}',
+    },
+    'es': {
+        'item': '{lb} lb de {name}', 'and': 'y',
+        'subject': {'pickup_ready': 'HarvestNet: sus productos están listos en {food_bank}',
+                    'pickup_changed': 'HarvestNet: su recogida cambió',
+                    'pickup_released': 'HarvestNet: gracias por avisarnos'},
+        'opening': {'pickup_ready': 'Sus productos están listos en {food_bank}.',
+                    'pickup_changed': 'Su recogida cambió. Ahora es en {food_bank}.'},
+        'not_chosen': 'Este no es un banco de alimentos que eligió. Si no puede ir, use el enlace de abajo y su porción pasará a otra familia.',
+        'what': 'Qué: {items}', 'when': 'Cuándo: {when}', 'code': 'Su código: {code} (muéstrelo al recoger)',
+        'wash': 'Por favor lave los productos antes de comerlos.',
+        'release': '¿No puede ir? Abra este enlace y toque "No puedo ir". Su porción pasará a otra familia:',
+        'coming': 'Si va a venir, no tiene que hacer nada.',
+        'released': 'Gracias por avisarnos. Su porción pasará a otra familia.',
+        'tip': 'Consejo de Market Match: pregunte en {market} por su programa verificado que iguala sus dólares de CalFresh para frutas y verduras. {url}',
+        'footer': ('HarvestNet. Esta dirección solo se usa para avisos de recogida y se borra con su solicitud '
+                   'después de 7 días. No leemos las respuestas a este correo.'),
+        'range': 'de {start} a {end}', 'dated': '{day}, {range}', 'am': 'a. m.', 'pm': 'p. m.',
+        'weekdays': ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'),
+        'months': ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre',
+                   'octubre', 'noviembre', 'diciembre'),
+        'day': '{weekday} {date} de {month}',
+    },
+}
+NOTICE_KINDS = ('pickup_ready', 'pickup_changed', 'pickup_released')
+
+
+def _clock(moment, words):
+    hour = moment.hour % 12 or 12
+    minutes = f':{moment.minute:02d}' if moment.minute else ''
+    return f"{hour}{minutes} {words['pm'] if moment.hour >= 12 else words['am']}"
+
+
+def pickup_when(window, words):
+    """The pickup window as the household reads it, at the notice's own clock time.
+
+    ISO times with an offset read "Tuesday, October 13, 6 pm to 8 pm"; plain clock times
+    ("18:00") are shown as given.
+    """
+    try:
+        start = datetime.fromisoformat(window['start'].replace('Z', '+00:00'))
+        end = datetime.fromisoformat(window['end'].replace('Z', '+00:00'))
+    except ValueError:
+        return words['range'].format(start=window['start'].strip(), end=window['end'].strip())
+    span = words['range'].format(start=_clock(start, words), end=_clock(end, words))
+    day = words['day'].format(weekday=words['weekdays'][start.weekday()], month=words['months'][start.month - 1], date=start.day)
+    return words['dated'].format(day=day, range=span)
+
+
+def _items(items, words):
+    parts = [words['item'].format(lb=f"{item['pounds']:g}", name=one_line(item['name'], 'produce name')) for item in items]
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} {words['and']} {parts[-1]}"
+
+
+def _market_tip(notice, words, now):
+    """The Market Match tip: SNAP households only, and only a verified, nearby, recently
+    checked market. Markets are trusted, verified records, never arbitrary model suggestions."""
+    market = notice.get('market')
+    if not (notice.get('snap') == 'yes' and market and market.get('verified') is True and market.get('nearby') is True
+            and market.get('source_url') and market.get('verified_at')):
+        return None
+    from datetime import timedelta
+    checked = datetime.fromisoformat(market['verified_at'].replace('Z', '+00:00'))
+    current = now or datetime.now(timezone.utc)
+    if checked.tzinfo is None:
+        raise ValueError('Market verification timestamp requires timezone')
+    if current - timedelta(days=30) <= checked <= current:
+        return words['tip'].format(market=one_line(market['name'], 'market name'), url=one_line(market['source_url'], 'market link'))
+    return None
+
+
+def pickup_email(notice, *, now=None):
+    """A household's pickup email: ``{to, kind, language, subject, text}``.
+
+    ``kind`` is ``pickup_ready`` (the default), ``pickup_changed`` (a changed version moved
+    the pickup) or ``pickup_released`` (the thank-you after "Can't make it"). Only households
+    that gave an email get one, so ``to`` is required.
+    """
+    kind = notice.get('kind', 'pickup_ready')
+    if kind not in NOTICE_KINDS:
+        raise ValueError(f'Pickup notice kind must be one of {", ".join(NOTICE_KINDS)}')
+    to = email_address(notice.get('to'))
+    language = notice.get('language') if notice.get('language') in PICKUP_EMAIL else 'en'
+    words = PICKUP_EMAIL[language]
+    if kind == 'pickup_released':
+        if notice.get('released') is not True or not notice.get('pickup_id'):
+            raise ValueError('Send a release notice only after the core released the pickup')
+        return {'to': to, 'kind': kind, 'language': language, 'subject': words['subject'][kind],
+                'text': f"{words['released']}\n\n--\n{words['footer']}\n"}
     if notice.get('committed') is not True:
         raise ValueError('Notify only produce with a recorded commitment')
     for field in ('food_bank', 'items', 'window', 'request_code', 'pickup_id', 'version', 'release_url'):
@@ -306,83 +400,23 @@ def pickup_message(notice, *, now=None):
         raise ValueError('Pickup window requires start and end')
     if not isinstance(notice['items'], list) or any(not isinstance(item, dict) or not isinstance(item.get('name'), str) or not item['name'].strip() or type(item.get('pounds')) not in (int,float) or not math.isfinite(item['pounds']) or item['pounds'] <= 0 for item in notice['items']):
         raise ValueError('Pickup pounds must come from positive calculator results')
-    words = PICKUP_TEXT.get(notice.get('language'), PICKUP_TEXT['en'])
-    items = ', '.join(words['item'].format(lb=f"{item['pounds']:g}", name=item['name']) for item in notice['items'])
-    message = words['body'].format(items=items, food_bank=notice['food_bank'], start=notice['window']['start'],
-                                   end=notice['window']['end'], code=notice['request_code'], url=notice['release_url'])
-    # The Market Match tip: SNAP households only, and only a verified, nearby, recently checked market.
-    # Markets are trusted, verified records, never arbitrary model suggestions.
-    market = notice.get('market')
-    if notice.get('snap') == 'yes' and market and market.get('verified') is True and market.get('nearby') is True and market.get('source_url') and market.get('verified_at'):
-        from datetime import timedelta
-        checked = datetime.fromisoformat(market['verified_at'].replace('Z', '+00:00'))
-        current = now or datetime.now(timezone.utc)
-        if checked.tzinfo is None:
-            raise ValueError('Market verification timestamp requires timezone')
-        if current - timedelta(days=30) <= checked <= current:
-            message += words['tip'].format(market=market['name'], url=market['source_url'])
-    return message
-
-
-# The household's pickup text, in its own language (ticket #6). The reply words match
-# CANT_MAKE_IT and YES above. Numbers, names and times come only from the notice.
-PICKUP_TEXT = {
-    'en': {
-        'item': '{lb} lb {name}',
-        'body': ("HarvestNet: {items} at {food_bank}, {start} to {end}. Your code: {code}. "
-                 "Wash before eating. Reply YES to confirm, or CAN'T MAKE IT to pass it to another family ({url})."),
-        'tip': ' Market Match tip: ask {market} about its verified CalFresh produce match. {url}',
-    },
-    'es': {
-        'item': '{lb} lb de {name}',
-        'body': ('HarvestNet: {items} en {food_bank}, de {start} a {end}. Su código: {code}. '
-                 'Lave los productos antes de comerlos. Responda SÍ para confirmar, o NO PUEDO IR para pasarla a otra familia ({url}).'),
-        'tip': ' Consejo de Market Match: pregunte en {market} por su programa verificado que iguala sus dólares de CalFresh para frutas y verduras. {url}',
-    },
-}
-
-
-def reply_words(data):
-    text = data.get('text', data.get('Body'))
-    return ' '.join(str(text or '').lower().replace('’', "'").strip().rstrip('.!').split())
-
-
-def household_reply(store, core, data):
-    """An SMS reply. YES confirms; CAN'T MAKE IT calls the core's release operation.
-
-    The pickup is the one in the last text sent to the replying phone (recorded by
-    ``/notifications/prepare``), or an explicit ``pickup_id`` and ``request_code`` from a
-    trusted caller. Anything else gets the instructions back and changes nothing.
-    """
-    sender = data.get('from', data.get('From'))
-    words = reply_words(data)
-    if data.get('pickup_id') or data.get('request_code'):
-        if not (data.get('pickup_id') and data.get('request_code')):
-            raise ValueError('An explicit reply names both pickup_id and request_code')
-        pickup = {'pickup_id': data['pickup_id'], 'request_code': data['request_code'],
-                  'release_token': data.get('release_token'), 'food_bank': None}
-    elif sender:
-        pickup = store.reply_binding(sender)
-    else:
-        raise ValueError("A reply needs the sending phone, or the pickup it's about")
-    base = {'to': sender, 'released': False}
-    if pickup is None:
-        return 200, {**base, 'status': 'no_open_pickup',
-                     'message': "HarvestNet: we couldn't find an open pickup for this number. Nothing was changed."}
-    if words in YES:
-        where = f" at {pickup['food_bank']}, {pickup['window_start']} to {pickup['window_end']}" if pickup.get('food_bank') else ''
-        return 200, {**base, 'status': 'confirmed', 'pickup_id': pickup['pickup_id'],
-                     'message': f"HarvestNet: thanks, see you{where}. Your code: {pickup['request_code']}."}
-    if words in CANT_MAKE_IT:
-        result = core.release(pickup['request_code'], pickup['pickup_id'], pickup.get('release_token'))
-        if result.get('released') is True and sender:
-            store.unbind_reply(sender, pickup['pickup_id'])
-        message = result.get('message') or ("HarvestNet: thanks for telling us. Your portion will go to another family."
-                                            if result.get('released') else
-                                            "HarvestNet: we got your reply but couldn't release the pickup yet. We'll try again.")
-        return 200, {**result, 'to': sender, 'pickup_id': pickup['pickup_id'], 'message': message}
-    return 200, {**base, 'status': 'ignored', 'pickup_id': pickup['pickup_id'],
-                 'message': "HarvestNet: reply YES to confirm your pickup, or CAN'T MAKE IT to pass it to another family."}
+    url = one_line(notice['release_url'], 'release_url')
+    if not url.startswith(('https://', 'http://')):
+        raise ValueError('Pickup notice requires an http(s) release_url')
+    food_bank = one_line(notice['food_bank'], 'food bank')
+    parts = [words['opening'][kind].format(food_bank=food_bank)]
+    if kind == 'pickup_changed' and notice.get('reply_expected') is True:
+        parts.append(words['not_chosen'])
+    parts.append('\n'.join((words['what'].format(items=_items(notice['items'], words)),
+                            words['when'].format(when=pickup_when(notice['window'], words)),
+                            words['code'].format(code=one_line(notice['request_code'], 'request code')))))
+    parts += [words['wash'], f"{words['release']}\n{url}", words['coming']]
+    tip = _market_tip(notice, words, now)
+    if tip:
+        parts.append(tip)
+    parts.append(f"--\n{words['footer']}")
+    return {'to': to, 'kind': kind, 'language': language,
+            'subject': words['subject'][kind].format(food_bank=food_bank), 'text': '\n\n'.join(parts) + '\n'}
 
 
 def approval_page(record, token):
@@ -400,12 +434,20 @@ def approval_page(record, token):
     document.getElementById('result').textContent=JSON.stringify(await response.json(),null,2);}}</script></html>'''
 
 
-def handler_for(store, core, events_token, public_url):
+def handler_for(store, core, events_token, public_url, *, approver_emails=None,
+                approval_webhook=None, webhook_token=None, test_recipients=()):
+    approver_emails=approver_emails or {}
+    allowed={email.strip().lower() for email in test_recipients if email.strip()}
+    if approval_webhook:
+        parsed=urlsplit(approval_webhook)
+        if not parsed.netloc or (parsed.scheme!='https' and not (parsed.scheme=='http' and parsed.hostname in ('localhost','127.0.0.1'))):
+            raise ValueError('approval email webhook must use HTTPS')
     class Handler(JsonHandler):
         def do_GET(self):
             parsed = urlsplit(self.path)
             if parsed.path == '/health':
-                return self.send_json(200, {'status': 'ok', 'approval_mode': 'live_core' if core.base_url else 'local_approval_fallback'})
+                return self.send_json(200, {'status': 'ok', 'approval_mode': 'live_core' if core.base_url else 'local_approval_fallback',
+                                            'approval_email': 'configured' if approval_webhook and webhook_token and approver_emails and allowed else 'manual'})
             if parsed.path != '/human/review':
                 return self.send_json(404, {'error': 'Not found'})
             try:
@@ -439,17 +481,31 @@ def handler_for(store, core, events_token, public_url):
                     for link in links:
                         link['decision_url'] = public_url.rstrip('/') + '/human/review?token=' + link.pop('token')
                         link['message'] = approval_message(link)
+                        link['subject'] = approval_subject(link)
+                        address=approver_emails.get(link['organization_id'])
+                        if not (address and approval_webhook and webhook_token):
+                            link['email_delivery']='manual'
+                        elif address.lower() not in allowed:
+                            link['email_delivery']='outside_test_allowlist'
+                        else:
+                            # The link was already issued. A timeout may mean n8n sent the email;
+                            # do not reissue automatically. The caller still gets the link for a
+                            # deliberate manual fallback or an explicit reissue.
+                            try:
+                                result=request_json(approval_webhook,{
+                                    'to':address,'lot_id':link['lot_id'],'version':link['version'],
+                                    'decision_url':link['decision_url'],'subject':link['subject'],
+                                    'message':link['message']},token=webhook_token)
+                                link['email_delivery']='sent' if result.get('sent') is True else 'uncertain'
+                            except (HTTPError,URLError,TimeoutError,OSError,ValueError):
+                                link['email_delivery']='uncertain'
                     return self.send_json(201, {'status': 'awaiting_humans', 'committed': False, 'requests': links})
                 if path == '/human/decision':
                     record = store.decide(data['token'], data['decision'], data['version'], data['terms_hash'], data.get('human_confirmed'))
                     return self.send_json(200, core.decision(record))
                 if path == '/notifications/prepare':
-                    message = pickup_message(data)
-                    if data.get('to'):
-                        store.bind_reply(data)
-                    return self.send_json(200, {'to': data['to'], 'message': message, 'mode': 'prepared_text', 'sent': False})
-                if path == '/household/replies':
-                    return self.send_json(*household_reply(store, core, data))
+                    # The core's trusted notice becomes one email for n8n; nothing is sent or kept here.
+                    return self.send_json(200, {**pickup_email(data), 'mode': 'prepared_email', 'sent': False})
                 self.send_json(404, {'error': 'Not found'})
             except StaleApproval as exc:
                 self.send_json(409, {'error': str(exc)})
@@ -470,10 +526,17 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     args = parser.parse_args()
     events_token = os.getenv('API_EVENTS_TOKEN')
-    store = ApprovalStore(os.getenv('APPROVALS_DB', 'runtime/approvals.sqlite'),
-                          reply_key=os.getenv('REPLY_BINDING_KEY') or events_token)
+    store = ApprovalStore(os.getenv('APPROVALS_DB', 'runtime/approvals.sqlite'))
     public_url = os.getenv('APPROVAL_PUBLIC_URL', f'http://127.0.0.1:{args.port}')
-    serve(handler_for(store, CoreAPI.from_env(), events_token, public_url), args.port, args.host)
+    approver_emails=json.loads(os.getenv('APPROVER_EMAILS_JSON') or '{}')
+    if not isinstance(approver_emails,dict) or any(k not in APPROVERS or not isinstance(v,str) for k,v in approver_emails.items()):
+        raise ValueError('APPROVER_EMAILS_JSON must map organization IDs to email addresses')
+    approver_emails={k:email_address(v) for k,v in approver_emails.items()}
+    serve(handler_for(store, CoreAPI.from_env(), events_token, public_url,
+                      approver_emails=approver_emails,
+                      approval_webhook=os.getenv('N8N_APPROVAL_WEBHOOK_URL'),
+                      webhook_token=os.getenv('N8N_WEBHOOK_TOKEN'),
+                      test_recipients=os.getenv('SES_TEST_RECIPIENTS','').split(',')),args.port,args.host)
 
 
 if __name__ == '__main__':

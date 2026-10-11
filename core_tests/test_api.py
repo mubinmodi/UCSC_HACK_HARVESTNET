@@ -28,13 +28,13 @@ class APITests(unittest.TestCase):
         status,preview=self.api.call('POST','/requests/preview',self.form)
         self.assertEqual(status,200); self.assertFalse(preview['saved'])
         self.assertEqual(self.api.call('POST','/requests',self.form)[0],400)
-        status,r=self.api.call('POST','/requests',{**self.form,'consent':True,'phone':'+15555550142'})
+        status,r=self.api.call('POST','/requests',{**self.form,'consent':True,'email':'household@example.invalid'})
         self.assertEqual(status,201); self.assertEqual(r['fair_share_lb'],4)
-        self.assertNotIn('phone',r)
-        self.assertTrue(self.e.records.get('phone',r['request_code']))
+        self.assertNotIn('email',r); self.assertIs(r['emails'],True)
+        self.assertTrue(self.e.records.get('email',r['request_code']))
         self.now='2026-10-20T12:00:00-07:00'
         self.assertEqual(self.api.call('GET','/requests/'+r['request_code'])[0],404)
-        self.assertEqual(self.e.records.all('phone'),[])
+        self.assertEqual(self.e.records.all('email'),[])
         self.assertEqual(self.api.call('POST','/requests',{**self.form,'consent':True,'name':'private'})[0],400)
 
 

@@ -140,7 +140,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <li>Food bank and donor agents negotiate item by item; the advocate argues from fair-share gaps. <span class="tag l3">Level 3</span></li>
     <li>Managers approve the exact version. No one approves for anyone else. <span class="tag l3">Level 3</span></li>
     <li>The city cooler fails. The Directory finds a food bank with cold space; reason cards explain why. <span class="tag l2">Level 2</span></li>
-    <li>The parent gets a text with the food bank, time, items, and code. <span class="tag ev">Evidence</span></li>
+    <li>The parent can get an email with the food bank, time, items, and code if they provided an address. <span class="tag ev">Evidence</span></li>
     <li>The results strip compares against first-come-first-served. <span class="tag ev">Evidence</span></li>
   </ol>
 </section>
@@ -189,23 +189,23 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card">Profile: romaine must move, apples stay</div><span class="arrow">→</span>
     <div class="card">Directory: find food banks with cold space</div><span class="arrow">→</span>
     <div class="card">Reason card for every candidate</div><span class="arrow">→</span>
-    <div class="card">New version, fresh approvals, new texts</div>
+    <div class="card">New version, fresh approvals, new email notices</div>
   </div>
   <div class="quote">"Rural food bank: has cold space for only 50 lb of the 200 lb, 40 minutes away, but its pickup hours don't overlap households' pickup time, 6 pm to 8 pm. Not chosen."</div>
   <div class="quote">"Eastside food bank: has cold space for only 150 lb of the 200 lb, 15 minutes away, households can collect 6 pm to 8 pm. Chosen."</div>
   <p class="small"><span class="label">Recorded</span> Reason cards from the synthetic cooler-failure scenario. Old approvals don't carry over: the city and eastside managers must approve the new version.</p>
 </section>
 
-<section class="slide" aria-label="Moment 6: the household text">
+<section class="slide" aria-label="Moment 6: the household email">
   <h2>6 &nbsp;The household hears back <span class="tag ev">Evidence</span></h2>
   <ul>
-    <li>A text names the food bank, the pickup window, the items and pounds, and the household's code.</li>
+    <li>A pickup email names the food bank, the pickup window, the items and pounds, and the household's code.</li>
     <li>Pounds come from the portion calculator, up to the fair share. Never guessed by an AI.</li>
-    <li>"Can't make it" releases the portion to the next household furthest below its fair share.</li>
-    <li>If the cooler change moves a pickup to a food bank the household didn't choose, it can accept or decline.</li>
+    <li>The "Can't make it" link opens the household page; tapping its release button gives the portion to the next household furthest below fair share.</li>
+    <li>If a cooler change moves a pickup to a food bank the household didn't choose, the email explains the change and offers that link.</li>
     <li>A household counts as reached only when it confirms pickup.</li>
   </ul>
-  <p class="small">Texts are in the household's language. Spanish produce names come from the reviewed produce profiles.</p>
+  <p class="small">Emails are in the household's language. Spanish produce names come from the reviewed produce profiles. This synthetic scenario contains no addresses and sends no email.</p>
 </section>
 
 <section class="slide" aria-label="Moment 7: honest results">
@@ -238,7 +238,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card"><h3>Cisco AGNTCY</h3><p>A2A messages in the negotiation room. Directory finds food banks by capability.</p></div>
     <div class="card"><h3>Claude</h3><p>Negotiators, the advocate, and the front-desk assistant. Calculators supply every number.</p></div>
     <div class="card"><h3>ElevenLabs</h3><p>The voice line, with English and Spanish read-back.</p></div>
-    <div class="card"><h3>n8n</h3><p>Text alerts, approval requests, and the "Can't make it" reply.</p></div>
+    <div class="card"><h3>n8n</h3><p>Pickup and human-review email through Amazon SES.</p></div>
     <div class="card"><h3>Beeceptor</h3><p>Mock inventory, storage, cooler status, and truck schedules, with a cooler switch.</p></div>
     <div class="card"><h3>AWS</h3><p>Hosting for the agents, the API, and the web pages.</p></div>
   </div>

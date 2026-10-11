@@ -46,10 +46,10 @@ These use it:
    word in California. Check "Lechuga romana".
 5. **Voice line** (`integrations/elevenlabs/agent-prompt.md`). The Spanish first message and the
    table of fixed lines. Spoken "libras" versus written "lb".
-6. **Cooler-change texts** (`agents/src/harvestnet_agents/cooler_failure_flow.py`, `_NOTICE`).
-   "Su recogida cambió", and the reply words "SÍ" and "NO PUEDO IR".
-7. **n8n pickup text** (`harvestnet_platform/approvals.py`, `PICKUP_TEXT['es']`). Especially the
-   Market Match tip. Also check that it describes Market Match correctly, and verify the
+6. **Cooler-change messages** (`agents/src/harvestnet_agents/cooler_failure_flow.py`, `_NOTICE`).
+   "Su recogida cambió", and "use el enlace No puedo ir".
+7. **n8n pickup emails** (`harvestnet_platform/approvals.py`, `PICKUP_EMAIL['es']`). The subjects,
+   the "No puedo ir" link line and the footer. Especially the Market Match tip. Also check that it describes Market Match correctly, and verify the
    participating markets before the tip is shown to anyone (design section 9, Workflow 3).
 8. **Results strip** (`frontend/results-strip/src/App.tsx`). "Por orden de llegada",
    "Cobertura del banco peor atendido", "Negociadores con IA".
@@ -59,10 +59,10 @@ These use it:
 
 - **Food bank names** come from the scenario fixtures in English ("Rural food bank") and appear
   inside Spanish sentences. Real food banks have proper names, so this only affects the demo.
-- **n8n reply confirmations** (`household_reply` in `harvestnet_platform/approvals.py`: "thanks,
-  see you …", "we couldn't find an open pickup …") are English only. The reply doesn't carry the
-  household's language.
-- **Times in n8n texts** are shown as the notice gives them. The sender should pass readable times.
+- **SMS replies are gone** (user decision, October 11, 2026): pickup messages are emails with a
+  "Can't make it" link, so there are no reply confirmations to translate.
+- **Times in n8n emails** are shown as the notice's own clock time (with the date when the notice
+  gives one), not converted to the household's time zone.
 - **Staff screens** (donor page, food bank dashboards, approval review pages) are English only.
   They are for staff, not households. Their wording was reviewed for plain English and left as is.
 - **API error messages** are English only. The household page shows its own translated errors
