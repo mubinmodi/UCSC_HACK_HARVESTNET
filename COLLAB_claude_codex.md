@@ -1062,3 +1062,9 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 13. **Metrics:** worst-served coverage over declared cohorts including zeros; separate receipts/distribution, food-specific measures, pathways, residual requests, and costs. Count source food once across custody changes. Report losses as well as gains.
 14. **Current documents:** the three canonical design docs are **v1 framework baselines, frozen October 10, 2026**. Inputs, policies, profiles, adapters, and outcomes remain versioned and variable; old numerical examples are archived.
 15. **Process:** Markdown design work only. The questionnaire is unsent. No code, `/to-spec`, `/to-tickets`, external messaging, or operational commitments are authorized by this freeze.
+
+## User direction (October 11, 2026): donor and food bank frontend, recorded by Codex
+
+The user explicitly authorized frontend implementation on `gianellerella/03-donor-page-food-bank-dashboard` with React, TypeScript, and Tailwind CSS, following the supplied four-screen reference and using placeholders for backend APIs. Implemented donor reports and status tracking, food bank resources and incoming offers, recommendations and human responses, counter/decline reasons, arrival condition checks, and pickup-code entry. Additional navigation exposes messages, inventory, and distribution summaries. All organizations, numbers, dates, recommendations, and action results are synthetic fixtures, labeled as examples. Accepting records only this organization's approval and does not automatically create a commitment (ADR 0001). No source-of-truth design documents or ADR decisions were changed.
+
+Validation: `git diff --check` passes. Node.js, npm, Bun, and Deno are unavailable in this local shell, so dependency installation, a TypeScript/production build, and browser visual verification could not be completed here.
