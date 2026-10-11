@@ -1,13 +1,23 @@
 # Human approvals and household texts (#18)
 
 `python -m harvestnet_platform.approvals` starts the review/notification adapter on
-localhost:8030. Set `API_EVENTS_TOKEN` (random secret) and `APPROVAL_PUBLIC_URL`.
-SQLite stores only drafts and opaque organization decision capabilities; no
-household phone numbers, SNAP answers, or text contents are retained.
+localhost:8030. Set `API_EVENTS_TOKEN` (random secret), `APPROVAL_PUBLIC_URL`, and
+`REPLY_BINDING_KEY` (random secret). SQLite stores drafts, opaque organization
+decision capabilities, and, for SMS replies, which pickup the last text to a phone
+was about. The phone is stored only as a keyed hash; no phone numbers, SNAP
+answers, or text contents are retained.
 
-An authenticated core posts to `/approval-requests` with `event_id`, `version`,
-the complete `terms`, and named approving `organizations`. Each organization
-gets a separate random, expiring review URL, exact terms hash, and message.
+An authenticated core posts to `/approval-requests` with `lot_id` (the core's
+change requests still say `event_id`, which is read too), `version`, the complete
+`terms`, and named approving `organizations` (`market`, `city`, `rural`,
+`eastside`). Each organization gets a separate random review URL, the exact
+`sha256:` terms hash, an `expires_at` in ISO 8601, and a message. Links last
+`APPROVAL_LINK_TTL_SECONDS` (default 3600, at most 86400), or `ttl_seconds` in the
+request. A repeat of the same request is refused, so a webhook retry adds no links.
+To replace a lost or expired link for the same version, post the same request
+with `"reissue": true` (and the organizations to reissue): the old link stops
+working. A link that already carries a decision can't be reissued; changed terms
+need a new version.
 Distribute a URL only to that organization's authorized human. These are bearer
 capabilities: possession authenticates the invited human, not their named identity.
 Use HTTPS, don't log links, and never share links with agents. For stronger staff
@@ -21,13 +31,18 @@ does not equal human approval. Issuing a higher version invalidates all old link
 Keep this mirror up to date with EVERY core amendment. Even with that mirror,
 the core must independently recheck the current version and resource holds.
 
-Set `CORE_API_URL` and `CORE_API_TOKEN` for the live core. Human decisions POST
-to `/approvals` with event, organization, version, terms hash, decision, and an
-idempotent receipt ID. With no core, the labeled local fallback records a human
-decision but **does not commit**. A service outage returns 503; retry the same
-human decision safely. The core must deduplicate receipt IDs and enforce current
-version, required approvals, holds and deadlines before commitment. These core
-operations are proposed pending ticket #1/#9, not deployed endpoints.
+Set `CORE_API_URL` and `CORE_API_TOKENS` for the live core. `CORE_API_TOKENS` is a
+JSON map of each organization to its own core staff token, the same shape as the
+core's `HARVESTNET_STAFF_TOKENS` (which is also read if `CORE_API_TOKENS` is unset);
+each decision is sent with its own organization's token. A single legacy
+`CORE_API_TOKEN` still starts, with a warning, but only commits that one
+organization's decisions. Human decisions POST to `/approvals` as the contract's `record_approval`:
+`lot_id`, `version`, `organization_id`, `terms_hash` (`sha256:...`), `decision`,
+and the idempotent `receipt_id`. With no core, the labeled local fallback records
+a human decision but **does not commit**. A core rejection (401, 409, and so on)
+comes back with the core's own status and error. Only an unreachable core returns
+503; retry the same human decision safely. The core deduplicates receipt IDs and
+enforces the current version, required approvals, holds and deadlines.
 
 ## Import n8n workflows
 
@@ -58,19 +73,30 @@ recheck the current version/holds; it must not accept arbitrary public receipts.
 Pickup workflow forwards trusted core notice data to `/notifications/prepare`:
 `committed: true`, `food_bank`, calculator `items: [{name, pounds}]`, `window:
 {start,end}`, `request_code`, `pickup_id`, `version`, `release_url`, and `to`.
+The text asks the household to reply YES or CAN'T MAKE IT, and the platform
+remembers that this phone's last text was about this pickup.
 Optional `snap: yes` and `market` metadata add a tip only if `verified: true`,
 `nearby: true`, source URL exists, and timezone-aware verification is within
 30 days. This is a freshness policy, not proof of current participation; feed
 trusted verified market records. All example market data in tests is synthetic.
 Names, pounds, time and code come from the core, never model arithmetic.
 
-Reply workflow receives `{text, request_code, pickup_id, release_token}` from a
-trusted authenticated SMS bridge. The bridge must verify the SMS provider's
-signature and associate sender/code with an issued pickup; never trust a raw
-phone number or unsolicited text as authorization. Recognized cannot-make-it
-messages call `/pickups/{pickup_id}/release` using the pickup-scoped token. A
-missing/offline core reports `release_pending`, never pretends food was released.
-The core owns reassignment to the next household and expiry of requests.
+Reply workflow receives the inbound SMS (`From` and `Body`, as Twilio sends them,
+or `from` and `text`) and posts it to `/household/replies`. The platform finds the
+pickup in the last text sent to that phone, still open. **YES** confirms and
+answers with the food bank, window and code; nothing changes. **CAN'T MAKE IT**
+(also "cannot make it", "no puedo ir") calls the core's
+`POST /pickups/{pickup_id}/release` with that pickup's `request_code`, and the
+reply is sent back by SMS. Any other text gets the two options back. An unknown
+number changes nothing. A trusted caller may instead name `pickup_id` and
+`request_code` directly. A missing or offline core reports `release_pending` and
+keeps the pickup for a retry; it never pretends food was released. The core owns
+reassignment to the next household and expiry of requests.
+
+The incoming webhook must be authenticated. Twilio can't add a custom header, so
+in deployment either put Twilio's signature check in front of this webhook or use
+credentials Twilio can send (Basic auth in the webhook URL). A raw, unverified
+text is never treated as authorization.
 
 The four workflows are now imported as unpublished drafts in the HarvestNet n8n
 Cloud workspace. A separate manual connection check successfully calls the live

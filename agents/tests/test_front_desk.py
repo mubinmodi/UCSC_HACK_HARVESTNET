@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from harvestnet_agents.llm_negotiators import SpendingCap
 from harvestnet_agents.front_desk import (
     EXTRACTION_SCHEMA,
     AgreementStatus,
@@ -441,7 +442,7 @@ def test_claude_extractor_sends_a_small_structured_request_and_parses_it():
     fx = load("en_complete")
     client = FakeClient(fake_response(json.dumps(fx["extractor_output"])))
     transcript = Transcript.from_dict(fx["transcript"])
-    draft = intake_transcript(transcript, ClaudeExtractor(client=client))
+    draft = intake_transcript(transcript, ClaudeExtractor(client=client, cap=SpendingCap(1.0)))
     assert draft.to_dict() == fx["expected_draft"]
 
     (call,) = client.calls
@@ -457,4 +458,31 @@ def test_claude_extractor_sends_a_small_structured_request_and_parses_it():
 def test_claude_extractor_raises_instead_of_guessing(stop_reason):
     client = FakeClient(fake_response("{", stop_reason=stop_reason))
     with pytest.raises(ExtractionError):
-        ClaudeExtractor(client=client)(Transcript.from_dict(load("en_complete")["transcript"]))
+        ClaudeExtractor(client=client, cap=SpendingCap(1.0))(Transcript.from_dict(load("en_complete")["transcript"]))
+
+
+def test_claude_extractor_spending_cap_comes_from_one_setting_and_defaults_to_zero(monkeypatch):
+    fx = load("en_complete")
+    transcript = Transcript.from_dict(fx["transcript"])
+    monkeypatch.delenv("CLAUDE_RUN_CAP_USD", raising=False)
+    client = FakeClient(fake_response(json.dumps(fx["extractor_output"])))
+    with pytest.raises(ExtractionError, match="spending cap"):
+        ClaudeExtractor(client=client)(transcript)
+    assert client.calls == []  # no call was made
+
+    monkeypatch.setenv("CLAUDE_RUN_CAP_USD", "0.50")
+    extractor = ClaudeExtractor(client=client)
+    assert extractor.cap.limit_usd == 0.5
+    extractor(transcript)
+    assert len(client.calls) == 1
+    assert len(extractor.cap.entries) == 1 and extractor.cap.reserved_usd == 0
+
+
+def test_claude_extractor_cap_is_shared_and_blocks_when_spent():
+    fx = load("en_complete")
+    transcript = Transcript.from_dict(fx["transcript"])
+    client = FakeClient(fake_response(json.dumps(fx["extractor_output"])))
+    cap = SpendingCap(0.0001)  # below one call's worst case
+    with pytest.raises(ExtractionError):
+        ClaudeExtractor(client=client, cap=cap)(transcript)
+    assert client.calls == []

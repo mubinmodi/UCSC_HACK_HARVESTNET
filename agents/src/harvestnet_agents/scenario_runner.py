@@ -78,7 +78,7 @@ from .negotiation import (
     amendment_to_dict,
 )
 from .lane_b_rule_checks import RuleCheckResult, run_lane_b_rule_checks
-from .llm_negotiators import LLMNegotiator
+from .llm_negotiators import LLMNegotiator, SpendingCap
 from .profiles import ProfileSet
 from .rules_negotiators import TurnError, _Negotiator, rules_negotiator
 from .scenario import Fault, Scenario, SurplusOffer, draft_to_dict, facts_for, jsonable, offer_draft
@@ -431,9 +431,13 @@ def _llm_record(negotiator: Any) -> dict[str, Any] | None:
 def llm_negotiators_for(roles: Iterable[Role | str], **llm_kwargs: Any) -> NegotiatorFactory:
     """A factory giving ``LLMNegotiator`` to these roles and rules-based ones to the rest.
 
-    ``llm_kwargs`` go to ``LLMNegotiator`` (``cap`` is required; ``client``, ``config``).
+    ``llm_kwargs`` go to ``LLMNegotiator`` (``cap``, ``client``, ``config``). Without a
+    ``cap``, every negotiator from this factory shares ``SpendingCap.from_env()``
+    (``CLAUDE_RUN_CAP_USD``, default 0).
     """
     llm_roles = {Role(r) for r in roles}
+    if llm_kwargs.get("cap") is None:
+        llm_kwargs["cap"] = SpendingCap.from_env()
 
     def factory(role: Role, organization_id: str, calculators: Calculators) -> Negotiator:
         if role in llm_roles:

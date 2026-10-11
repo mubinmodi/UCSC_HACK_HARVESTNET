@@ -222,11 +222,11 @@ class API:
         q={k:v[0] for k,v in parse_qs(urlsplit(target).query).items()}
         root=path[0]
         calc=self.engine.calc
-        if root=='approvals' and method=='POST' and 'event_id' in b:
+        if root=='approvals' and method=='POST' and ('event_id' in b or b.get('organization_id')=='donor'):
             # Compatibility with Lane C's existing capability-verified human relay.
             # The event denotes the same lot; normalize names, never the decision.
             b=copy.deepcopy(b)
-            b['lot_id']=b.get('lot_id',b['event_id'])
+            b['lot_id']=b.get('lot_id',b.get('event_id'))
             if b.get('organization_id')=='donor':
                 b['organization_id']=self.records.get('lot',b['lot_id'])['draft']['donor_id']
             digest=b.get('terms_hash','')

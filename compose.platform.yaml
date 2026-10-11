@@ -11,9 +11,11 @@ x-agent: &agent
     ALLOW_INTERNAL_HTTP: '1'
     RECEIPTS_DB: /app/runtime/receipts.sqlite
 services:
+  # The service (container) name stays `donor` so deployment overlays keep matching;
+  # the organization it hosts is `market` (docs/contracts/README.md decision 1).
   donor:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, donor, --host, 0.0.0.0]
+    command: [python, -m, harvestnet_platform.transport, --organization, market, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://donor:8020

@@ -1,5 +1,5 @@
 {
-  "name": "HarvestNet - authenticated cannot make it reply",
+  "name": "HarvestNet - SMS reply: YES confirms, cannot make it releases",
   "nodes": [
     {
       "id": "authenticated-event",
@@ -53,6 +53,30 @@
       }
     },
     {
+      "id": "send-text",
+      "name": "Send text",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "resource": "sms",
+        "operation": "send",
+        "from": "={{ $vars.HARVESTNET_SMS_FROM }}",
+        "to": "={{ $json.to }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "CONFIGURE_IN_N8N",
+          "name": "HarvestNet SMS provider"
+        }
+      }
+    },
+    {
       "id": "respond",
       "name": "Respond",
       "type": "n8n-nodes-base.respondToWebhook",
@@ -81,6 +105,17 @@
       ]
     },
     "Validate and prepare": {
+      "main": [
+        [
+          {
+            "node": "Send text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send text": {
       "main": [
         [
           {

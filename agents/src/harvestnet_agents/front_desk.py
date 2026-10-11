@@ -827,10 +827,18 @@ class ClaudeExtractor:
     model: str = "claude-sonnet-5-5"
     max_tokens: int = 1024
     effort: str = "low"
+    cap: Any = None  # a SpendingCap; default SpendingCap.from_env() (CLAUDE_RUN_CAP_USD, default 0)
+
+    def __post_init__(self) -> None:
+        from .llm_negotiators import SpendingCap
+
+        if self.cap is None:
+            self.cap = SpendingCap.from_env()
 
     def __call__(self, transcript: Transcript) -> Mapping[str, Any]:
-        client = self.client if self.client is not None else _default_client()
-        response = client.beta.messages.create(
+        from .llm_negotiators import CostEntry, SpendingCapReached, usage_cost_usd, worst_case_cost_usd
+
+        request = dict(
             model=self.model,
             max_tokens=self.max_tokens,
             betas=[FALLBACK_BETA],
@@ -839,6 +847,26 @@ class ClaudeExtractor:
             system=EXTRACTION_PROMPT,
             messages=[{"role": "user", "content": f"<transcript>\n{transcript.render()}\n</transcript>"}],
         )
+        # Reserve the worst case before calling; over the cap, no call is made.
+        worst = worst_case_cost_usd(self.model, request, self.max_tokens)
+        try:
+            self.cap.reserve(worst)
+        except SpendingCapReached as exc:
+            raise ExtractionError(f"spending cap: {exc}; use the text form") from exc
+        try:
+            client = self.client if self.client is not None else _default_client()
+            response = client.beta.messages.create(**request)
+        except Exception:
+            self.cap.reserved_usd = max(0.0, self.cap.reserved_usd - worst)
+            raise
+        usage = getattr(response, "usage", None)
+        served = getattr(response, "model", None) or self.model
+        self.cap.settle(worst, CostEntry(
+            "front_desk", "front_desk", served,
+            getattr(usage, "input_tokens", 0) or 0, getattr(usage, "output_tokens", 0) or 0,
+            getattr(usage, "cache_creation_input_tokens", 0) or 0, getattr(usage, "cache_read_input_tokens", 0) or 0,
+            worst, usage_cost_usd([self.model, served], usage),
+        ))
         if response.stop_reason == "refusal":
             raise ExtractionError("the model declined to extract this transcript")
         if response.stop_reason == "max_tokens":

@@ -5,6 +5,15 @@ import os
 from .transport import Receiver, agent_card, load_policy, ORGANIZATIONS
 
 
+def organization_systems():
+    """This organization's own systems: the HarvestNet systems service (which applies the
+    demo cooler switch) when ``SYSTEMS_URL`` is set, else Beeceptor or recorded copies."""
+    from .systems import Systems
+    if os.getenv('SYSTEMS_URL'):
+        return Systems(os.environ['SYSTEMS_URL'], upstream='harvestnet_systems')
+    return Systems(os.getenv('BEECEPTOR_BASE_URL'))
+
+
 async def main():
     from a2a.server.agent_execution import AgentExecutor
     from a2a.server.apps import A2AStarletteApplication
@@ -23,11 +32,15 @@ async def main():
     print(f'Policy: {_label}; transport: native AGNTCY A2A; approvals disabled', flush=True)
     receiver = Receiver(organization, policy, os.getenv('RECEIPTS_DB', ':memory:'))
     if os.getenv('AGNTCY_DIRECTORY_ADDRESS'):
-        from .directory import AgntcyDirectory, record_for
-        from .systems import Systems
+        import threading
+        from .directory import AgntcyDirectory, DirectoryPublisher
+        from .http import seconds
         directory = AgntcyDirectory(os.environ['AGNTCY_DIRECTORY_ADDRESS'])
-        record = record_for(organization, os.environ['AGENT_PUBLIC_URL'], Systems(os.getenv('BEECEPTOR_BASE_URL')))
-        directory.register(record)
+        publisher = DirectoryPublisher(directory, organization, os.environ['AGENT_PUBLIC_URL'], organization_systems())
+        publisher.refresh()  # fail visibly at startup
+        # Re-read own systems and republish when capabilities change (cooler failure, new hours).
+        interval = seconds(os.getenv('DIRECTORY_REFRESH_SECONDS', '30'))
+        threading.Thread(target=publisher.run_forever, args=(interval,), daemon=True).start()
 
     class Executor(AgentExecutor):
         async def execute(self, context, event_queue):

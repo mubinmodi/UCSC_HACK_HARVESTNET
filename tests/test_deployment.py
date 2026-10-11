@@ -68,3 +68,23 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse(result['allocated'])
         self.assertNotIn('instruction',result['draft_request'])
         self.assertNotIn('name',result['draft_request'])
+
+    def test_per_organization_core_tokens_and_new_settings_load_from_secrets(self):
+        content = secrets_loader.env_file({'CORE_API_TOKENS': '{"market":"m","city":"c"}', 'REPLY_BINDING_KEY': 'k',
+                                           'APPROVAL_LINK_TTL_SECONDS': '3600', 'AGENT_TURN_TIMEOUT_SECONDS': '60'})
+        self.assertIn('CORE_API_TOKENS=\'{"market":"m","city":"c"}\'', content)
+        root = Path(__file__).parents[1]
+        for compose in ('compose.deployment.yaml', 'compose.platform.yaml', 'compose.agntcy.yaml'):
+            text = (root / compose).read_text()
+            self.assertNotIn('CORE_API_TOKEN:', text)
+            self.assertNotIn('ORGANIZATION_ID: donor', text)
+            self.assertNotIn('--organization, donor', text)
+        self.assertIn('--organization, market', (root / 'compose.platform.yaml').read_text())
+
+    def test_platform_ci_is_read_only_runs_pushes_on_main_and_uses_in_repo_agents(self):
+        workflow = (Path(__file__).parents[1] / '.github' / 'workflows' / 'platform.yml').read_text()
+        self.assertIn('permissions:\n  contents: read', workflow)
+        self.assertIn('push:\n    branches: [main]', workflow)
+        self.assertNotIn('f06b148', workflow)
+        self.assertNotIn('repository:', workflow)
+        self.assertIn('PYTHONPATH: agents/src', workflow)

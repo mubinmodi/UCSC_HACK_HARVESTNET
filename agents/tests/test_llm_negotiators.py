@@ -340,3 +340,27 @@ def test_a_refusal_falls_back_without_reading_content():
     assert len(client.requests) == 1
     assert decision.source == "fallback" and "refusal" in decision.fallback_reason
     assert decision.move.kind is MoveKind.ACCEPT
+
+
+def test_spending_cap_setting_is_one_env_value_defaulting_to_zero():
+    from harvestnet_agents.llm_negotiators import run_cap_usd_from_env
+
+    assert run_cap_usd_from_env({}) == 0
+    assert run_cap_usd_from_env({"CLAUDE_RUN_CAP_USD": ""}) == 0
+    assert run_cap_usd_from_env({"CLAUDE_RUN_CAP_USD": "2.5"}) == 2.5
+    assert SpendingCap.from_env({"CLAUDE_RUN_CAP_USD": "1"}).limit_usd == 1
+    for bad in ("nan", "inf", "-1", "five"):
+        with pytest.raises(ValueError):
+            run_cap_usd_from_env({"CLAUDE_RUN_CAP_USD": bad})
+
+
+def test_negotiators_from_the_factory_share_the_env_cap_and_make_no_call_at_zero(monkeypatch):
+    from harvestnet_agents.calculators import StandInCalculators
+    from harvestnet_agents.scenario_runner import llm_negotiators_for
+
+    monkeypatch.setenv("CLAUDE_RUN_CAP_USD", "0")
+    factory = llm_negotiators_for([Role.FOOD_BANK, Role.ADVOCATE], client=object())
+    city, advocate = factory(Role.FOOD_BANK, "city", StandInCalculators()), factory(Role.ADVOCATE, "advocate", StandInCalculators())
+    assert city.cap is advocate.cap and city.cap.limit_usd == 0
+    monkeypatch.setenv("CLAUDE_RUN_CAP_USD", "3")
+    assert llm_negotiators_for([Role.FOOD_BANK])(Role.FOOD_BANK, "city", StandInCalculators()).cap.limit_usd == 3

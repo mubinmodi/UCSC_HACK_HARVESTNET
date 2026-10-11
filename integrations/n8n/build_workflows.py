@@ -63,7 +63,9 @@ def main():
     files = {
         'approval-requests.json': workflow('HarvestNet - carry human review requests', [webhook('harvestnet-approval-request'),code,sms(),respond()]),
         'pickup-texts.json': workflow('HarvestNet - committed pickup and verified Market Match text',[webhook('harvestnet-pickup'),api('/notifications/prepare'),sms(),respond()]),
-        'cannot-make-it.json': workflow('HarvestNet - authenticated cannot make it reply',[webhook('harvestnet-household-reply'),api('/household/replies'),respond()]),
+        # An inbound SMS (sender + text) goes to the platform, which finds the pickup the
+        # last text to that phone was about: YES confirms, CAN'T MAKE IT calls the release.
+        'cannot-make-it.json': workflow('HarvestNet - SMS reply: YES confirms, cannot make it releases',[webhook('harvestnet-household-reply'),api('/household/replies'),sms(),respond()]),
         'human-decisions.json': workflow('HarvestNet - relay explicit version-bound human decision',[webhook('harvestnet-human-decision'),decision_api,respond()])}
     for file, data in files.items():
         (ROOT/file).write_text(json.dumps(data,indent=2)+'\n')

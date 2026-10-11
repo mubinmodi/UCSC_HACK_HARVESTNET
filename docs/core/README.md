@@ -19,7 +19,7 @@ On PowerShell, use `$env:PYTHONPATH='agents/src'` once, then omit the prefix fro
 the commands. `evaluate` stores each scenario's results in the records the server
 reads (`--database`, default `DATABASE_URL` or `runtime/core.sqlite`), so
 `GET /results?scenario_id=...` serves them unchanged. The cooler-failure scenario
-reads Lane C's organization systems in process, so run from the repository root. The server binds localhost port 8050. `PORT`, `DATABASE_URL`,
+reads Lane C's organization systems in process, so run from the repository root. The server binds localhost port 8050. `HOST` (set `0.0.0.0` in a container), `PORT`, `DATABASE_URL`,
 `HARVESTNET_FIXTURE`, `HARVESTNET_ALLOWED_ORIGIN` and `HARVESTNET_STAFF_TOKENS`
 configure it. Staff tokens are a JSON object with a different secret for each
 organization ID. Store them in ignored local configuration and pass them as

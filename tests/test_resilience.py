@@ -16,13 +16,14 @@ from harvestnet_platform.budget import Budget, BudgetExceeded
 from harvestnet_platform.directory import search_capability
 from harvestnet_platform.http import request_json
 from harvestnet_platform.join import MoveBridge
-from harvestnet_platform.systems import Systems, BANKS
+from harvestnet_platform.systems import Systems, BANKS, SYSTEM_ORGANIZATIONS
 from harvestnet_platform.transport import Receiver, handler_for as transport_handler, rpc_request
 
 
 def envelope():
-    return {'event_id': 'restart', 'sequence': 1, 'turn': 'donor',
-            'input': {'turn': 'donor', 'draft': {'version': 1, 'terms': {}}, 'facts': {}}}
+    return {'event_id': 'restart', 'sequence': 1, 'turn': 'market',
+            'input': {'role': 'donor', 'draft': {'version': 1, 'terms': {}}, 'facts': {},
+                      'turn': {'organization_id': 'market', 'number': 1, 'now': '2026-10-13T12:00:00-07:00', 'accepted_by': []}}}
 
 
 def notice():
@@ -33,7 +34,7 @@ def notice():
 
 class ResilienceTests(unittest.TestCase):
     def test_http_transport_rejects_bad_shapes_without_losing_next_valid_turn(self):
-        receiver = Receiver('donor')
+        receiver = Receiver('market')
         server = ThreadingHTTPServer(('127.0.0.1', 0), transport_handler(receiver, 'transport-test', 'http://localhost'))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -63,9 +64,9 @@ class ResilienceTests(unittest.TestCase):
         url = f'http://127.0.0.1:{server.server_port}/notifications/prepare'
         try:
             with self.assertRaises(HTTPError) as failure:
-                request_json(url, {**notice(), 'items': [None], 'to': 'test-only'}, token='events')
+                request_json(url, {**notice(), 'items': [None], 'to': '+18315550100'}, token='events')
             self.assertEqual(failure.exception.code, 400)
-            result = request_json(url, {**notice(), 'to': 'test-only'}, token='events')
+            result = request_json(url, {**notice(), 'to': '+18315550100'}, token='events')
             self.assertFalse(result['sent'])
             self.assertIn('8 lb apples', result['message'])
         finally:
@@ -108,13 +109,13 @@ class ResilienceTests(unittest.TestCase):
                 calls.append(1)
                 return {'organization_id': org, 'version': 1, 'action': 'ask_human', 'reason': 'test'}
             path = str(Path(tmp) / 'receipts.sqlite')
-            receiver = Receiver('donor', policy, path)
+            receiver = Receiver('market', policy, path)
             with ThreadPoolExecutor(max_workers=8) as pool:
                 receipts = list(pool.map(lambda _: receiver.receive(envelope()), range(30)))
             self.assertEqual(len(calls), 1)
             self.assertTrue(all(r == receipts[0] for r in receipts))
             receiver.db.close()
-            restarted = Receiver('donor', policy, path)
+            restarted = Receiver('market', policy, path)
             self.assertEqual(restarted.receive(envelope()), receipts[0])
             self.assertEqual(len(calls), 1)
             restarted.db.close()
@@ -122,12 +123,12 @@ class ResilienceTests(unittest.TestCase):
     def test_malformed_nested_transport_inputs_are_validation_errors(self):
         for field, value in [('input', []), ('input', None)]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
-                Receiver('donor').receive({**envelope(), field: value})
+                Receiver('market').receive({**envelope(), field: value})
         for draft in ([], None, 'wrong'):
             data = envelope()
             data['input']['draft'] = draft
             with self.subTest(draft=draft), self.assertRaises(ValueError):
-                Receiver('donor').receive(data)
+                Receiver('market').receive(data)
 
     def test_invalid_network_receipt_keeps_pending_turn_for_retry(self):
         class InvalidThenValid:
@@ -136,7 +137,7 @@ class ResilienceTests(unittest.TestCase):
         bridge = MoveBridge(InvalidThenValid())
         data = envelope()['input']
         with self.assertRaises(ValueError):
-            bridge('donor', data)
+            bridge('market', data)
         self.assertEqual(bridge.sequence, 0)
         self.assertIsNotNone(bridge.pending)
 
@@ -160,21 +161,21 @@ class ResilienceTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             path = str(Path(tmp) / 'approvals.sqlite')
             store = ApprovalStore(path)
-            links = store.request('lot', 1, {'lb': 8}, ['donor', 'city'])
+            links = store.request('lot', 1, {'lb': 8}, ['market', 'city'])
             link = links[0]
             receipt = store.decide(link['token'], 'approve', 1, link['terms_hash'], True)
             store.db.close()
             restarted = ApprovalStore(path)
             self.assertEqual(restarted.decide(link['token'], 'approve', 1, link['terms_hash'], True), receipt)
-            self.assertEqual(restarted.approved_organizations('lot'), ['donor'])
+            self.assertEqual(restarted.approved_organizations('lot'), ['market'])
             with self.assertRaises(ValueError):
                 restarted.decide(link['token'], 'decline', 1, link['terms_hash'], True)
             restarted.db.close()
 
     def test_core_outage_returns_503_then_retries_same_human_receipt(self):
         store = ApprovalStore()
-        link = store.request('lot', 1, {'lb': 8}, ['donor'])[0]
-        server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(store, CoreAPI('https://core.example'), 'events', 'http://localhost'))
+        link = store.request('lot', 1, {'lb': 8}, ['market'])[0]
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(store, CoreAPI('https://core.example', {'market': 'market-staff'}), 'events', 'http://localhost'))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         body = {'token': link['token'], 'decision': 'approve', 'version': 1,
@@ -212,7 +213,7 @@ class ResilienceTests(unittest.TestCase):
 
     def test_all_system_resources_accept_mock_contract_and_failures_are_isolated(self):
         systems = Systems('https://mock.example')
-        for org in ('donor', *BANKS):
+        for org in SYSTEM_ORGANIZATIONS:
             for resource in systems.fixture[org]:
                 recorded = systems.recorded(org, resource)
                 with patch('harvestnet_platform.systems.request_json', return_value=copy.deepcopy(recorded)):

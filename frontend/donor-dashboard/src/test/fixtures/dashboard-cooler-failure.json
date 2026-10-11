@@ -1,0 +1,241 @@
+{
+  "_source": "Recorded from harvestnet_core's #23 cooler-failure join (core_tests/test_cooler_failure_join.py, after the city cooler switch and the change proposal). Synthetic scenario data; not a measured result.",
+  "mode": "synthetic",
+  "synthetic": true,
+  "food_bank_id": "city",
+  "name": "City food bank",
+  "capacity": {
+    "storage": [
+      {
+        "window": {
+          "start": "2026-10-13T12:00:00-07:00",
+          "end": "2026-10-14T21:00:00-07:00"
+        },
+        "cold_free_lb": 250,
+        "dry_free_lb": 200
+      }
+    ],
+    "pickup_windows": [
+      {
+        "start": "2026-10-13T18:00:00-07:00",
+        "end": "2026-10-13T20:00:00-07:00"
+      },
+      {
+        "start": "2026-10-14T18:00:00-07:00",
+        "end": "2026-10-14T20:00:00-07:00"
+      }
+    ],
+    "truck": {
+      "window": {
+        "start": "2026-10-13T13:00:00-07:00",
+        "end": "2026-10-13T17:00:00-07:00"
+      },
+      "refrigerated": true,
+      "capacity_lb": 250
+    },
+    "cooler": {
+      "status": "failed",
+      "temperature_c": 14,
+      "cold_available": false,
+      "source": "recorded_fixture",
+      "mode": "replay",
+      "synthetic": true,
+      "observed_at": "2026-10-13T22:30:00Z"
+    }
+  },
+  "incoming_offers": [
+    {
+      "lot_id": "lot-market-1013",
+      "version": 14,
+      "donor_id": "market",
+      "donor_name": "Farmers market",
+      "for_us": [
+        {
+          "produce_id": "romaine",
+          "name": "Romaine lettuce",
+          "pounds": 200.0
+        },
+        {
+          "produce_id": "apples",
+          "name": "Apples",
+          "pounds": 50.0
+        }
+      ],
+      "transport": {
+        "food_bank_id": "city",
+        "mover": "food_bank",
+        "departs_at": "2026-10-13T15:00:00-07:00",
+        "arrives_at": "2026-10-13T15:20:00-07:00"
+      },
+      "agent_suggests": null,
+      "agent_reason": "Our 4 households' 32 lb fair-share gap is already planned in the 231 lb for us. 319 lb of potatoes is still unclaimed, so rather than let it go to waste we ask for some beyond fair share. Arriving at 1:40 pm, we have 469 lb of dry space for it from arrival until pickup ends, households can collect it 4 pm to 6 pm, and its produce profile keeps it usable in dry storage until then. Asking for 319 lb more, beyond fair share.",
+      "needs_your_approval": false
+    }
+  ],
+  "fair_share_gap": {
+    "households": 4,
+    "people": 10,
+    "below_fair_share_lb": 0,
+    "limited_fridge": 2,
+    "evening_only": 4,
+    "table_version": "0.1.0-placeholder"
+  },
+  "disagreements": [],
+  "expected_arrivals": [
+    {
+      "lot_id": "lot-market-1013",
+      "version": 14,
+      "arrives_at": "2026-10-13T15:20:00-07:00",
+      "items": [
+        {
+          "produce_id": "romaine",
+          "food_bank_id": "city",
+          "pounds": 200.0
+        },
+        {
+          "produce_id": "apples",
+          "food_bank_id": "city",
+          "pounds": 50.0
+        }
+      ],
+      "status": "committed"
+    }
+  ],
+  "disruptions": [
+    {
+      "lot_id": "lot-market-1013",
+      "version": 15,
+      "based_on_version": 14,
+      "change": "cooler_failure",
+      "status": "awaiting_approvals",
+      "proposer_id": "city",
+      "needs_approval_from": [
+        "city",
+        "eastside"
+      ],
+      "approved_by": [],
+      "declined_by": [],
+      "needs_your_approval": true,
+      "dashboard": {
+        "food_bank_id": "city",
+        "status": "assessed",
+        "synthetic": true,
+        "reading": {
+          "organization_id": "city",
+          "resource": "cooler",
+          "synthetic": true,
+          "mode": "replay",
+          "source": "recorded_fixture",
+          "fixture_version": "cooler-failure/contract-v0.1",
+          "observed_at": "2026-10-13T22:30:00Z",
+          "cooler_status": "failed"
+        },
+        "flags": [
+          "city cooler reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "city truck reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "city pickup-hours reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "Directory results came from 'local_directory_fallback', not the AGNTCY Directory",
+          "rural storage reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "rural pickup-hours reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "eastside storage reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving",
+          "eastside pickup-hours reading is a recorded copy (mode replay, source recorded_fixture), not a live reading; a human should confirm it before approving"
+        ],
+        "profile_set_version": "2026-10-11.1",
+        "items": {
+          "move": [
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "reason": "Romaine lettuce: profile says it needs a fridge (produce profiles v2026-10-11.1), and the cooler failed, so it must move"
+            }
+          ],
+          "stay": [
+            {
+              "produce_id": "apples",
+              "pounds": 50,
+              "reason": "Apples: profile says it keeps without a fridge (produce profiles v2026-10-11.1), so it stays"
+            }
+          ],
+          "human_check": []
+        },
+        "reason_cards": [
+          {
+            "food_bank_id": "rural",
+            "name": "Rural food bank",
+            "outcome": "rejected",
+            "text": "Rural food bank: has cold space for only 50 lb of the 200 lb, 40 minutes away, but its pickup hours don't overlap households' pickup time, 6 pm to 8 pm. Not chosen.",
+            "reasons": [
+              "has cold space for only 50 lb of the 200 lb",
+              "40 minutes away",
+              "its pickup hours don't overlap households' pickup time, 6 pm to 8 pm"
+            ],
+            "facts": {
+              "response": "answered",
+              "cold_space_lb": 50,
+              "travel_minutes": 40,
+              "pickup_windows": [
+                {
+                  "start": "2026-10-13T23:00:00Z",
+                  "end": "2026-10-14T01:00:00Z"
+                },
+                {
+                  "start": "2026-10-15T01:00:00Z",
+                  "end": "2026-10-15T03:00:00Z"
+                }
+              ],
+              "arrives_at": "2026-10-13T23:10:00Z"
+            }
+          },
+          {
+            "food_bank_id": "eastside",
+            "name": "Eastside food bank",
+            "outcome": "chosen",
+            "text": "Eastside food bank: has cold space for only 150 lb of the 200 lb, 15 minutes away, households can collect 6 pm to 8 pm. Chosen.",
+            "reasons": [
+              "has cold space for only 150 lb of the 200 lb",
+              "15 minutes away",
+              "households can collect 6 pm to 8 pm"
+            ],
+            "facts": {
+              "response": "answered",
+              "cold_space_lb": 150,
+              "travel_minutes": 15,
+              "pickup_windows": [
+                {
+                  "start": "2026-10-14T01:00:00Z",
+                  "end": "2026-10-14T04:00:00Z"
+                },
+                {
+                  "start": "2026-10-15T01:00:00Z",
+                  "end": "2026-10-15T04:00:00Z"
+                }
+              ],
+              "arrives_at": "2026-10-13T22:45:00Z"
+            }
+          }
+        ],
+        "fallback": [
+          {
+            "produce_id": "romaine",
+            "pounds": 50.0,
+            "kind": "same_day_offer",
+            "reason": "Eastside food bank has no cold space for these 50 lb; offer it tonight to City food bank households who can come 6 pm to 8 pm, since romaine lettuce keeps 1 to 2 days at room temperature (profile v2026-10-11.1)"
+          }
+        ],
+        "new_version": {
+          "event_id": "lot-market-1013",
+          "version": 15,
+          "based_on_version": 14,
+          "status": "awaiting_receiver_decision",
+          "receiving_food_bank_id": "eastside",
+          "needs_approval_from": [
+            "eastside",
+            "city"
+          ],
+          "terms_hash": "9bad093b0b809769251c163089076e1e2a98d24d3d89f79e92ee0b67f4b7f417",
+          "committed": false
+        }
+      }
+    }
+  ]
+}
