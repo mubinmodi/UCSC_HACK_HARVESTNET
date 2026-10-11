@@ -1,0 +1,121 @@
+# AWS single-instance stack, layered on compose.platform.yaml (the five organization
+# hosts on the private `platform` network):
+#
+#   docker compose -p harvestnet --env-file /opt/harvestnet/deploy.env \
+#     -f compose.platform.yaml -f deploy/aws/compose.aws.yaml up -d --no-build
+#
+# Differences from compose.deployment.yaml, on purpose:
+# - The core is the real Lane A server (python -m harvestnet_core.server) built into
+#   the same image, on SQLite in a named volume. The core reads DATABASE_URL, not the
+#   POSTGRES_* settings, and SQLite is its supported single-host option, so there is
+#   no Postgres container (less memory on a small instance, nothing to back up twice).
+# - One image (deploy/aws/Dockerfile) for every service, built once on the instance.
+# - The organization hosts run the real policy adapter (harvestnet_core.join_adapter).
+# - Caddy also serves the frontend apps from the release bundle, on the same origin.
+# Built by deploy/aws/remote_deploy.sh, which sets HARVESTNET_RELEASE.
+
+x-app-image: &app-image
+  image: harvestnet-app:${HARVESTNET_RELEASE:?set by deploy/aws/remote_deploy.sh}
+  pull_policy: never
+
+x-agent-env: &agent-env
+  AGENT_POLICY: harvestnet_core.join_adapter:policy
+  CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+  CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+
+services:
+  donor:
+    <<: *app-image
+    environment: *agent-env
+  city:
+    <<: *app-image
+    environment: *agent-env
+  rural:
+    <<: *app-image
+    environment: *agent-env
+  eastside:
+    <<: *app-image
+    environment: *agent-env
+  advocate:
+    <<: *app-image
+    environment: *agent-env
+
+  systems:
+    <<: *app-image
+    command: [python, -m, harvestnet_platform.systems, --host, 0.0.0.0]
+    environment:
+      BEECEPTOR_BASE_URL: ${BEECEPTOR_BASE_URL:-}
+      DEMO_SWITCH_TOKEN: ${DEMO_SWITCH_TOKEN:?set DEMO_SWITCH_TOKEN}
+      COOLER_STATE_PATH: /app/runtime/coolers.json
+    volumes: [systems-data:/app/runtime]
+    networks: [platform, egress]
+    restart: unless-stopped
+
+  approvals:
+    <<: *app-image
+    command: [python, -m, harvestnet_platform.approvals, --host, 0.0.0.0]
+    environment:
+      API_EVENTS_TOKEN: ${API_EVENTS_TOKEN:?set API_EVENTS_TOKEN}
+      APPROVAL_PUBLIC_URL: ${APPROVAL_PUBLIC_URL:?set APPROVAL_PUBLIC_URL}
+      CORE_API_URL: ${CORE_API_URL:-http://core:8000}
+      CORE_API_TOKEN: ${CORE_API_TOKEN:-}
+      N8N_DECISION_WEBHOOK_URL: ${N8N_DECISION_WEBHOOK_URL:-}
+      N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:-}
+      ALLOW_INTERNAL_HTTP: '1'
+      APPROVALS_DB: /app/runtime/approvals.sqlite
+    volumes: [approvals-data:/app/runtime]
+    networks: [platform, egress]
+    depends_on:
+      core:
+        condition: service_healthy
+    restart: unless-stopped
+
+  core:
+    <<: *app-image
+    command: [python, -m, harvestnet_core.server]
+    environment:
+      HOST: 0.0.0.0
+      PORT: '8000'
+      DATABASE_URL: /app/data/core.sqlite
+      HARVESTNET_FIXTURE: docs/contracts/examples/scenario-normal-afternoon.json
+      HARVESTNET_ALLOWED_ORIGIN: ${HARVESTNET_ALLOWED_ORIGIN:?set HARVESTNET_ALLOWED_ORIGIN}
+      HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [core-data:/app/data, budget-data:/app/budget]
+    networks: [platform, egress]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  gateway:
+    image: caddy:2.10.2-alpine
+    environment:
+      HARVESTNET_DOMAIN: ${HARVESTNET_DOMAIN:?set HARVESTNET_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/aws/frontends.caddy:/etc/caddy/frontends.caddy:ro
+      - ./frontend-dist:/srv/frontend:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [platform, egress]
+    depends_on: [approvals, core]
+    restart: unless-stopped
+
+networks:
+  egress:
+
+volumes:
+  systems-data:
+  approvals-data:
+  core-data:
+  budget-data:
+  caddy-data:
+  caddy-config:

@@ -2,6 +2,7 @@
 hackathon project
 
 Household web page (ticket #2): [`frontend/household/`](frontend/household/README.md).
+Donor page and food bank dashboard (ticket #3): [`frontend/donor-dashboard/`](frontend/donor-dashboard/README.md).
 
 ## Lane C implementation
 
