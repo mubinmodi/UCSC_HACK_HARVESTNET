@@ -1,4 +1,14 @@
-node_modules/
-dist/
-*.tsbuildinfo
 .DS_Store
+HarvestNet_Share.zip
+.print_*
+*.raw.pdf
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+runtime/
+output/

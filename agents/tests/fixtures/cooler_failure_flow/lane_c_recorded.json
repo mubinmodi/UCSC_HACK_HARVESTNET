@@ -1,0 +1,365 @@
+{
+  "_source": "Copied, not imported, from Lane C. Readings are the output of harvestnet_platform.systems.Systems().read(org, resource) after switch('city', True), with no BEECEPTOR_BASE_URL set, so mode is 'replay' (PR #26, harvestnet_platform/systems.py and harvestnet_platform/fixtures/systems.json, commit 824dbe2; unchanged on calebdbur/21 at 8cd17a3). The directory result is harvestnet_platform.directory.LocalDirectory(systems, endpoints).search(min_cold_lb=0) (PR #27, harvestnet_platform/directory.py, commit bfa2438; endpoint URLs are local placeholders). All values are synthetic (Lane C fixture_version synthetic-v1).",
+  "readings": {
+    "city_cooler": {
+      "organization_id": "city",
+      "resource": "cooler",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "status": "failed",
+        "temperature_c": 14,
+        "cold_available": false
+      },
+      "disruption": "synthetic_cooler_failure"
+    },
+    "city_truck": {
+      "organization_id": "city",
+      "resource": "truck",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "available": true,
+        "capacity_lb": 250,
+        "refrigerated": true,
+        "windows": [
+          {
+            "start": "2026-10-11T20:00:00Z",
+            "end": "2026-10-12T00:00:00Z"
+          }
+        ]
+      }
+    },
+    "city_pickup_hours": {
+      "organization_id": "city",
+      "resource": "pickup-hours",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "windows": [
+          {
+            "start": "2026-10-12T01:00:00Z",
+            "end": "2026-10-12T03:00:00Z"
+          }
+        ]
+      }
+    },
+    "city_storage": {
+      "organization_id": "city",
+      "resource": "storage",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "cold_available_lb": 0,
+        "dry_available_lb": 200,
+        "windows": [
+          {
+            "start": "2026-10-11T20:00:00Z",
+            "end": "2026-10-12T03:00:00Z"
+          }
+        ]
+      },
+      "disruption": "synthetic_cooler_failure"
+    },
+    "rural_storage": {
+      "organization_id": "rural",
+      "resource": "storage",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "cold_available_lb": 50,
+        "dry_available_lb": 700,
+        "windows": [
+          {
+            "start": "2026-10-11T20:00:00Z",
+            "end": "2026-10-12T01:00:00Z"
+          }
+        ]
+      }
+    },
+    "rural_pickup_hours": {
+      "organization_id": "rural",
+      "resource": "pickup-hours",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "windows": [
+          {
+            "start": "2026-10-11T23:00:00Z",
+            "end": "2026-10-12T01:00:00Z"
+          }
+        ]
+      }
+    },
+    "eastside_storage": {
+      "organization_id": "eastside",
+      "resource": "storage",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "cold_available_lb": 150,
+        "dry_available_lb": 100,
+        "windows": [
+          {
+            "start": "2026-10-11T20:00:00Z",
+            "end": "2026-10-12T04:00:00Z"
+          }
+        ]
+      }
+    },
+    "eastside_pickup_hours": {
+      "organization_id": "eastside",
+      "resource": "pickup-hours",
+      "synthetic": true,
+      "mode": "replay",
+      "source": "recorded_fixture",
+      "fixture_version": "synthetic-v1",
+      "observed_at": "2026-10-11T14:00:00Z",
+      "data": {
+        "windows": [
+          {
+            "start": "2026-10-12T01:00:00Z",
+            "end": "2026-10-12T04:00:00Z"
+          }
+        ]
+      }
+    }
+  },
+  "directory": {
+    "mode": "local_directory_fallback",
+    "synthetic": true,
+    "records": [
+      {
+        "name": "harvestnet.org/agents/city",
+        "schema_version": "1.0.0",
+        "version": "1.0.0",
+        "description": "HarvestNet organization proposals; no external commitment authority",
+        "authors": [
+          "HarvestNet city"
+        ],
+        "created_at": "2026-10-11T14:00:00Z",
+        "skills": [
+          {
+            "id": 101
+          }
+        ],
+        "domains": [],
+        "modules": [
+          {
+            "id": 203,
+            "name": "integration/a2a",
+            "data": {
+              "card_data": {
+                "name": "HarvestNet city",
+                "description": "HarvestNet organization proposals; no external commitment authority",
+                "url": "http://127.0.0.1:9010/",
+                "version": "1.0.0",
+                "protocolVersion": "0.3.0",
+                "preferredTransport": "JSONRPC",
+                "capabilities": {
+                  "streaming": false
+                },
+                "defaultInputModes": [
+                  "application/json"
+                ],
+                "defaultOutputModes": [
+                  "application/json"
+                ],
+                "securitySchemes": {
+                  "bearer": {
+                    "type": "http",
+                    "scheme": "bearer"
+                  }
+                },
+                "security": [
+                  {
+                    "bearer": []
+                  }
+                ],
+                "skills": [
+                  {
+                    "id": "organization_move",
+                    "name": "Propose own organization move",
+                    "description": "Respond to versioned calculator facts on a published turn",
+                    "tags": [
+                      "negotiation",
+                      "city",
+                      "cold_space",
+                      "pickup_hours"
+                    ]
+                  }
+                ],
+                "supportsAuthenticatedExtendedCard": false
+              },
+              "card_schema_version": "v1.0.0"
+            }
+          }
+        ],
+        "annotations": {
+          "harvestnet": "{\"capabilities\": {\"cold_space_lb\": 0, \"fixture_version\": \"synthetic-v1\", \"observed_at\": \"2026-10-11T14:00:00Z\", \"pickup_hours\": [{\"end\": \"2026-10-12T03:00:00Z\", \"start\": \"2026-10-12T01:00:00Z\"}], \"role\": \"food_bank\", \"synthetic\": true}, \"organization_id\": \"city\"}"
+        }
+      },
+      {
+        "name": "harvestnet.org/agents/rural",
+        "schema_version": "1.0.0",
+        "version": "1.0.0",
+        "description": "HarvestNet organization proposals; no external commitment authority",
+        "authors": [
+          "HarvestNet rural"
+        ],
+        "created_at": "2026-10-11T14:00:00Z",
+        "skills": [
+          {
+            "id": 101
+          }
+        ],
+        "domains": [],
+        "modules": [
+          {
+            "id": 203,
+            "name": "integration/a2a",
+            "data": {
+              "card_data": {
+                "name": "HarvestNet rural",
+                "description": "HarvestNet organization proposals; no external commitment authority",
+                "url": "http://127.0.0.1:9020/",
+                "version": "1.0.0",
+                "protocolVersion": "0.3.0",
+                "preferredTransport": "JSONRPC",
+                "capabilities": {
+                  "streaming": false
+                },
+                "defaultInputModes": [
+                  "application/json"
+                ],
+                "defaultOutputModes": [
+                  "application/json"
+                ],
+                "securitySchemes": {
+                  "bearer": {
+                    "type": "http",
+                    "scheme": "bearer"
+                  }
+                },
+                "security": [
+                  {
+                    "bearer": []
+                  }
+                ],
+                "skills": [
+                  {
+                    "id": "organization_move",
+                    "name": "Propose own organization move",
+                    "description": "Respond to versioned calculator facts on a published turn",
+                    "tags": [
+                      "negotiation",
+                      "rural",
+                      "cold_space",
+                      "pickup_hours"
+                    ]
+                  }
+                ],
+                "supportsAuthenticatedExtendedCard": false
+              },
+              "card_schema_version": "v1.0.0"
+            }
+          }
+        ],
+        "annotations": {
+          "harvestnet": "{\"capabilities\": {\"cold_space_lb\": 50, \"fixture_version\": \"synthetic-v1\", \"observed_at\": \"2026-10-11T14:00:00Z\", \"pickup_hours\": [{\"end\": \"2026-10-12T01:00:00Z\", \"start\": \"2026-10-11T23:00:00Z\"}], \"role\": \"food_bank\", \"synthetic\": true}, \"organization_id\": \"rural\"}"
+        }
+      },
+      {
+        "name": "harvestnet.org/agents/eastside",
+        "schema_version": "1.0.0",
+        "version": "1.0.0",
+        "description": "HarvestNet organization proposals; no external commitment authority",
+        "authors": [
+          "HarvestNet eastside"
+        ],
+        "created_at": "2026-10-11T14:00:00Z",
+        "skills": [
+          {
+            "id": 101
+          }
+        ],
+        "domains": [],
+        "modules": [
+          {
+            "id": 203,
+            "name": "integration/a2a",
+            "data": {
+              "card_data": {
+                "name": "HarvestNet eastside",
+                "description": "HarvestNet organization proposals; no external commitment authority",
+                "url": "http://127.0.0.1:9030/",
+                "version": "1.0.0",
+                "protocolVersion": "0.3.0",
+                "preferredTransport": "JSONRPC",
+                "capabilities": {
+                  "streaming": false
+                },
+                "defaultInputModes": [
+                  "application/json"
+                ],
+                "defaultOutputModes": [
+                  "application/json"
+                ],
+                "securitySchemes": {
+                  "bearer": {
+                    "type": "http",
+                    "scheme": "bearer"
+                  }
+                },
+                "security": [
+                  {
+                    "bearer": []
+                  }
+                ],
+                "skills": [
+                  {
+                    "id": "organization_move",
+                    "name": "Propose own organization move",
+                    "description": "Respond to versioned calculator facts on a published turn",
+                    "tags": [
+                      "negotiation",
+                      "eastside",
+                      "cold_space",
+                      "pickup_hours"
+                    ]
+                  }
+                ],
+                "supportsAuthenticatedExtendedCard": false
+              },
+              "card_schema_version": "v1.0.0"
+            }
+          }
+        ],
+        "annotations": {
+          "harvestnet": "{\"capabilities\": {\"cold_space_lb\": 150, \"fixture_version\": \"synthetic-v1\", \"observed_at\": \"2026-10-11T14:00:00Z\", \"pickup_hours\": [{\"end\": \"2026-10-12T04:00:00Z\", \"start\": \"2026-10-12T01:00:00Z\"}], \"role\": \"food_bank\", \"synthetic\": true}, \"organization_id\": \"eastside\"}"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "rural_bids_toward_its_gap_on_produce_it_can_receive",
+  "role": "food_bank",
+  "responses": [
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01",
+          "name": "pickup_feasibility",
+          "input": {
+            "arrives_at": "2026-10-13T15:40",
+            "usable_until": "2026-11-01T00:00"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_02",
+          "name": "storage_at",
+          "input": {
+            "at": "2026-10-13T15:40"
+          }
+        }
+      ]
+    },
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 410,
+        "output_tokens": 260,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2900
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "counter",
+            "reason": "Our 42 households are 310 lb below fair share. Romaine needs a cold chain we can't get here, but apples dropped off at 3:40 pm fit our 800 lb of dry space and households can collect them by 6 pm. We ask for all 300 lb of apples.",
+            "amendment": {
+              "kind": "set_pounds",
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "from_food_bank_id": null,
+              "to_food_bank_id": null,
+              "pounds": 300.0,
+              "mover": null,
+              "departs_at": null,
+              "arrives_at": null
+            },
+            "holds": null
+          }
+        }
+      ]
+    }
+  ]
+}

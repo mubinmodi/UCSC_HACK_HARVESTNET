@@ -1,0 +1,503 @@
+{
+  "kind": "scenario",
+  "contract_version": "contract-v0.1",
+  "synthetic": true,
+  "note": "Synthetic scenario derived from agreed contract example; calculated results are not live observations.",
+  "scenario_id": "more-produce-than-storage",
+  "title": "more produce than storage",
+  "mode": "synthetic",
+  "timezone": "America/Los_Angeles",
+  "clock": {
+    "start": "2026-10-13T11:00:00-07:00",
+    "end": "2026-10-14T21:00:00-07:00"
+  },
+  "policies": {
+    "fair_share_table_version": "0.1.0-placeholder",
+    "produce_profile_set_version": "2026-10-11.1",
+    "rounds_without_new_terms_before_disagreement": 3,
+    "request_expiry_days": 7
+  },
+  "organizations": [
+    {
+      "organization_id": "market",
+      "role": "donor",
+      "name": "Farmers market"
+    },
+    {
+      "organization_id": "city",
+      "role": "food_bank",
+      "name": "City food bank"
+    },
+    {
+      "organization_id": "rural",
+      "role": "food_bank",
+      "name": "Rural food bank"
+    },
+    {
+      "organization_id": "eastside",
+      "role": "food_bank",
+      "name": "Eastside food bank"
+    },
+    {
+      "organization_id": "advocate",
+      "role": "advocate",
+      "name": "Advocate"
+    }
+  ],
+  "turn_order": [
+    "market",
+    "city",
+    "rural",
+    "eastside",
+    "advocate"
+  ],
+  "donors": [
+    {
+      "organization_id": "market",
+      "travel_minutes": {
+        "city": 20,
+        "rural": 40,
+        "eastside": 25
+      },
+      "drop_off": {
+        "window": {
+          "start": "2026-10-13T13:00:00-07:00",
+          "end": "2026-10-13T15:00:00-07:00"
+        },
+        "refrigerated": false,
+        "capacity_lb": 700,
+        "food_bank_ids": [
+          "rural",
+          "eastside"
+        ]
+      }
+    }
+  ],
+  "food_banks": [
+    {
+      "organization_id": "city",
+      "area": "Downtown Santa Cruz",
+      "low_access": false,
+      "storage": [
+        {
+          "window": {
+            "start": "2026-10-13T12:00:00-07:00",
+            "end": "2026-10-14T21:00:00-07:00"
+          },
+          "cold_free_lb": 5,
+          "dry_free_lb": 5
+        }
+      ],
+      "pickup_windows": [
+        {
+          "start": "2026-10-13T18:00:00-07:00",
+          "end": "2026-10-13T20:00:00-07:00"
+        },
+        {
+          "start": "2026-10-14T18:00:00-07:00",
+          "end": "2026-10-14T20:00:00-07:00"
+        }
+      ],
+      "truck": {
+        "window": {
+          "start": "2026-10-13T13:00:00-07:00",
+          "end": "2026-10-13T17:00:00-07:00"
+        },
+        "refrigerated": true,
+        "capacity_lb": 250
+      }
+    },
+    {
+      "organization_id": "rural",
+      "area": "Watsonville",
+      "low_access": true,
+      "storage": [
+        {
+          "window": {
+            "start": "2026-10-13T12:00:00-07:00",
+            "end": "2026-10-14T21:00:00-07:00"
+          },
+          "cold_free_lb": 5,
+          "dry_free_lb": 5
+        }
+      ],
+      "pickup_windows": [
+        {
+          "start": "2026-10-13T16:00:00-07:00",
+          "end": "2026-10-13T18:00:00-07:00"
+        },
+        {
+          "start": "2026-10-14T18:00:00-07:00",
+          "end": "2026-10-14T20:00:00-07:00"
+        }
+      ],
+      "truck": null
+    },
+    {
+      "organization_id": "eastside",
+      "area": "Live Oak",
+      "low_access": false,
+      "storage": [
+        {
+          "window": {
+            "start": "2026-10-13T12:00:00-07:00",
+            "end": "2026-10-14T21:00:00-07:00"
+          },
+          "cold_free_lb": 5,
+          "dry_free_lb": 5
+        }
+      ],
+      "pickup_windows": [
+        {
+          "start": "2026-10-13T18:00:00-07:00",
+          "end": "2026-10-13T21:00:00-07:00"
+        },
+        {
+          "start": "2026-10-14T18:00:00-07:00",
+          "end": "2026-10-14T21:00:00-07:00"
+        }
+      ],
+      "truck": null
+    }
+  ],
+  "travel_minutes_between_food_banks": {
+    "city": {
+      "rural": 40,
+      "eastside": 15
+    },
+    "rural": {
+      "city": 40,
+      "eastside": 35
+    },
+    "eastside": {
+      "city": 15,
+      "rural": 35
+    }
+  },
+  "requests": [
+    {
+      "request_code": "K7P4",
+      "submitted_at": "2026-10-13T11:05:00-07:00",
+      "channel": "voice",
+      "language": "es",
+      "household_size": 4,
+      "received_this_week_lb": 0,
+      "pickup_windows": [
+        {
+          "days": [
+            "mon",
+            "tue",
+            "wed",
+            "thu",
+            "fri"
+          ],
+          "start": "18:00",
+          "end": null
+        }
+      ],
+      "limited_fridge": true,
+      "neighborhood": "Watsonville",
+      "cant_eat": [
+        "eggplant"
+      ],
+      "snap": "yes",
+      "chosen_food_bank_ids": [
+        "rural",
+        "city"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "M2Q9",
+      "submitted_at": "2026-10-13T11:10:00-07:00",
+      "channel": "web",
+      "language": "en",
+      "household_size": 2,
+      "received_this_week_lb": 3,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue",
+            "wed"
+          ],
+          "start": "16:00",
+          "end": "18:00"
+        }
+      ],
+      "limited_fridge": false,
+      "neighborhood": "Watsonville",
+      "cant_eat": [],
+      "snap": "not_said",
+      "chosen_food_bank_ids": [
+        "rural"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "R3T1",
+      "submitted_at": "2026-10-13T11:12:00-07:00",
+      "channel": "web",
+      "language": "en",
+      "household_size": 1,
+      "received_this_week_lb": 4,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue"
+          ],
+          "start": "16:00",
+          "end": "18:00"
+        }
+      ],
+      "limited_fridge": false,
+      "neighborhood": "Watsonville",
+      "cant_eat": [],
+      "snap": "no",
+      "chosen_food_bank_ids": [
+        "rural"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "B8W2",
+      "submitted_at": "2026-10-13T11:20:00-07:00",
+      "channel": "web",
+      "language": "es",
+      "household_size": 6,
+      "received_this_week_lb": 0,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue",
+            "wed",
+            "thu"
+          ],
+          "start": "18:00",
+          "end": "20:00"
+        }
+      ],
+      "limited_fridge": true,
+      "neighborhood": "Pajaro",
+      "cant_eat": [],
+      "snap": "yes",
+      "chosen_food_bank_ids": [
+        "rural"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "C4N6",
+      "submitted_at": "2026-10-13T11:25:00-07:00",
+      "channel": "web",
+      "language": "en",
+      "household_size": 3,
+      "received_this_week_lb": 2,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue",
+            "wed"
+          ],
+          "start": "18:00",
+          "end": "20:00"
+        }
+      ],
+      "limited_fridge": false,
+      "neighborhood": "Downtown Santa Cruz",
+      "cant_eat": [
+        "potatoes"
+      ],
+      "snap": "not_said",
+      "chosen_food_bank_ids": [
+        "city"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "D9H3",
+      "submitted_at": "2026-10-13T11:30:00-07:00",
+      "channel": "voice",
+      "language": "en",
+      "household_size": 2,
+      "received_this_week_lb": 0,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue"
+          ],
+          "start": "18:00",
+          "end": "20:00"
+        }
+      ],
+      "limited_fridge": true,
+      "neighborhood": "Downtown Santa Cruz",
+      "cant_eat": [],
+      "snap": "no",
+      "chosen_food_bank_ids": [
+        "city",
+        "eastside"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "F5J8",
+      "submitted_at": "2026-10-13T11:40:00-07:00",
+      "channel": "web",
+      "language": "en",
+      "household_size": 5,
+      "received_this_week_lb": 6,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue",
+            "wed"
+          ],
+          "start": "18:30",
+          "end": "21:00"
+        }
+      ],
+      "limited_fridge": false,
+      "neighborhood": "Live Oak",
+      "cant_eat": [],
+      "snap": "yes",
+      "chosen_food_bank_ids": [
+        "eastside"
+      ],
+      "consent": true
+    },
+    {
+      "request_code": "G1L7",
+      "submitted_at": "2026-10-13T11:45:00-07:00",
+      "channel": "web",
+      "language": "es",
+      "household_size": 1,
+      "received_this_week_lb": 0,
+      "pickup_windows": [
+        {
+          "days": [
+            "tue",
+            "wed",
+            "thu",
+            "fri"
+          ],
+          "start": "18:00",
+          "end": "21:00"
+        }
+      ],
+      "limited_fridge": false,
+      "neighborhood": "Live Oak",
+      "cant_eat": [],
+      "snap": "not_said",
+      "chosen_food_bank_ids": [
+        "eastside",
+        "city"
+      ],
+      "consent": true
+    }
+  ],
+  "surplus_offers": [
+    {
+      "lot_id": "lot-market-1013",
+      "donor_id": "market",
+      "reported_at": "2026-10-13T12:00:00-07:00",
+      "deadline": "2026-10-13T15:00:00-07:00",
+      "recall_notice": false,
+      "items": [
+        {
+          "produce_id": "apples",
+          "quantity": 300,
+          "unit": "lb",
+          "lb_per_unit": null,
+          "condition_grade": "good",
+          "usable_until": "2026-11-01T00:00:00-07:00",
+          "condition_doubt": null
+        },
+        {
+          "produce_id": "romaine",
+          "quantity": 200,
+          "unit": "lb",
+          "lb_per_unit": null,
+          "condition_grade": "good",
+          "usable_until": "2026-10-15T12:00:00-07:00",
+          "condition_doubt": null
+        },
+        {
+          "produce_id": "potatoes",
+          "quantity": 8,
+          "unit": "sack",
+          "lb_per_unit": 50,
+          "condition_grade": "good",
+          "usable_until": "2026-11-10T00:00:00-07:00",
+          "condition_doubt": null
+        }
+      ]
+    }
+  ],
+  "faults": [],
+  "humans": [
+    {
+      "organization_id": "market",
+      "on_approval_request": "approve",
+      "after_minutes": 5
+    },
+    {
+      "organization_id": "city",
+      "on_approval_request": "approve",
+      "after_minutes": 10
+    },
+    {
+      "organization_id": "rural",
+      "on_approval_request": "approve",
+      "after_minutes": 10
+    },
+    {
+      "organization_id": "eastside",
+      "on_approval_request": "approve",
+      "after_minutes": 15
+    }
+  ],
+  "household_replies": [
+    {
+      "request_code": "K7P4",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "M2Q9",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "R3T1",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "B8W2",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "C4N6",
+      "on_pickup_notice": "cant_make_it"
+    },
+    {
+      "request_code": "D9H3",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "F5J8",
+      "on_pickup_notice": "collect"
+    },
+    {
+      "request_code": "G1L7",
+      "on_pickup_notice": "no_reply"
+    }
+  ],
+  "rule_checks": [
+    "zero_invalid_commitments",
+    "no_double_booking",
+    "pounds_conserved",
+    "fair_share_respected",
+    "versioned_approvals",
+    "no_auto_commit",
+    "all_pounds_have_pathway",
+    "number_check_failures_counted"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "operation": "record_approval",
+  "group": "approvals",
+  "method": "POST",
+  "path": "/approvals",
+  "summary": "An organization's human approves or declines one exact version. Commitment only happens when every named organization approves the same version.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/approvals",
+      "body": {
+        "lot_id": "lot-market-1013",
+        "version": 3,
+        "organization_id": "city",
+        "terms_hash": "sha256:3f6c1e0d9a7b5c2e8f4a6d1b0c9e7f5a3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a",
+        "decision": "approve",
+        "receipt_id": "rcpt-7f3a9c"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "lot_id": "lot-market-1013",
+        "version": 3,
+        "organization_id": "city",
+        "decision": "approve",
+        "receipt_id": "rcpt-7f3a9c",
+        "status": "approval_recorded",
+        "committed": false,
+        "approved_by": [
+          "market",
+          "city"
+        ],
+        "awaiting_approval_from": [
+          "rural",
+          "eastside"
+        ]
+      }
+    }
+  }
+}

@@ -1,26 +1,19 @@
-# HarvestNet organization workspace
+# UCSC_HACK_HARVESTNET
+hackathon project
 
-React + TypeScript + Tailwind CSS frontend for donor staff and food bank managers. Based on the supplied mobile reference, with a sidebar and wider workspace on desktop.
+Household web page (ticket #2): [`frontend/household/`](frontend/household/README.md).
 
-## Run
+## Lane C implementation
 
-Install Node.js 20.19+ or 22.12+, then:
+The platform integration branches now contain organization-system fixtures,
+A2A/native AGNTCY hosts, version-bound human approvals, importable n8n workflows,
+offline fallbacks, deployment configuration and a real-agent join adapter.
 
-```sh
-npm install
-npm run dev
-```
+Start with [the platform runbook](docs/platform/DEPLOYMENT.md).
+For an account-free local rehearsal, run `python -m harvestnet_platform.demo`
+from the repo root, then open the URL saved in `runtime/demo-url.txt`.
+This is a labeled platform rehearsal; the full household/core/negotiator
+implementation and live deployments are tracked in the team's other issues.
 
-`npm run build` checks TypeScript and creates a production bundle. `npm run preview` serves it locally.
-
-## Screens
-
-- Report surplus produce: profile selector, quantity/unit, condition, deadline, recall flag, delivery ability, and notes.
-- My Donations: active/completed filters, item status, transport information, household reach, and relisting with a new deadline.
-- Food Bank Dashboard: storage, truck/cooler status, pickup hours, fair-share gap, and incoming offers.
-- Offer Details: example recommendation, accept/counter/decline, arrival condition checks, pickup code validation, and preserved reasons.
-- Messages, inventory, and distribution views are accessible through navigation.
-
-All data and actions are **synthetic examples**. `src/api.ts` contains the replaceable in-memory API adapter. No external offers or approvals are created. Reloading resets state. Approval by one organization does not create a commitment; all organizations must approve the same draft in the real backend. The sample pickup code for committed lettuce is `7316`; approve the arrival condition first. Each offer detail shows its example code.
-
-Produce thumbnails are bundled SVG illustrations and require no external image requests. Resource and fair-share values come from the API adapter. Frontend validation is only for this demo; the backend must validate food safety, capacity, draft versions, and all commitments during integration.
+Tests: `python -m unittest discover -s tests -v` (Python 3.12+).
+Optional native SDK tests require `requirements-agntcy.txt`.

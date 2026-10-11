@@ -1,0 +1,201 @@
+{
+  "kind": "produce_profiles",
+  "version": "2026-10-11.1",
+  "status": "proposed",
+  "note": "Proposed data shape, pending ticket #1 (contract day). Every field cites sources (with a basis saying how the value was read) or carries an explicit assumption. General references are not lot evidence: the actual lot's condition comes from the donor (ADR 0003).",
+  "sources": {
+    "usda-foodkeeper-v128": {
+      "title": "FoodKeeper data, Product sheet (file FMA-Data-v128.xlsx, data version 128, modified 2018-09-06)",
+      "publisher": "USDA Food Safety and Inspection Service",
+      "url": "https://www.fsis.usda.gov/shared/data/EN/foodkeeper.json",
+      "accessed": "2026-10-11",
+      "note": "Household storage times from date of purchase (DOP_Pantry_*, DOP_Refrigerate_*). FoodKeeper calls its times guidelines, not hard rules."
+    },
+    "ucd-apple-golden-delicious": {
+      "title": "Apple (Golden Delicious), Produce Fact Sheet (last updated August 1999)",
+      "authors": "Mitcham, E. J.; Crisosto, C. H.; Kader, A. A.",
+      "publisher": "UC Davis Postharvest Research and Extension Center",
+      "url": "https://postharvest.ucdavis.edu/produce-facts-sheets/apple-golden-delicious",
+      "accessed": "2026-10-11"
+    },
+    "ucd-lettuce-romaine": {
+      "title": "Lettuce (Romaine and Loose-Leaf), Produce Fact Sheet (last updated September 2025)",
+      "authors": "Cantwell, M.; Li, P.; Zhang, Y.; Hu, H.; Liu, X.; Kulchin, N. X.; Donis-Gonzalez, I. R.",
+      "publisher": "UC Davis Postharvest Research and Extension Center",
+      "url": "https://postharvest.ucdavis.edu/produce-facts-sheets/lettuce-romaine",
+      "accessed": "2026-10-11"
+    },
+    "ucd-potato-early-crop": {
+      "title": "Potato (Early Crop), Produce Fact Sheet (last updated November 1998)",
+      "authors": "Suslow, T. V.; Voss, R.",
+      "publisher": "UC Davis Postharvest Research and Extension Center",
+      "url": "https://postharvest.ucdavis.edu/produce-facts-sheets/potato",
+      "accessed": "2026-10-11"
+    },
+    "ucd-tomato": {
+      "title": "Tomato, Produce Fact Sheet (last updated May 1997)",
+      "authors": "Suslow, T. V.; Cantwell, M.",
+      "publisher": "UC Davis Postharvest Research and Extension Center",
+      "url": "https://postharvest.ucdavis.edu/produce-facts-sheets/tomato",
+      "accessed": "2026-10-11"
+    }
+  },
+  "profiles": [
+    {
+      "id": "apples",
+      "name": "Apples",
+      "specificity": "Whole fresh apples. Temperature targets use Golden Delicious as the reference cultivar; other cultivars may differ.",
+      "needs_fridge": {
+        "value": false,
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Apples) lists pantry storage of 3 weeks from purchase, so a household fridge is not required."
+      },
+      "days_usable_cold": {
+        "value": {"min": 28, "max": 42},
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Apples): refrigerator 4 to 6 weeks from purchase, at 7 days per week."
+      },
+      "days_usable_room": {
+        "value": {"min": 21, "max": 21},
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Apples): pantry 3 weeks from purchase, at 7 days per week."
+      },
+      "transport_temperature": {
+        "value": {
+          "target_min_c": -1,
+          "target_max_c": 1,
+          "cold_required": false,
+          "chilling_injury_below_c": null,
+          "freezing_injury_at_c": -1.7
+        },
+        "sources": ["ucd-apple-golden-delicious", "usda-foodkeeper-v128"],
+        "basis": "UC Davis: optimum 0 C plus or minus 1 C, 90-95% RH, freezing at -1.7 C; the sheet lists no chilling injury. Cold is the optimum, not a requirement, because FoodKeeper gives 3 weeks at pantry temperature."
+      },
+      "condition_grade": {
+        "value": ["good", "use_soon", "not_for_people"],
+        "assumption": "HarvestNet's proposed grade categories (docs/MVP_DESIGN.md section 5). The grade of an actual lot is the donor's evidence, not part of the profile."
+      },
+      "units": {
+        "value": {"lb": 1, "case": null},
+        "assumption": "Accepted units per docs/MVP_DESIGN.md section 5. Pounds are the base unit. Case net weight varies by pack, so none is stored here; the donor must state it on the surplus offer."
+      }
+    },
+    {
+      "id": "romaine",
+      "name": "Romaine lettuce",
+      "specificity": "Whole romaine heads (the UC Davis sheet also covers loose-leaf lettuce).",
+      "needs_fridge": {
+        "value": true,
+        "sources": ["usda-foodkeeper-v128", "ucd-lettuce-romaine"],
+        "basis": "FoodKeeper (Lettuce: iceberg, romaine) gives refrigerator storage only, with no pantry time. UC Davis: romaine begins to yellow within 1-2 days at ambient temperature."
+      },
+      "days_usable_cold": {
+        "value": {"min": 7, "max": 14},
+        "sources": ["usda-foodkeeper-v128", "ucd-lettuce-romaine"],
+        "basis": "FoodKeeper (Lettuce: iceberg, romaine): refrigerator 1 to 2 weeks from purchase. UC Davis is consistent: about 14 days at 5 C, about 21 days near 0 C."
+      },
+      "days_usable_room": {
+        "value": {"min": 1, "max": 2},
+        "sources": ["ucd-lettuce-romaine"],
+        "basis": "UC Davis: romaine and dark green leafy lettuces begin to yellow within 1-2 days at ambient temperature."
+      },
+      "transport_temperature": {
+        "value": {
+          "target_min_c": 0,
+          "target_max_c": 5,
+          "cold_required": true,
+          "chilling_injury_below_c": null,
+          "freezing_injury_at_c": -0.2
+        },
+        "sources": ["ucd-lettuce-romaine"],
+        "basis": "UC Davis: storing near 0 C is required to optimize life (about 21 days); about 14 days at 5 C; >95% RH; freeze damage below -0.2 C; yellowing does not generally occur at 10 C or lower."
+      },
+      "condition_grade": {
+        "value": ["good", "use_soon", "not_for_people"],
+        "assumption": "HarvestNet's proposed grade categories (docs/MVP_DESIGN.md section 5). The grade of an actual lot is the donor's evidence, not part of the profile."
+      },
+      "units": {
+        "value": {"lb": 1, "case": null},
+        "assumption": "Accepted units per docs/MVP_DESIGN.md section 5. Pounds are the base unit. Case net weight varies by pack, so none is stored here; the donor must state it on the surplus offer."
+      }
+    },
+    {
+      "id": "potatoes",
+      "name": "Potatoes",
+      "specificity": "Whole fresh table potatoes. Temperature target is from the UC Davis early-crop sheet (table use); household times are FoodKeeper's general potato entry.",
+      "needs_fridge": {
+        "value": false,
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Potatoes): pantry storage is 'the recommended storage method for whole potatoes'."
+      },
+      "days_usable_cold": {
+        "value": {"min": 7, "max": 14},
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Potatoes): refrigerator 1 to 2 weeks from purchase, with a note that refrigeration can darken them on cooking and make them taste sweet."
+      },
+      "days_usable_room": {
+        "value": {"min": 30, "max": 60},
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Potatoes): pantry 1 to 2 months from purchase, converted at 30 days per month. UC Davis notes immature early-crop potatoes keep less well (good quality for 3-5 weeks at optimum)."
+      },
+      "transport_temperature": {
+        "value": {
+          "target_min_c": 7,
+          "target_max_c": 7,
+          "cold_required": false,
+          "chilling_injury_below_c": null,
+          "freezing_injury_at_c": -0.8
+        },
+        "sources": ["ucd-potato-early-crop", "usda-foodkeeper-v128"],
+        "basis": "UC Davis (early crop): table use 7 C at 98% RH; freezing injury begins at -0.8 C; storage near 0 C for a few weeks may cause chilling discoloration in some varieties (no threshold given, so none is stored). Not cold-required, because FoodKeeper recommends pantry storage."
+      },
+      "condition_grade": {
+        "value": ["good", "use_soon", "not_for_people"],
+        "assumption": "HarvestNet's proposed grade categories (docs/MVP_DESIGN.md section 5). The grade of an actual lot is the donor's evidence, not part of the profile."
+      },
+      "units": {
+        "value": {"lb": 1, "sack": null},
+        "assumption": "Accepted units per docs/MVP_DESIGN.md section 5. Pounds are the base unit. Sack net weight varies, so none is stored here; the donor must state it on the surplus offer."
+      }
+    },
+    {
+      "id": "tomatoes",
+      "name": "Tomatoes",
+      "specificity": "Whole ripe tomatoes (firm-ripe, USDA color stage 6, or riper). Mature-green tomatoes would need their own profile.",
+      "needs_fridge": {
+        "value": false,
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Tomatoes): 'Refrigeration may affect flavor; USDA recommends pantry storage.'"
+      },
+      "days_usable_cold": {
+        "value": null,
+        "sources": ["usda-foodkeeper-v128", "ucd-tomato"],
+        "basis": "Not recommended, so no cold life is given. FoodKeeper lists no refrigerator time for whole tomatoes and recommends pantry storage. UC Davis: chilling sensitive below 10 C if held longer than 2 weeks, or at 5 C longer than 6-8 days."
+      },
+      "days_usable_room": {
+        "value": {"min": 7, "max": 7},
+        "sources": ["usda-foodkeeper-v128"],
+        "basis": "FoodKeeper (Tomatoes): pantry 'until ripe, then 7 days'. Counted from ripe, which matches this profile's maturity."
+      },
+      "transport_temperature": {
+        "value": {
+          "target_min_c": 7,
+          "target_max_c": 10,
+          "cold_required": false,
+          "chilling_injury_below_c": 10,
+          "freezing_injury_at_c": -1
+        },
+        "sources": ["ucd-tomato"],
+        "basis": "UC Davis: firm-ripe (USDA color stage 6) 7-10 C for 3-5 days; chilling sensitive below 10 C if longer than 2 weeks, or at 5 C longer than 6-8 days; freezing injury begins at -1 C. A short refrigerated trip is not by itself unsuitable (ADR 0003): exposure time matters."
+      },
+      "condition_grade": {
+        "value": ["good", "use_soon", "not_for_people"],
+        "assumption": "HarvestNet's proposed grade categories (docs/MVP_DESIGN.md section 5). The grade of an actual lot is the donor's evidence, not part of the profile."
+      },
+      "units": {
+        "value": {"lb": 1, "case": null},
+        "assumption": "Accepted units per docs/MVP_DESIGN.md section 5. Pounds are the base unit. Case net weight varies by pack, so none is stored here; the donor must state it on the surplus offer."
+      }
+    }
+  ]
+}

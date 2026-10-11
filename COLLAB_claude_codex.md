@@ -1043,6 +1043,25 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 **For Codex:** the earlier requests to update `CURRENT_DESIGN.md` and `PROJECT_BRIEF.md` no longer apply, because those files are now future scope. Please review `docs/MVP_DESIGN.md` directly.
 ---
 
+## User direction (October 11, 2026): start Lane B on the Mac mini, recorded by Claude
+
+The user asked Claude to "do everything that is required for the Mac mini." Claude took that as approval of the two-machine split in `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`, and as the explicit go-ahead to implement Lane B tickets once their blockers close.
+
+- `CLAUDE.md` and `AGENTS.md` now carry a Lane B exception to the design-only rule.
+- GitHub labels `claimed: macbook` and `claimed: mac-mini` exist. A machine adds its label and an issue comment before starting a ticket.
+- Mac mini: #12, then #15, and #14. MacBook Air: #11, then #13, then joins #20 and #23.
+- Every Lane B ticket waits on #1 (contract day), which is still open. Nothing has been built yet. Lane C's #16–#19 branches already have code against proposed, not agreed, contracts.
+
+## User direction (October 11, 2026): the contracts are agreed, recorded by Claude
+
+The user, as team lead, said the team has already discussed and agreed the four contracts for ticket #1. `docs/contracts/` marks them **Agreed**, and its "Decisions made" list records where Lane B and Lane C shapes were reconciled. The example-data API skeleton is live on AWS Lambda (address in `docs/contracts/public-api.md`). Lane B tickets #11–#15 and the Lane B side of #23 were built ahead of contract day against proposed shapes, and now follow these contracts.
+
+## User direction (October 11, 2026): food banks may take surplus beyond fair share, recorded by Claude
+
+The user decided that food banks may bid past their households' fair-share gap once that gap is met, so surplus goes out rather than waste (design §8). In the rules-based and LLM food bank negotiators, bids still go toward the fair-share gap first. Only after a version plans a food bank's whole gap may it bid beyond fair share. Those bids are bounded only by its own storage (at arrival and until pickup ends), pickup hours, truck or drop-off, and its produce profiles, and their reasons say "beyond fair share".
+
+Simulated result (synthetic numbers): in the normal-afternoon scenario, unclaimed produce drops from 818 lb (249 lb apples, 169 lb romaine, 400 lb potatoes) to 0 lb. Fair-share figures don't change, and extra pounds are recorded apart from fair share.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*
@@ -1062,6 +1081,16 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 13. **Metrics:** worst-served coverage over declared cohorts including zeros; separate receipts/distribution, food-specific measures, pathways, residual requests, and costs. Count source food once across custody changes. Report losses as well as gains.
 14. **Current documents:** the three canonical design docs are **v1 framework baselines, frozen October 10, 2026**. Inputs, policies, profiles, adapters, and outcomes remain versioned and variable; old numerical examples are archived.
 15. **Process:** Markdown design work only. The questionnaire is unsent. No code, `/to-spec`, `/to-tickets`, external messaging, or operational commitments are authorized by this freeze.
+
+## User direction (October 11, 2026): household frontend, recorded by Codex
+
+The user explicitly authorized implementing the frontend on `gianellerella/02-household-web-page` with React, TypeScript, and Tailwind CSS, using the supplied visual reference and placeholders for all backend APIs. Implemented household details, review and consent, food bank choice, and pickup preview with English/Spanish text. All numerical values, food bank details, codes, and API outcomes are synthetic. The reference uses credits while `docs/MVP_DESIGN.md` proposes pounds; credits remain an explicitly labeled visual placeholder, pending the real policy/API. No ADR or source-of-truth design decision was changed.
+
+Validation limitation: the local shell has no Node.js/npm installation, so dependency installation, TypeScript build, and browser verification could not be run here.
+
+## Update (October 11, 2026): household page wired to the agreed contract, recorded by Claude
+
+At the team leader's direction, Claude finished ticket #2 on Gianelle's branch, building on her page. The app moved from the repo root to `frontend/household/`, matching the other frontend apps. The placeholder adapter was replaced by calls to the agreed public API (`docs/contracts/public-api.md`), so the credits placeholder above no longer applies: the page shows pounds, the fair share, the read-back, and the consent question exactly as the API sends them, and calculates none of them (ADR-0002). The live skeleton answers with synthetic examples, and the page labels them as example data. Node.js is now available locally; typecheck, build, and tests (fetch mocked with the contract examples) were run. No ADR or source-of-truth design decision was changed.
 
 ## User direction (October 11, 2026): donor and food bank frontend, recorded by Codex
 

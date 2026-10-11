@@ -1,0 +1,22 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "donor_accepts_plan_before_deadline",
+  "role": "donor",
+  "responses": [
+    {
+      "model": "claude-sonnet-5-5",
+      "stop_reason": "refusal",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": []
+    }
+  ],
+  "expected": {
+    "source": "fallback",
+    "number_check_failures": 0
+  }
+}
