@@ -1,0 +1,45 @@
+@import "tailwindcss";
+/* Results strip (ticket #5). Colors and fonts follow the household page (#2). Sized for a projector: big type, strong contrast. */
+:root{font-family:Arial,Helvetica,sans-serif;color:#193e36;background:#f2f5ee;font-synthesis:none;font-weight:400}
+*{box-sizing:border-box}
+body{margin:0}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid #c8a43b;outline-offset:3px}
+h1,h2,.brand-name{font-family:Georgia,'Times New Roman',serif}
+h1,h2,p,dl,dd{margin:0}
+
+.page{padding:max(16px,2.5vw) max(16px,3vw);font-size:clamp(16px,1.15vw,26px);line-height:1.35}
+.strip-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:1.2em}
+.brand-name{display:flex;align-items:center;gap:8px;font-size:1.5em;font-weight:700;color:#143f35;letter-spacing:-.5px}
+.brand-name svg{color:#b8962a;width:1.1em;height:1.1em}
+h1{font-size:clamp(28px,2.8vw,56px);line-height:1.15;font-weight:700;letter-spacing:-.8px;margin-top:.15em}
+.language{border:1px solid #9fb8aa;border-radius:11px;padding:.45em .8em;font-size:.8em;font-weight:700;background:#fff;color:#143f35}
+
+.example-banner{display:flex;align-items:center;gap:.5em;margin-bottom:1.2em;padding:.6em 1em;background:#fff1c7;color:#5a3a00;border:3px solid #5a3a00;border-radius:12px;font-weight:800}
+.example-banner svg{flex-shrink:0;width:1.2em;height:1.2em}
+.error{font-weight:700;color:#a11616;margin-bottom:1em}
+
+.runs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.2vw}
+@media(max-width:900px){.runs{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}}
+@media(max-width:520px){.runs{grid-template-columns:1fr}}
+
+.run{background:#fafaf4;border:2px solid #dce8df;border-radius:18px;padding:1.1em;display:flex;flex-direction:column;gap:.8em;box-shadow:0 10px 35px #1948320d}
+.run h2{font-size:1.3em;line-height:1.2;color:#143f35}
+.run dl{display:flex;flex-direction:column;gap:.8em}
+.mode{align-self:flex-start;padding:.2em .75em;border-radius:999px;color:#fff;font-weight:800;text-transform:uppercase;letter-spacing:.05em;font-size:.8em}
+.mode-live{background:#1f6b3a}
+.mode-replay{background:#1d4f91}
+.mode-synthetic{background:#8a5300}
+.mode-unknown{background:#4f5f58}
+.reason{font-size:.8em;color:#4f5f58}
+
+.metric dt{display:flex;align-items:center;gap:.4em;color:#4f5f58;font-weight:700}
+.metric dt svg{width:1em;height:1em;flex-shrink:0;color:#205441}
+.headline-tag{margin-left:auto;font-size:.65em;text-transform:uppercase;letter-spacing:.06em;color:#7a5d00;background:#f6ecc4;border-radius:6px;padding:.15em .45em}
+.metric dd{font-size:2.1em;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;color:#143f35}
+.metric .missing{font-size:.45em;font-weight:600;font-style:italic;color:#4f5f58}
+.invalid{font-size:.8em;color:#4f5f58;border-top:1px solid #dce8df;padding-top:.6em}
+
+.legend{margin-top:1.4em;color:#4f5f58;font-size:.75em}
+.legend p{margin:.3em 0}
+.source{font-style:italic}

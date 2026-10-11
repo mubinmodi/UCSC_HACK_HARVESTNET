@@ -1,0 +1,41 @@
+# HarvestNet results strip (ticket #5)
+
+React + TypeScript + Tailwind CSS + Vite, the same stack and setup as the household page (#2).
+It's the demo's scoreboard: for one scenario, the four methods side by side (first-come-first-served,
+nearest food bank, rules-based negotiators, LLM negotiators), with produce wasted, worst-served
+fair-share coverage, households reached, and each run's mode label (live, replay, or synthetic).
+English and Spanish.
+
+## Run locally
+
+Install Node.js 20.19+ (or 22.12+), then:
+
+```sh
+cd frontend/results-strip
+npm install
+npm run dev
+```
+
+Open the local URL Vite prints (usually http://localhost:5173). `npm run build` checks TypeScript and
+creates the production bundle; `npm run preview` serves it.
+
+## Data
+
+- `src/api.ts` is the adapter for `GET /results?scenario_id=normal-afternoon`, as described in
+  `docs/contracts/public-api.md` (on `main`).
+- **No API address set (default):** the page shows the contract's example response
+  (`docs/contracts/examples/public-api/get_results.json`). It's synthetic, so the page shows an
+  "Example data" banner.
+- **Real API:** start it with `VITE_API_BASE_URL=http://127.0.0.1:8050 npm run dev`. The API must allow
+  this page's origin for CORS (the core server reads `HARVESTNET_ALLOWED_ORIGIN`).
+- **The page calculates nothing.** It shows the API's numbers as sent. The only formatting is showing
+  coverage (sent as a share, such as 0.25) as a percent. A missing number shows "Not measured yet", and
+  a method the API marks `not_run` shows "Not run" with the API's reason.
+- The banner appears whenever the API says `measured: false` or `synthetic: true`.
+
+## Done-when checklist (from ticket #5)
+
+- [x] Shows all four methods side by side for one scenario.
+- [x] Clearly shows each run's mode label.
+- [x] Numbers come only from the API. Nothing is calculated in the page.
+- [ ] Readable on a projector. *(Large type, high contrast, and fits a 1920×1080 screen. Check on the real projector.)*
