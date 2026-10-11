@@ -39,9 +39,12 @@ class LLMProvider:
 
 
 def publish_evaluation(fixture,records,*,llm_provider=None,repeats=1,output=None):
+    # The cap may be shared across scenarios, so report this scenario's own spend.
+    spent_before=llm_provider.cap.spent_usd if llm_provider is not None else 0
     result=evaluate(fixture,llm_provider=llm_provider,repeats=repeats,output=output)
-    if llm_provider:
-        result['llm_cost_usd']=llm_provider.cap.spent_usd
+    if llm_provider is not None:
+        result['llm_cost_usd']=llm_provider.cap.spent_usd-spent_before
+        result['llm_cap_spent_usd']=llm_provider.cap.spent_usd
         result['llm_cap_usd']=llm_provider.cap.limit_usd
     with records.transaction(): records.put('results',fixture['scenario_id'],result)
     return result

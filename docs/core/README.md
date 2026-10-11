@@ -154,9 +154,16 @@ cap requires explicit authorization. This session spent no provider credits.
 
 Repeated runs report individual values plus mean and standard deviation.
 `publish_evaluation` stores the results response; `/results` returns those method
-values unchanged. Missing LLM configuration gives `not_run`, with null values;
-zero-cap fallback is labeled `fallback_only` and `measured: false`. Neither is
-presented as a real LLM evaluation. Paid repeated LLM runs on the deployed system
+values unchanged. Missing LLM configuration gives `not_run`, with null values.
+Each LLM run is labeled from its own `policy_provenance` events, not from the
+shared cap: it reports `model_calls`, `llm_decisions`, `fallback_decisions` and
+`template_fallbacks`. Runs with no LLM decisions (zero cap, or a shared cap
+already spent) are `fallback_only` with `measured: false`; a run that hits the
+cap midway is `partial`, with the counts visible. A number-check re-ask records
+both calls' cost and counts. `llm_cost_usd` is this scenario's own spend;
+`llm_cap_spent_usd` is the shared cap's running total. A zero cap never builds
+the Anthropic client. `not_run` and `fallback_only` are not presented as a real
+LLM evaluation. Paid repeated LLM runs on the deployed system
 remain an open acceptance gate.
 
 ## Actual transport join
