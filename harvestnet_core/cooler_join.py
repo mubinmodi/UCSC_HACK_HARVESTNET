@@ -153,10 +153,11 @@ def candidate_answer(systems_url, organization, name):
             'pickup_hours': _json(f'{base}/systems/{quote(organization)}/pickup-hours')}
 
 
-def handle_cooler_reading(*, food_bank_id, lot_id, systems_url, core_url, token, directory, answer, profiles=None):
+def handle_cooler_reading(*, food_bank_id, lot_id, systems_url, core_url, token, directory, answer, profiles=None, propose=True):
     """Run when the food bank's cooler reading changes. Proposes a new version; never commits.
 
     ``answer(organization_id)`` returns that candidate's own answer, or ``None`` for no answer.
+    With ``propose=False`` it only assesses: nothing is written to the core.
     """
     from harvestnet_platform.directory import record_info
     base, core = systems_url.rstrip('/'), core_url.rstrip('/')
@@ -181,6 +182,8 @@ def handle_cooler_reading(*, food_bank_id, lot_id, systems_url, core_url, token,
     flow = run_cooler_failure_flow(cooler_reading=cooler, truck_reading=read('truck'), pickup_hours_reading=read('pickup-hours'),
                                    holding=holding, directory_result=found, answers=answers,
                                    travel_minutes=holding['travel_minutes'], profiles=profiles)
+    if not propose:
+        return {'status': 'assessed', 'flow': flow, 'change': None}
     reading = flow.signal.reading.summary()
     status = {'status': 'failed', 'temperature_c': signal.temperature_c, 'cold_available': False,
               **{k: reading[k] for k in ('source', 'mode', 'synthetic', 'observed_at')}}

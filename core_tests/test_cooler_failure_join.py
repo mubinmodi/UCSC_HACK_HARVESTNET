@@ -63,6 +63,9 @@ class CoolerFailureJoin(unittest.TestCase):
         self.fixture = json.loads(FIXTURE.read_text())
         self.engine, self.faults, self.pre_run = join.run_until_fault(self.fixture)
         self.fault = self.faults[0]
+        # Versions come from the run, never hard-coded: the change builds on the committed version.
+        self.committed = self.engine.records.get('lot', LOT)['draft']['version']
+        self.new = self.committed + 1
         self.clock = {'now': self.fault['at']}
         self.api = API(self.engine, clock=lambda: self.clock['now'], staff_tokens=TOKENS)
         with self.engine.records.transaction():
@@ -95,10 +98,14 @@ class CoolerFailureJoin(unittest.TestCase):
         self.store.db.close()
         self.engine.records.close()
 
-    def handle(self):
+    def handle(self, propose=True):
         return self.join.handle_cooler_reading(
             food_bank_id='city', lot_id=LOT, systems_url=self.systems_url, core_url=self.core_url, token=TOKENS['city'],
-            directory=self.directory, answer=lambda org: self.join.candidate_answer(self.systems_url, org, self.engine.names[org]))
+            directory=self.directory, answer=lambda org: self.join.candidate_answer(self.systems_url, org, self.engine.names[org]),
+            propose=propose)
+
+    def texts(self):
+        return self.join.household_texts(self.engine, LOT, self.new, household_page_url='https://households.example.invalid', item_names=ITEM_NAMES)
 
     def flip_switch(self):
         status, reading = call('POST', self.systems_url + '/demo/city/cooler', {'failed': True}, DEMO)
@@ -169,49 +176,49 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertTrue(receiver_board['disruptions'][0]['needs_your_approval'])
 
         # 3. The new version needs fresh approvals.
-        self.assertEqual((change['version'], change['based_on_version'], change['committed']), (13, 12, False))
+        self.assertEqual((change['version'], change['based_on_version'], change['committed']), (self.new, self.committed, False))
         self.assertEqual(change['terms_hash'], 'sha256:' + flow.new_version.terms_hash)
-        self.assertEqual(lot_before['approvals']['eastside']['version'], 12)  # the old approvals exist ...
-        self.assertEqual(changes.find(self.engine.records, LOT, 13)['approvals'], {})  # ... and don't carry over
+        self.assertEqual(lot_before['approvals']['eastside']['version'], self.committed)  # the old approvals exist ...
+        self.assertEqual(changes.find(self.engine.records, LOT, self.new)['approvals'], {})  # ... and don't carry over
         status, pending = call('GET', self.core_url + '/approvals?organization_id=eastside', token=TOKENS['eastside'])
-        self.assertEqual([(a['version'], a['change']) for a in pending['approvals']], [(13, 'cooler_failure')])
-        stale = {'lot_id': LOT, 'version': 13, 'organization_id': 'eastside', 'decision': 'approve',
+        self.assertEqual([(a['version'], a['change']) for a in pending['approvals']], [(self.new, 'cooler_failure')])
+        stale = {'lot_id': LOT, 'version': self.new, 'organization_id': 'eastside', 'decision': 'approve',
                  'terms_hash': lot_before['approvals']['eastside']['terms_hash']}
         self.assertEqual(call('POST', self.core_url + '/approvals', stale, TOKENS['eastside'])[0], 409)
         status, issued = call('POST', self.approvals_url + '/approval-requests', change['approval_request'], EVENTS)
         self.assertEqual(status, 201)
         links = {link['organization_id']: link for link in issued['requests']}
         self.assertEqual(sorted(links), ['city', 'eastside'])
-        self.assertTrue(all(l['terms_hash'] == flow.new_version.terms_hash and 'version 13' in l['message'] for l in links.values()))
+        self.assertTrue(all(l['terms_hash'] == flow.new_version.terms_hash and f'version {self.new}' in l['message'] for l in links.values()))
 
         status, decided = self.human(links['eastside'], 'approve', '2026-10-13T15:35:00-07:00')
         self.assertEqual(status, 200)
         self.assertEqual((decided['committed'], decided['awaiting_approval_from']), (False, ['city']))
         from harvestnet_agents.cooler_failure_flow import NotCommittedError
         with self.assertRaises(NotCommittedError):
-            self.join.household_texts(self.engine, LOT, 13, household_page_url='https://households.example.invalid', item_names=ITEM_NAMES)
+            self.texts()
         status, decided = self.human(links['city'], 'approve', '2026-10-13T15:40:00-07:00')
         self.assertEqual(status, 200)
         self.assertTrue(decided['committed'])
 
         lot = self.engine.records.get('lot', LOT)
-        self.assertEqual(lot['change_version'], 13)
+        self.assertEqual(lot['change_version'], self.new)
         romaine = sorted((a['food_bank_id'], a['pounds'], a.get('pathway')) for a in lot['commitments'] if a['produce_id'] == 'romaine')
         self.assertEqual(romaine, [('city', 50.0, 'same_day_offer'), ('eastside', 150.0, None)])
         self.assertIn({'produce_id': 'apples', 'food_bank_id': 'city', 'pounds': 50.0}, lot['commitments'])
 
         # 4. Affected households get a new text and can decline.
-        notices = self.join.household_texts(self.engine, LOT, 13, household_page_url='https://households.example.invalid', item_names=ITEM_NAMES)
+        notices = self.texts()
         by_code = {n['request_code']: n for n in notices}
         self.assertEqual(sorted(by_code), ['C4N6', 'D9H3', 'G1L7', 'K7P4'])
         self.assertEqual({c: n['reply_expected'] for c, n in by_code.items()}, {'C4N6': True, 'D9H3': False, 'G1L7': False, 'K7P4': True})
-        self.assertTrue(all(n['food_bank_id'] == 'eastside' and n['version'] == 13 and n['decline_replies'] for n in notices))
+        self.assertTrue(all(n['food_bank_id'] == 'eastside' and n['version'] == self.new and n['decline_replies'] for n in notices))
         self.assertIn('NO PUEDO IR', by_code['K7P4']['message'])
         self.assertIn('lechuga romana', by_code['K7P4']['message'])
         self.assertIn("CAN'T MAKE IT", by_code['C4N6']['message'])
         self.assertEqual({c: n['to'] for c, n in by_code.items() if n['to']}, PHONES)
         pickup = self.engine.records.get('pickup', by_code['C4N6']['pickup_id'])
-        self.assertEqual((pickup['food_bank_id'], pickup['version'], pickup['moved_from_food_bank_id']), ('eastside', 13, 'city'))
+        self.assertEqual((pickup['food_bank_id'], pickup['version'], pickup['moved_from_food_bank_id']), ('eastside', self.new, 'city'))
         self.assertEqual(by_code['C4N6']['items'], [{'name': 'romaine lettuce', 'pounds': pickup['pounds'], 'produce_id': 'romaine'}])
         prepared = self.join.prepare_texts(self.approvals_url, EVENTS, notices)
         self.assertEqual(sorted(p['to'] for p in prepared), sorted(PHONES.values()))
@@ -238,7 +245,7 @@ class CoolerFailureJoin(unittest.TestCase):
         # The proposer's later approval of the declined version changes nothing. The core
         # answers 409; Lane C's bridge reports any core HTTP error as 503 (a listed gap).
         self.assertNotEqual(self.human(links['city'], 'approve', '2026-10-13T15:40:00-07:00')[0], 200)
-        late = {'lot_id': LOT, 'version': 13, 'organization_id': 'city', 'decision': 'approve', 'terms_hash': result['change']['terms_hash']}
+        late = {'lot_id': LOT, 'version': self.new, 'organization_id': 'city', 'decision': 'approve', 'terms_hash': result['change']['terms_hash']}
         self.assertEqual(call('POST', self.core_url + '/approvals', late, TOKENS['city'])[0], 409)
         lot = self.engine.records.get('lot', LOT)
         self.assertIn({'produce_id': 'romaine', 'food_bank_id': 'city', 'pounds': 200.0}, lot['commitments'])
@@ -246,14 +253,14 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertTrue(all(p['food_bank_id'] != 'eastside' or p['items'][0]['produce_id'] != 'romaine' for p in self.engine.records.all('pickup')))
         from harvestnet_agents.cooler_failure_flow import NotCommittedError
         with self.assertRaises(NotCommittedError):
-            self.join.household_texts(self.engine, LOT, 13, household_page_url='https://households.example.invalid', item_names=ITEM_NAMES)
+            self.texts()
         self.assertTrue(self.join.rule_checks(self.engine, LOT, result['flow'])['no_auto_commit'])
 
     def test_core_refuses_stale_unnamed_late_and_unrecorded_changes(self):
         self.flip_switch()
         change = self.handle()['change']
         flow_terms = change['approval_request']['terms']
-        receipt = {'lot_id': LOT, 'version': 13, 'decision': 'approve', 'terms_hash': change['terms_hash']}
+        receipt = {'lot_id': LOT, 'version': self.new, 'decision': 'approve', 'terms_hash': change['terms_hash']}
         self.assertEqual(call('POST', self.core_url + '/approvals', {**receipt, 'organization_id': 'rural'}, TOKENS['rural'])[0], 409)
         self.assertEqual(call('POST', self.core_url + '/approvals', {**receipt, 'organization_id': 'city'}, TOKENS['eastside'])[0], 401)
         # A second proposal while this version awaits approvals is refused.
@@ -263,30 +270,37 @@ class CoolerFailureJoin(unittest.TestCase):
         status, body = call('POST', self.core_url + '/approvals', {**receipt, 'organization_id': 'eastside', 'receipt_id': 'r-late'}, TOKENS['eastside'])
         self.assertEqual(status, 409)
         self.assertIn('trip time has passed', body['error']['message'])
-        self.assertEqual(changes.find(self.engine.records, LOT, 13)['status'], 'awaiting_approvals')
+        self.assertEqual(changes.find(self.engine.records, LOT, self.new)['status'], 'awaiting_approvals')
 
     def test_core_refuses_a_change_before_the_failure_is_recorded_or_moving_produce_that_keeps(self):
         self.flip_switch()
         holding = changes.holding(self.engine, LOT, 'city')
         self.assertEqual(sorted((i['produce_id'], i['pounds']) for i in holding['items']), [('apples', 50.0), ('romaine', 200.0)])
         self.assertNotIn('request_code', json.dumps(holding))
-        result = self.handle()
-        terms = copy.deepcopy(result['change']['approval_request']['terms'])
-        self.engine.records.delete('change', f'{LOT}:13')
+        # Lane B's terms, assessed only: nothing is written to the core yet.
+        terms = self.handle(propose=False)['flow'].new_version.terms
+        self.assertEqual(self.engine.records.all('change'), [])
+        body = {'terms': terms, 'organizations': ['city', 'eastside']}
+        url = f'{self.core_url}/lots/{LOT}/changes'
+        # 1. The failed cooler isn't in city's status yet.
+        status, refused = call('POST', url, body, TOKENS['city'])
+        self.assertEqual(status, 409)
+        self.assertIn('failed cooler', refused['error']['message'])
+        cooler = {'status': 'failed', 'temperature_c': self.fault['reading']['temperature_c'], 'cold_available': False}
+        self.assertEqual(call('PUT', self.core_url + '/food-banks/city/status', {'cooler': cooler}, TOKENS['city'])[0], 200)
+        # 2. Moving apples (which keep without a fridge) is refused; the pounds still add up.
         moved_apples = copy.deepcopy(terms)
         moved_apples['moves'].append({**moved_apples['moves'][0], 'produce_id': 'apples', 'pounds': 50})
         moved_apples['staying'] = []
-        status, body = call('POST', f'{self.core_url}/lots/{LOT}/changes', {'terms': moved_apples, 'organizations': ['city', 'eastside']}, TOKENS['city'])
+        status, refused = call('POST', url, {**body, 'terms': moved_apples}, TOKENS['city'])
         self.assertEqual(status, 409)
-        self.assertIn('only cold-dependent produce moves', body['error']['message'])
-        bank = self.engine.records.get('bank', 'city')
-        bank.pop('cooler')
-        with self.engine.records.transaction():
-            self.engine.records.put('bank', 'city', bank)
-        status, body = call('POST', f'{self.core_url}/lots/{LOT}/changes', {'terms': terms, 'organizations': ['city', 'eastside']}, TOKENS['city'])
-        self.assertEqual(status, 409)
-        self.assertIn('failed cooler', body['error']['message'])
-        self.assertEqual(call('POST', f'{self.core_url}/lots/{LOT}/changes', {'terms': terms, 'organizations': ['city', 'eastside']}, TOKENS['eastside'])[0], 401)
+        self.assertIn('only cold-dependent produce moves', refused['error']['message'])
+        # 3. Another food bank can't propose city's change.
+        self.assertEqual(call('POST', url, body, TOKENS['eastside'])[0], 401)
+        self.assertEqual(self.engine.records.all('change'), [])
+        # The unaltered terms are accepted, as a proposal awaiting approvals.
+        status, accepted = call('POST', url, body, TOKENS['city'])
+        self.assertEqual((status, accepted['version'], accepted['committed']), (201, self.new, False))
 
     def test_organization_systems_follow_the_core_records_and_the_switch(self):
         before = {org: self.systems.read(org, 'storage')['data']['cold_available_lb'] for org in ('city', 'rural', 'eastside')}
