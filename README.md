@@ -1,6 +1,8 @@
 # UCSC_HACK_HARVESTNET
 hackathon project
 
+Household web page (ticket #2): [`frontend/household/`](frontend/household/README.md).
+
 ## Lane C implementation
 
 The platform integration branches now contain organization-system fixtures,
