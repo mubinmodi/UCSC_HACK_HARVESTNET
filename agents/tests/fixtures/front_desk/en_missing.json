@@ -1,0 +1,36 @@
+{
+  "transcript": {
+    "language": "en",
+    "turns": [
+      {"speaker": "assistant", "text": "Hi, this is HarvestNet. How many people are in your household?"},
+      {"speaker": "household", "text": "Just two of us."},
+      {"speaker": "assistant", "text": "When can you pick up?"},
+      {"speaker": "household", "text": "Saturday, before 11 in the morning."},
+      {"speaker": "assistant", "text": "Is your fridge space limited?"},
+      {"speaker": "household", "text": "Hmm, I'm not sure."},
+      {"speaker": "assistant", "text": "What neighborhood are you near?"},
+      {"speaker": "household", "text": "Sorry, can we come back to that?"},
+      {"speaker": "assistant", "text": "If you'd like, you can tell me whether you receive CalFresh, or skip that question."},
+      {"speaker": "household", "text": "I'd rather skip that."}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 2, "evidence": "two of us"},
+    "pickup_windows": {"value": [{"days": ["sat"], "start": null, "end": "11:00"}], "evidence": "Saturday, before 11 in the morning"},
+    "limited_fridge": {"value": null, "evidence": null},
+    "neighborhood": {"value": null, "evidence": null},
+    "cant_eat": {"value": null, "evidence": null},
+    "snap": {"value": "prefer_not_to_say", "evidence": "I'd rather skip that"}
+  },
+  "expected_draft": {
+    "language": "en",
+    "household_size": 2,
+    "pickup_windows": [{"days": ["sat"], "start": null, "end": "11:00"}],
+    "limited_fridge": null,
+    "neighborhood": null,
+    "cant_eat": null,
+    "snap": "not_said",
+    "missing": ["limited_fridge", "neighborhood", "cant_eat"],
+    "dropped": []
+  }
+}

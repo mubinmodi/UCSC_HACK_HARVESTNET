@@ -1,0 +1,41 @@
+{
+  "transcript": {
+    "language": "es",
+    "turns": [
+      {"speaker": "assistant", "text": "Hola, habla HarvestNet. ¿Cuántas personas hay en su hogar?"},
+      {"speaker": "household", "text": "Mi esposo, yo y tres niños."},
+      {"speaker": "assistant", "text": "¿Cuándo puede recoger?"},
+      {"speaker": "household", "text": "Los sábados por la tarde."},
+      {"speaker": "assistant", "text": "¿Tiene poco espacio en el refrigerador?"},
+      {"speaker": "household", "text": "Sí, muy poco."},
+      {"speaker": "assistant", "text": "¿Cerca de qué vecindario está?"},
+      {"speaker": "household", "text": "Cerca de Castroville."},
+      {"speaker": "assistant", "text": "¿Hay algo que no puedan comer?"},
+      {"speaker": "household", "text": "Nada de chiles, por favor."},
+      {"speaker": "assistant", "text": "Si quiere, puede decirme si recibe CalFresh, o saltar esa pregunta."},
+      {"speaker": "household", "text": "No, no recibimos."}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 5, "evidence": "Mi esposo, yo y tres niños"},
+    "pickup_windows": {"value": [{"days": ["sat"], "start": "15:00", "end": null}], "evidence": "Los sábados por la tarde"},
+    "limited_fridge": {"value": true, "evidence": "Sí, muy poco"},
+    "neighborhood": {"value": "Castroville", "evidence": "Cerca de Castroville"},
+    "cant_eat": {"value": ["chiles"], "evidence": "Nada de chiles"},
+    "snap": {"value": "no", "evidence": "no recibimos"}
+  },
+  "expected_draft": {
+    "language": "es",
+    "household_size": null,
+    "pickup_windows": null,
+    "limited_fridge": true,
+    "neighborhood": "Castroville",
+    "cant_eat": ["chiles"],
+    "snap": "no",
+    "missing": ["household_size", "pickup_windows"],
+    "dropped": [
+      ["household_size", "number_not_in_evidence"],
+      ["pickup_windows", "number_not_in_evidence"]
+    ]
+  }
+}
