@@ -43,10 +43,17 @@ def make_server(api, host='127.0.0.1',port=8050):
     return ThreadingHTTPServer((host,port),Handler)
 
 
+def bind_address(environ=None):
+    """HOST defaults to 127.0.0.1; a container sets HOST=0.0.0.0 to accept its network."""
+    environ=os.environ if environ is None else environ
+    return environ.get('HOST','127.0.0.1'), int(environ.get('PORT','8050'))
+
+
 if __name__=='__main__':
     Path('runtime').mkdir(exist_ok=True)
     fixture=json.loads(Path(os.environ.get('HARVESTNET_FIXTURE','docs/contracts/examples/scenario-normal-afternoon.json')).read_text())
     records=Records(os.environ.get('DATABASE_URL','runtime/core.sqlite'))
     engine=Engine(fixture,records)
     api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')))
-    make_server(api,port=int(os.environ.get('PORT','8050'))).serve_forever()
+    host,port=bind_address()
+    make_server(api,host=host,port=port).serve_forever()

@@ -16,7 +16,7 @@ PYTHONPATH=agents/src python -m harvestnet_core.server
 ```
 
 On PowerShell, use `$env:PYTHONPATH='agents/src'` once, then omit the prefix from
-the commands. The server binds localhost port 8050. `PORT`, `DATABASE_URL`,
+the commands. The server binds localhost port 8050. `HOST` (set `0.0.0.0` in a container), `PORT`, `DATABASE_URL`,
 `HARVESTNET_FIXTURE`, `HARVESTNET_ALLOWED_ORIGIN` and `HARVESTNET_STAFF_TOKENS`
 configure it. Staff tokens are a JSON object with a different secret for each
 organization ID. Store them in ignored local configuration and pass them as
