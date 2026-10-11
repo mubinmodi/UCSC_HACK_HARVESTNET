@@ -1,0 +1,100 @@
+{
+  "operation": "get_food_bank_dashboard",
+  "group": "food_bank",
+  "method": "GET",
+  "path": "/food-banks/{food_bank_id}/dashboard",
+  "summary": "A food bank manager's dashboard: today's capacity, incoming offers, fair-share gap (counts only), disagreements, and arrivals.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/food-banks/city/dashboard"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "food_bank_id": "city",
+        "name": "City food bank",
+        "capacity": {
+          "storage": [
+            {
+              "window": {
+                "start": "2026-10-13T12:00:00-07:00",
+                "end": "2026-10-14T21:00:00-07:00"
+              },
+              "cold_free_lb": 250,
+              "dry_free_lb": 200
+            }
+          ],
+          "pickup_windows": [
+            {
+              "start": "2026-10-13T18:00:00-07:00",
+              "end": "2026-10-13T20:00:00-07:00"
+            }
+          ],
+          "truck": {
+            "window": {
+              "start": "2026-10-13T13:00:00-07:00",
+              "end": "2026-10-13T17:00:00-07:00"
+            },
+            "refrigerated": true,
+            "capacity_lb": 250
+          },
+          "cooler": {
+            "status": "working",
+            "temperature_c": 4,
+            "source": "beeceptor",
+            "synthetic": true
+          }
+        },
+        "incoming_offers": [
+          {
+            "lot_id": "lot-market-1013",
+            "version": 3,
+            "donor_id": "market",
+            "donor_name": "Farmers market",
+            "for_us": [
+              {
+                "produce_id": "romaine",
+                "name": "Romaine lettuce",
+                "pounds": 200
+              }
+            ],
+            "transport": {
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T14:00:00-07:00",
+              "arrives_at": "2026-10-13T14:20:00-07:00"
+            },
+            "agent_suggests": "accept",
+            "agent_reason": "At arrival (2:20 pm) we have 250 lb of cold space free and our share needs 200 lb. Households can collect from 6 pm to 8 pm.",
+            "needs_your_approval": true
+          }
+        ],
+        "fair_share_gap": {
+          "households": 3,
+          "people": 6,
+          "below_fair_share_lb": 19,
+          "limited_fridge": 1,
+          "evening_only": 3,
+          "table_version": "0.1.0-placeholder"
+        },
+        "disagreements": [],
+        "expected_arrivals": [
+          {
+            "lot_id": "lot-market-1013",
+            "version": 3,
+            "arrives_at": "2026-10-13T14:20:00-07:00",
+            "items": [
+              {
+                "produce_id": "romaine",
+                "pounds": 200
+              }
+            ],
+            "status": "awaiting_approvals"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "operation": "get_results",
+  "group": "results",
+  "method": "GET",
+  "path": "/results",
+  "summary": "The results strip: produce wasted, worst-served fair-share coverage, and households reached, per method on the same scenario.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/results",
+      "query": {
+        "scenario_id": "normal-afternoon"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "scenario_id": "normal-afternoon",
+        "run_mode": "synthetic",
+        "measured": false,
+        "note": "Example values for building the results strip. Not a measured result.",
+        "methods": [
+          {
+            "method": "first_come_first_served",
+            "produce_wasted_lb": 210,
+            "worst_served_coverage": 0.25,
+            "households_reached": 5,
+            "invalid_commitments": 0
+          },
+          {
+            "method": "nearest_food_bank",
+            "produce_wasted_lb": 180,
+            "worst_served_coverage": 0.31,
+            "households_reached": 5,
+            "invalid_commitments": 0
+          },
+          {
+            "method": "rules_based",
+            "produce_wasted_lb": 60,
+            "worst_served_coverage": 0.58,
+            "households_reached": 6,
+            "invalid_commitments": 0
+          },
+          {
+            "method": "llm",
+            "produce_wasted_lb": 50,
+            "worst_served_coverage": 0.62,
+            "households_reached": 6,
+            "invalid_commitments": 0
+          }
+        ],
+        "headline": [
+          "produce_wasted_lb",
+          "worst_served_coverage"
+        ]
+      }
+    }
+  }
+}

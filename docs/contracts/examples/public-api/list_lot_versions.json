@@ -1,0 +1,56 @@
+{
+  "operation": "list_lot_versions",
+  "group": "donor",
+  "method": "GET",
+  "path": "/lots/{lot_id}/versions",
+  "summary": "Every version of a lot's draft agreement, with who proposed it and why.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/lots/lot-market-1013/versions"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "lot_id": "lot-market-1013",
+        "versions": [
+          {
+            "version": 1,
+            "proposer_id": "market",
+            "move": "offer",
+            "reason": "Surplus offer. Can drop off one load to rural and eastside only.",
+            "change": null
+          },
+          {
+            "version": 2,
+            "proposer_id": "advocate",
+            "move": "counter",
+            "reason": "Rural food bank's 42 households are furthest below fair share. Proposing 250 lb of apples go there.",
+            "change": {
+              "kind": "set_pounds",
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "pounds": 250
+            }
+          },
+          {
+            "version": 3,
+            "proposer_id": "market",
+            "move": "counter",
+            "reason": "Drop-off to rural and eastside on one route; city collects the romaine in its refrigerated truck.",
+            "change": {
+              "kind": "set_transport",
+              "food_bank_id": "city",
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T14:00:00-07:00",
+              "arrives_at": "2026-10-13T14:20:00-07:00"
+            }
+          }
+        ],
+        "current_version": 3
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "operation": "create_request",
+  "group": "household",
+  "method": "POST",
+  "path": "/requests",
+  "summary": "Save a household's request after it says yes to the consent question. Returns its short code.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/requests",
+      "body": {
+        "language": "en",
+        "household_size": 4,
+        "pickup_windows": [
+          {
+            "days": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri"
+            ],
+            "start": "18:00",
+            "end": null
+          }
+        ],
+        "limited_fridge": true,
+        "neighborhood": "Watsonville",
+        "cant_eat": [
+          "eggplant"
+        ],
+        "snap": "yes",
+        "channel": "web",
+        "consent": true,
+        "phone": "+15555550142"
+      }
+    },
+    "response": {
+      "status": 201,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "request_code": "K7P4",
+        "household_size": 4,
+        "fair_share_lb": 12,
+        "received_this_week_lb": 0,
+        "table_version": "0.1.0-placeholder",
+        "chosen_food_bank_ids": [],
+        "texts": true,
+        "expires_at": "2026-10-20T11:05:00-07:00",
+        "next": "choose_food_banks"
+      }
+    }
+  }
+}
