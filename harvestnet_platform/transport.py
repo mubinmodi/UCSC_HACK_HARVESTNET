@@ -26,7 +26,7 @@ def terms_hash(terms):
 def validate_move(move, organization, version):
     if not isinstance(move, dict) or move.get('action') not in ACTIONS:
         raise ValueError('Only agent proposal moves are allowed; transport cannot commit')
-    if move.get('organization_id') != organization or move.get('version') != version:
+    if move.get('organization_id') != organization or type(move.get('version')) is not int or move.get('version') != version:
         raise ValueError('Move must identify its own organization and the current version')
     if not isinstance(move.get('reason'), str) or not move['reason'].strip():
         raise ValueError('Every move must include a reason')
@@ -74,15 +74,17 @@ class Receiver:
         self.db.commit()
 
     def receive(self, envelope):
+        if not isinstance(envelope, dict):
+            raise ValueError('An organization event object is required')
         event, seq = envelope.get('event_id'), envelope.get('sequence')
         actor = envelope.get('turn')
         agent_input = envelope.get('input', {})
         if not isinstance(event, str) or not event or len(event) > 100 or type(seq) is not int or seq < 1:
             raise ValueError('Event and positive sequence required')
-        if actor not in ORGANIZATIONS or agent_input.get('turn') != actor:
+        if not isinstance(agent_input, dict) or actor not in ORGANIZATIONS or agent_input.get('turn') != actor:
             raise ValueError('Published turn must identify an organization')
         draft = agent_input.get('draft', {})
-        if type(draft.get('version')) is not int or draft['version'] < 1:
+        if not isinstance(draft, dict) or type(draft.get('version')) is not int or draft['version'] < 1:
             raise ValueError('Current draft version required')
         if not isinstance(agent_input.get('facts'), dict):
             raise ValueError('Calculator facts object required')
@@ -154,9 +156,12 @@ def handler_for(receiver, token, endpoint):
                 request = self.read_json()
                 if request.get('jsonrpc') != '2.0' or request.get('method') != 'message/send':
                     raise ValueError('Only A2A message/send is supported')
-                message = request['params']['message']
-                parts = message['parts']
-                if message.get('role') != 'user' or len(parts) != 1 or parts[0].get('kind') != 'data':
+                params = request.get('params')
+                if not isinstance(params, dict) or not isinstance(params.get('message'), dict):
+                    raise ValueError('A2A message object required')
+                message = params['message']
+                parts = message.get('parts')
+                if message.get('role') != 'user' or not isinstance(parts, list) or len(parts) != 1 or not isinstance(parts[0], dict) or parts[0].get('kind') != 'data':
                     raise ValueError('One A2A DataPart envelope required')
                 result = receiver.receive(parts[0]['data'])
                 self.send_json(200, rpc_result(request, result))

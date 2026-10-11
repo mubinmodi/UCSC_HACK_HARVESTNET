@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import json
+import math
 import os
 from datetime import datetime
 from .systems import Systems, BANKS
@@ -41,7 +42,7 @@ def instant(value):
 
 
 def search_capability(records, *, min_cold_lb=0, pickup_at=None):
-    if type(min_cold_lb) not in (int, float) or min_cold_lb < 0:
+    if type(min_cold_lb) not in (int, float) or not math.isfinite(min_cold_lb) or min_cold_lb < 0:
         raise ValueError('Nonnegative cold capacity required')
     matches = []
     for record in records:

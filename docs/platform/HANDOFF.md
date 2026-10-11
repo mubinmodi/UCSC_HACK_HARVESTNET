@@ -26,6 +26,18 @@ Nothing was merged to main, and no issue was closed on partial evidence.
 
 ## Remaining acceptance gates
 
+Expanded verification on October 11: all **36 local tests** pass, including
+native App SDK startup and authenticated exchange. Twelve added resilience checks
+cover malformed HTTP data, pending-turn recovery after invalid receipts, receipt
+and approval persistence after restart, simultaneous reservations across twelve
+budget connections, core outage/retry with the same human receipt, every mock
+system resource, isolated failure for each food bank, and inactive authenticated
+n8n workflow graphs. Testing found and fixed nested transport shape crashes,
+premature join-sequence advancement, incomplete pickup text validation, and
+nonfinite Directory capacity queries. The combined Compose configuration and
+regeneration of all four n8n imports pass. Workflow graph checks do not certify an
+actual n8n import/SMS execution, and Compose validation does not run containers.
+
 The shared #1 API contracts/skeleton and #20 real harness/agents have no code in
 the remote branches as last checked. Proposed Lane C interfaces need review with
 Lane A/B. Real-agent fixture equality and actual core rule checks for #21 cannot

@@ -147,10 +147,14 @@ def approval_message(link):
 def pickup_message(notice, *, now=None):
     if notice.get('committed') is not True:
         raise ValueError('Notify only produce with a recorded commitment')
-    for field in ('food_bank', 'items', 'window', 'request_code', 'pickup_id', 'version'):
+    for field in ('food_bank', 'items', 'window', 'request_code', 'pickup_id', 'version', 'release_url'):
         if not notice.get(field):
             raise ValueError(f'Pickup notice requires {field}')
-    if not isinstance(notice['items'], list) or any(type(item.get('pounds')) not in (int,float) or not math.isfinite(item['pounds']) or item['pounds'] <= 0 for item in notice['items']):
+    if type(notice['version']) is not int or notice['version'] < 1:
+        raise ValueError('Pickup notice requires a positive commitment version')
+    if not isinstance(notice['window'], dict) or any(not isinstance(notice['window'].get(key), str) or not notice['window'][key].strip() for key in ('start', 'end')):
+        raise ValueError('Pickup window requires start and end')
+    if not isinstance(notice['items'], list) or any(not isinstance(item, dict) or not isinstance(item.get('name'), str) or not item['name'].strip() or type(item.get('pounds')) not in (int,float) or not math.isfinite(item['pounds']) or item['pounds'] <= 0 for item in notice['items']):
         raise ValueError('Pickup pounds must come from positive calculator results')
     items = ', '.join(f"{item['pounds']:g} lb {item['name']}" for item in notice['items'])
     message = (f"HarvestNet: {items} at {notice['food_bank']}, {notice['window']['start']} to "

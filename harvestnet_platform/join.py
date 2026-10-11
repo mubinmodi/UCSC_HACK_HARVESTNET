@@ -10,7 +10,7 @@ import os
 import threading
 import uuid
 from pathlib import Path
-from .transport import ORGANIZATIONS, Receiver, InProcess, A2ATransport, canonical, load_policy
+from .transport import ORGANIZATIONS, Receiver, InProcess, A2ATransport, canonical, load_policy, validate_move
 
 REQUIRED_CHECKS = {'no_double_booking', 'pounds_conserved', 'versioned_approvals',
                    'no_auto_commit', 'all_pounds_have_pathway', 'zero_invalid_commitments'}
@@ -23,7 +23,7 @@ class MoveBridge:
         self.lock = threading.RLock()
 
     def __call__(self, organization, agent_input):
-        if organization not in ORGANIZATIONS or agent_input.get('turn') != organization:
+        if not isinstance(agent_input, dict) or organization not in ORGANIZATIONS or agent_input.get('turn') != organization:
             raise ValueError('Harness must follow the published organization turn')
         with self.lock:
             envelope = {'event_id': self.event, 'sequence':self.sequence+1,
@@ -32,12 +32,13 @@ class MoveBridge:
                 raise ValueError('A partial delivery must retry the identical turn before advancing')
             self.pending = envelope
             receipts = self.transport.broadcast(envelope)
-            self.sequence += 1
-            self.pending = None
             moves = [r['move'] for r in receipts if r['organization_id'] == organization]
             if len(moves) != 1 or moves[0] is None:
                 raise ValueError('One move from its own organization required')
-            return moves[0]
+            move = validate_move(moves[0], organization, agent_input['draft']['version'])
+            self.sequence += 1
+            self.pending = None
+            return move
 
 
 def require_outcomes(run):
