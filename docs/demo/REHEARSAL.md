@@ -29,7 +29,7 @@ One person can hold more than one role. Agree on names before the first run.
 |---|---|---|
 | **Presenter** | Says the script, moves the slides, keeps time | Frontend person (lead for #25) |
 | **Caller** | Makes the Spanish voice call on a phone (moment 1), or types into the household page if voice is down | Anyone who speaks Spanish |
-| **Operator** | Drives the donor page and the food bank dashboards, and flips the Beeceptor cooler switch (moments 2, 3, 5) | Full-stack C (platform) |
+| **Operator** | Drives the donor page and the food bank dashboards, and flips the cooler switch (moments 2, 3, 5) | Full-stack C (platform) |
 | **Approvers** | Approve as the market manager and the city and eastside managers, through n8n or the dashboards (moments 4, 5) | Full-stack A and B |
 | **Timekeeper and backup** | Holds a stopwatch, calls "skip ahead" at the marks, and opens the replay if the network fails | Anyone not presenting |
 
@@ -42,7 +42,7 @@ One person can hold more than one role. Agree on names before the first run.
 | 0:40 | 2. Farmers market reports surplus | Donor page | Level 1 |
 | 0:55 | 3. Agents negotiate | Version history | Level 3 |
 | 1:25 | 4. Live approval | n8n message or dashboard | Level 3 |
-| 1:40 | 5. Cooler fails | Beeceptor switch, city dashboard | Level 2 |
+| 1:40 | 5. Cooler fails | Cooler switch (command below), city dashboard | Level 2 |
 | 2:10 | 6. Household gets a text | Household page or phone | Evidence |
 | 2:25 | 7. Results strip | Results strip | Evidence |
 | 2:45 | Close | Slide 16 | |
@@ -65,10 +65,58 @@ version history instead of waiting.
       https://18-217-110-223.sslip.io/donor-dashboard/ (donor, then the city and eastside
       dashboards), https://18-217-110-223.sslip.io/results-strip/, and `docs/demo/replay.html`
       (kept in a background tab).
-- [ ] Start from a fresh scenario: `deploy/aws/reset_data.sh` wipes the live demo data (lots, households, review links, cooler state) and re-publishes the results strip. It keeps the Claude spending ledger.
+- [ ] Start from a fresh scenario: `deploy/aws/reset_data.sh` wipes the live demo data (lots, households, review links, cooler state) and re-publishes the results strip. It keeps the Claude spending ledger. Then check the cooler switch reads working (see "The cooler switch" below).
 - [ ] Check the phone for the voice line, and the phones or inboxes that receive n8n messages.
 - [ ] Spending cap: set `CLAUDE_RUN_CAP_USD` only if the team agreed to live Claude calls
       (`docs/platform/DEPLOYMENT.md`). Zero means rules and templates only. Say so if asked.
+
+## The cooler switch (moment 5, live on AWS)
+
+The switch is reachable through the gateway at `POST /systems/demo/<city|rural|eastside>/cooler`,
+behind the `DEMO_SWITCH_TOKEN` bearer. Without the token, or with a wrong one, it answers 401.
+Nothing else on the systems service is public.
+
+Read the token once, before the run, and keep it off screen:
+
+```
+export DEMO_SWITCH_TOKEN=$(aws secretsmanager get-secret-value --profile incubator --region us-east-2 \
+  --secret-id harvestnet/platform --query SecretString --output text \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["DEMO_SWITCH_TOKEN"])')
+```
+
+Fail the city cooler (the reply shows `"status": "failed"` and `"synthetic": true`):
+
+```
+curl -sS -X POST -H "Authorization: Bearer $DEMO_SWITCH_TOKEN" -H "Content-Type: application/json" \
+  https://18-217-110-223.sslip.io/systems/demo/city/cooler -d '{"failed": true}'
+```
+
+Reset it to working (after the run, and before the next one):
+
+```
+curl -sS -X POST -H "Authorization: Bearer $DEMO_SWITCH_TOKEN" -H "Content-Type: application/json" \
+  https://18-217-110-223.sslip.io/systems/demo/city/cooler -d '{"failed": false}'
+```
+
+What happens after the failing command, with no further action:
+
+- The city organization host polls its own cooler reading every 10 seconds
+  (`COOLER_WATCH_INTERVAL_SECONDS`). Allow about 15 seconds.
+- When the reading turns failed, the city food bank's agent records the failed cooler in its own
+  status, reads its committed holding, asks the other food banks for their own answers, runs the
+  cooler-failure flow and proposes the new version. It then asks the approval service to send the
+  review emails to the two named organizations. It never approves or commits; each manager does,
+  on their own review link.
+- One failure proposes once per lot. Polling again, or restarting the host, proposes nothing more.
+  The city host's log lines start with `cooler-watch:` (`deploy/aws/logs.sh`). All of it is
+  labeled synthetic.
+- Resetting the switch ends that failure. Failing it again starts a new one, which can propose
+  again against the lot's then-current committed version. If the first proposal is still awaiting
+  approvals, the core refuses a second one and the watcher logs that. If a manager declined the
+  proposed version, it is not proposed again (its review links were already used); start from a
+  fresh offer. If both managers approved, the plan has moved the romaine, so another failure on
+  the same lot proposes nothing new.
+- If the switch or the host fails live, use the recorded replay (fallback table below).
 
 ## Fallback switches
 

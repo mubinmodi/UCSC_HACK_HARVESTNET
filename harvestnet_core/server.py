@@ -64,8 +64,10 @@ if __name__=='__main__':
     page_url=os.environ.get('HARVESTNET_HOUSEHOLD_URL') if email_enabled else None
     if email_enabled and not page_url:
         raise ValueError('HARVESTNET_HOUSEHOLD_URL is required for email notices')
+    from .voice import extractor_from_env
+    # Voice intake: a Claude extractor under a hard spending cap only when a key and a cap are set; else the API answers 503.
     api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')),
-            household_page_url=page_url)
+            household_page_url=page_url,extractor=extractor_from_env())
     if email_enabled:
         allowed=os.environ.get('SES_TEST_RECIPIENTS','')
         dispatcher=EmailDispatcher(api,pickup_webhook=pickup_webhook,release_webhook=release_webhook,
