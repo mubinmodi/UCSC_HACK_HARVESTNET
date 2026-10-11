@@ -208,6 +208,20 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertEqual(romaine, [('city', 50.0, 'same_day_offer'), ('eastside', 150.0, None)])
         self.assertIn({'produce_id': 'apples', 'food_bank_id': 'city', 'pounds': 50.0}, lot['commitments'])
 
+        # A decision on the superseded version is refused once the change is committed (found live,
+        # #18): the lot's draft stays at that version, so it was still accepted before.
+        old = lot_before['approvals']['eastside']
+        resumed = self.clock['now']
+        self.clock['now'] = '2026-10-13T14:00:00-07:00'  # before the lot's own deadline, as it was live
+        for decision in ('approve', 'decline'):
+            stale = {'lot_id': LOT, 'version': self.committed, 'organization_id': 'eastside', 'decision': decision,
+                     'terms_hash': old['terms_hash'], 'receipt_id': f'r-superseded-{decision}'}
+            status, refused = call('POST', self.core_url + '/approvals', stale, TOKENS['eastside'])
+            self.assertEqual(status, 409)
+            self.assertIn('superseded', refused['error']['message'])
+        self.clock['now'] = resumed
+        self.assertEqual(self.engine.records.get('lot', LOT)['approvals']['eastside']['decision'], 'approve')
+
         # 4. Affected households get a new pickup email and can decline.
         notices = self.texts()
         by_code = {n['request_code']: n for n in notices}
