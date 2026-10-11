@@ -15,9 +15,13 @@ What each says yes to (docs/MVP_DESIGN.md section 6, Proposed):
   bank to collect. It asks its human about any condition doubt before offering.
 - **Food bank**: accepts only what its facts allow (storage at arrival, pickup hours,
   truck, and households collecting before the produce spoils). It counters with one
-  amendment plus a reason, bids toward its households' fair-share gap only for produce
-  it can receive, rejects produce not fit for people, and asks its human about any
-  condition doubt.
+  amendment plus a reason, bids toward its households' fair-share gap first, only for
+  produce it can receive, rejects produce not fit for people, and asks its human about
+  any condition doubt. Once the version plans its whole gap, it may bid **beyond fair
+  share** for produce still unclaimed, so surplus goes out rather than waste
+  (docs/MVP_DESIGN.md section 8; user direction, October 11, 2026). Those bids are
+  bounded only by its own facts and calculators, and their reasons say "beyond fair
+  share".
 - **Advocate**: never accepts, rejects, holds, or vetoes. It proposes one amendment
   toward the food bank with the largest fair-share gap, or passes.
 
@@ -31,7 +35,7 @@ The decision order and tie-breaks are **proposed** and listed in each class.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from .calculators import Calculators, StandInCalculators
@@ -288,17 +292,37 @@ class RulesFoodBank(_Negotiator):
     profile or condition doubt -> ask a human. Then transport: no line -> ask the donor to
     drop off if offered and suitable, else collect with its own truck, else remove the item;
     a collection its truck can't do -> switch to the donor's drop-off if suitable, else
-    reduce or remove. Then households can't collect before it spoils -> remove that item;
+    reduce or remove. Then households can't collect before it spoils (pickup hours, or its
+    produce profile's usable days in the storage it would sit in) -> remove that item;
     storage at arrival is short -> reduce the longest-lived item in that storage. With no
-    problem: bid toward its fair-share gap on the shortest-lived item it can receive; else
-    request holds if everyone named accepted, accept if named, or pass."""
+    problem: bid toward its fair-share gap on the shortest-lived item it can receive; once
+    the version plans its whole gap, bid beyond fair share the same way; else request
+    holds if everyone named accepted, accept if named, or pass.
+
+    Each bid is wholly toward fair share or wholly beyond it, never both: a bid toward the
+    gap stops at the gap, and only the next bid can go past it. A bid's limits are the
+    unclaimed pounds, its storage room in the item's storage class at arrival and when
+    pickup ends (storage over time), its truck's room when it collects, and, toward fair
+    share only, the gap. Beyond fair share has no other limit.
+
+    The donor's drop-off capacity is the donor's fact, not ours, so an extra bid can ask
+    more than its vehicle holds. The donor then asks us to collect. When we can't, and we
+    hold pounds beyond fair share, we take some of those back (never fair-share pounds)
+    before asking for the drop-off again, and we remember, for this lot, that the donor
+    turned down our drop-off at that load: no more extra bids that rely on its drop-off.
+    That memory is only what this organization saw in the shared draft (proposed)."""
 
     role = Role.FOOD_BANK
+
+    def __init__(self, organization_id: str, calculators: Calculators | None = None):
+        super().__init__(organization_id, calculators)
+        self._drop_off_refused_at: dict[str, float] = {}  # lot id -> our planned pounds when the donor said no
 
     def move(self, agent_input: AgentInput) -> Move:
         facts = agent_input.facts
         self._check_turn(agent_input, FoodBankFacts, getattr(facts, "food_bank_id", None))
         draft = agent_input.draft
+        self._note_drop_off_refusal(draft, facts)
         problems = self.review(agent_input)
         if problems:
             p = problems[0]
@@ -353,6 +377,14 @@ class RulesFoodBank(_Negotiator):
                     + ". Removing it from our share.",
                     SetPounds(a.produce_id, me, 0),
                 ))
+            elif not self._keeps_until(a.produce_id, tr.arrives_at, check.collect.end):
+                problems.append(Problem(
+                    "spoils_in_storage", MoveKind.COUNTER,
+                    f"Our households can't collect {name.lower()} before it spoils: its produce profile doesn't keep it "
+                    f"usable in {self._storage_label(a.produce_id)} storage until pickup ends at {_clock(check.collect.end)}. "
+                    "Removing it from our share.",
+                    SetPounds(a.produce_id, me, 0),
+                ))
 
         problems.extend(self._storage_problems(draft, facts, tr.arrives_at))
         return problems
@@ -371,6 +403,20 @@ class RulesFoodBank(_Negotiator):
     def _needs_cold_storage(self, produce_id: str) -> bool:
         profile = self._profile(produce_id)
         return profile is None or profile.needs_cold
+
+    def _storage_label(self, produce_id: str) -> str:
+        return "cold" if self._needs_cold_storage(produce_id) else "dry"
+
+    def _keeps_until(self, produce_id: str, arrives_at: datetime, until: datetime) -> bool:
+        """Whether the produce profile keeps this item usable, in the storage class it would
+        sit in here (cold if it needs cold, else dry), from arrival until ``until``. Uses
+        the profile's shortest stated life; a profile with no life for that storage (for
+        example, cold storage not recommended) never keeps it (ADR 0003)."""
+        profile = self._profile(produce_id)
+        if profile is None:
+            return False
+        days = profile.days_usable_cold if self._needs_cold_storage(produce_id) else profile.days_usable_room
+        return days is not None and until - arrives_at <= timedelta(days=days.min)
 
     def _collection(self, draft: DraftVersion, facts: FoodBankFacts, produce_ids: Sequence[str], pounds: float):
         """(departs, arrives) for collecting with our own truck, or the reason we can't."""
@@ -414,17 +460,58 @@ class RulesFoodBank(_Negotiator):
             )
         return self._remove_unmovable(draft, why_not)
 
+    def _cannot_collect(self, draft: DraftVersion, facts: FoodBankFacts, tr: Transport) -> str | None:
+        """Why our truck can't do this collection (capacity aside), or None if it can."""
+        ids = [a.produce_id for a in draft.allocations_to(self.organization_id)]
+        truck = facts.truck
+        if truck is None:
+            return "we have no truck free today"
+        if any(self._cold_chain(p) for p in ids) and not truck.refrigerated:
+            return "our truck isn't refrigerated"
+        if not (truck.window.contains(tr.departs_at) and truck.window.contains(tr.arrives_at)):
+            return f"our truck is only free {_clock(truck.window.start)} to {_clock(truck.window.end)}"
+        return None
+
+    def _note_drop_off_refusal(self, draft: DraftVersion, facts: FoodBankFacts) -> None:
+        """We never ask to collect when we can't, so a draft asking us to collect, where the
+        donor offered us a suitable drop-off, means the donor turned that drop-off down. It
+        counts on the donor's own version, or the first time we see it on someone else's;
+        never on our own (that is us taking pounds back while the line still says collect)."""
+        me, tr = self.organization_id, draft.transport(self.organization_id)
+        ids = [a.produce_id for a in draft.allocations_to(me)]
+        if not (tr is not None and tr.mover is Mover.FOOD_BANK and ids and self._drop_off_suits(draft, ids)
+                and self._cannot_collect(draft, facts, tr) is not None):
+            return
+        seen = self._drop_off_refused_at.get(draft.lot_id)
+        if draft.proposer_id == draft.donor_id or (seen is None and draft.proposer_id != me):
+            self._drop_off_refused_at[draft.lot_id] = draft.planned_lb(me) if seen is None else min(seen, draft.planned_lb(me))
+
+    def _take_back_beyond_fair_share(self, draft: DraftVersion, facts: FoodBankFacts, why: str) -> Problem | None:
+        """After the donor turned down our drop-off at this load, take back pounds we asked
+        for beyond fair share, on our longest-lived item, before asking again."""
+        me = self.organization_id
+        refused = self._drop_off_refused_at.get(draft.lot_id)
+        if refused is None or draft.planned_lb(me) < refused:
+            return None  # not refused at this load: we already took some back, so ask again
+        above = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, draft.planned_lb(me)).above_gap_lb
+        if above <= 0:
+            return None
+        a = max(draft.allocations_to(me), key=lambda a: (draft.item(a.produce_id).usable_until, a.produce_id))
+        back = min(a.pounds, above)
+        donor = draft.name_of(draft.donor_id)
+        return Problem(
+            "take_back_beyond_fair_share", MoveKind.COUNTER,
+            f"{donor} asks us to collect our {_lb(draft.planned_lb(me))} lb instead of dropping it off, and we can't: {why}. "
+            f"{_lb(above)} lb of our share is beyond fair share, so we take back {_lb(back)} lb of "
+            f"{self._item_name(a.produce_id).lower()} we asked for beyond fair share and keep our households' fair share.",
+            SetPounds(a.produce_id, me, self.calculators.adjust_pounds(a.pounds, -back)),
+        )
+
     def _truck_problem(self, draft: DraftVersion, facts: FoodBankFacts, tr: Transport) -> Problem | None:
         me, mine = self.organization_id, draft.allocations_to(self.organization_id)
         ids = [a.produce_id for a in mine]
         truck = facts.truck
-        why = None
-        if truck is None:
-            why = "we have no truck free today"
-        elif any(self._cold_chain(p) for p in ids) and not truck.refrigerated:
-            why = "our truck isn't refrigerated"
-        elif not (truck.window.contains(tr.departs_at) and truck.window.contains(tr.arrives_at)):
-            why = f"our truck is only free {_clock(truck.window.start)} to {_clock(truck.window.end)}"
+        why = self._cannot_collect(draft, facts, tr)
         if why is None and draft.planned_lb(me) > truck.capacity_lb:
             fit = self.calculators.capacity_fit(truck.capacity_lb, draft.planned_lb(me))
             a = max(mine, key=lambda a: (draft.item(a.produce_id).usable_until, a.produce_id))
@@ -437,6 +524,9 @@ class RulesFoodBank(_Negotiator):
         if why is None:
             return None
         if self._drop_off_suits(draft, ids):
+            take_back = self._take_back_beyond_fair_share(draft, facts, why)
+            if take_back is not None:
+                return take_back
             return Problem(
                 "ask_drop_off", MoveKind.COUNTER,
                 f"We can't collect: {why}. Asking {draft.name_of(draft.donor_id)} to drop off instead, as it offered.",
@@ -485,19 +575,24 @@ class RulesFoodBank(_Negotiator):
     # Bidding
 
     def _bid(self, draft: DraftVersion, facts: FoodBankFacts) -> Move | None:
+        """Fair share first (docs/MVP_DESIGN.md section 8): while this version leaves our
+        households below fair share, every bid goes toward that gap. Only once it plans our
+        whole gap do we bid beyond it, so surplus still goes out rather than waste. What we
+        see is our own facts and the shared draft; other food banks' gaps are the
+        advocate's to argue, and it can shift pounds planned above our gap to theirs."""
         me = self.organization_id
-        demand = facts.demand
-        gap = self.calculators.gap_after_plan(demand.below_fair_share_lb, draft.planned_lb(me))
-        if gap.remaining_gap_lb <= 0:
-            return None
+        gap = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, draft.planned_lb(me))
+        shortfall = gap.remaining_gap_lb if gap.remaining_gap_lb > 0 else None  # None: beyond fair share
         candidates = [i for i in draft.items if draft.unallocated_lb(i.produce_id) > 0]
         for item in sorted(candidates, key=lambda i: (i.usable_until, i.produce_id)):
-            bid = self._bid_for(draft, facts, item, gap.remaining_gap_lb)
+            bid = self._bid_for(draft, facts, item, shortfall)
             if bid is not None:
                 return bid
         return None
 
-    def _bid_for(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem, shortfall: float) -> Move | None:
+    def _bid_for(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem, shortfall: float | None) -> Move | None:
+        """A bid for one unclaimed item: toward our gap (``shortfall``), or beyond fair share
+        (``shortfall`` is None). The same facts bound both; only the gap differs."""
         me, pid = self.organization_id, item.produce_id
         if item.condition_grade == "not_for_people" or item.condition_doubt or self._profile(pid) is None:
             return None
@@ -505,31 +600,50 @@ class RulesFoodBank(_Negotiator):
         arrival = self._bid_arrival(draft, facts, ids)
         if arrival is None:
             return None
+        collecting = arrival.transport is not None and arrival.transport.mover is Mover.FOOD_BANK
+        uses_truck = collecting or (arrival.transport is None and not self._drop_off_suits(draft, ids))
+        if shortfall is None and not uses_truck and draft.lot_id in self._drop_off_refused_at:
+            return None  # the donor turned our drop-off down at a load we can't see past
         pickup = self.calculators.pickup_feasibility(arrival.at, facts.pickup_windows, item.usable_until)
-        if not pickup.feasible:
+        if not pickup.feasible or not self._keeps_until(pid, arrival.at, pickup.collect.end):
             return None
         cold = self._needs_cold_storage(pid)
-        free = self.calculators.storage_at(facts.storage, arrival.at)
-        free_lb = free.cold_free_lb if cold else free.dry_free_lb
+        # Storage over time: the produce sits here from arrival until pickup ends.
+        free_lb = min(
+            s.cold_free_lb if cold else s.dry_free_lb
+            for s in (self.calculators.storage_at(facts.storage, t) for t in (arrival.at, pickup.collect.end))
+        )
         in_class = sum(a.pounds for a in draft.allocations_to(me) if self._needs_cold_storage(a.produce_id) == cold)
         room = self.calculators.capacity_fit(free_lb, in_class).room_left_lb
-        limits = [draft.unallocated_lb(pid), room, shortfall]
-        collecting = arrival.transport is not None and arrival.transport.mover is Mover.FOOD_BANK
-        if collecting or (arrival.transport is None and not self._drop_off_suits(draft, ids)):
+        limits = [draft.unallocated_lb(pid), room] + ([shortfall] if shortfall is not None else [])
+        if uses_truck:
             limits.append(self.calculators.capacity_fit(facts.truck.capacity_lb, draft.planned_lb(me)).room_left_lb)
         bid = min(limits)
         if bid <= 0:
             return None
+        pounds = self.calculators.adjust_pounds(draft.pounds(pid, me), bid)
         name = self._item_name(pid).lower()
         label = "cold" if cold else "dry"
-        reason = (
-            f"Our {facts.demand.households} households are {_lb(shortfall)} lb below their fair share this week"
-            + (f" after the {_lb(draft.planned_lb(me))} lb already planned for us" if draft.planned_lb(me) else "")
-            + f". {_lb(draft.unallocated_lb(pid))} lb of {name} is unclaimed. Arriving at {_clock(arrival.at)}, we have "
-            f"{_lb(room)} lb of {label} space for it, and households can collect it {_window(pickup.collect)}, before it "
-            f"spoils. Asking for {_lb(bid)} lb."
-        )
-        return self._move(draft, MoveKind.COUNTER, reason, SetPounds(pid, me, draft.pounds(pid, me) + bid))
+        space = f"Arriving at {_clock(arrival.at)}, we have {_lb(room)} lb of {label} space for it"
+        if shortfall is not None:
+            reason = (
+                f"Our {facts.demand.households} households are {_lb(shortfall)} lb below their fair share this week"
+                + (f" after the {_lb(draft.planned_lb(me))} lb already planned for us" if draft.planned_lb(me) else "")
+                + f". {_lb(draft.unallocated_lb(pid))} lb of {name} is unclaimed. {space}, and households can collect it "
+                f"{_window(pickup.collect)}, before it spoils. Asking for {_lb(bid)} lb."
+            )
+        else:
+            met = (f"Our {facts.demand.households} households already have their fair share this week"
+                   if facts.demand.below_fair_share_lb <= 0 else
+                   f"Our {facts.demand.households} households' {_lb(facts.demand.below_fair_share_lb)} lb fair-share gap "
+                   f"is already planned in the {_lb(draft.planned_lb(me))} lb for us")
+            reason = (
+                f"{met}. {_lb(draft.unallocated_lb(pid))} lb of {name} is still unclaimed, so rather than let it go to "
+                f"waste we ask for some beyond fair share. {space} from arrival until pickup ends, households can collect "
+                f"it {_window(pickup.collect)}, and its produce profile keeps it usable in {label} storage until then. "
+                f"Asking for {_lb(bid)} lb more, beyond fair share."
+            )
+        return self._move(draft, MoveKind.COUNTER, reason, SetPounds(pid, me, pounds))
 
     def _bid_arrival(self, draft: DraftVersion, facts: FoodBankFacts, produce_ids: Sequence[str]) -> _Arrival | None:
         tr = draft.transport(self.organization_id)
@@ -586,7 +700,9 @@ class RulesFoodBank(_Negotiator):
 
     def _pass_reason(self, draft: DraftVersion, facts: FoodBankFacts) -> str:
         if facts.demand.below_fair_share_lb <= 0:
-            return f"Our {facts.demand.households} households already have their fair share this week, so we ask for nothing in version {draft.version}."
+            return (f"Our {facts.demand.households} households already have their fair share this week, and nothing "
+                    f"unclaimed in version {draft.version} fits our storage, pickup hours, and transport beyond it, so we "
+                    "ask for nothing.")
         return (f"Nothing unclaimed in version {draft.version} fits our storage, pickup hours, and transport, "
                 "so we ask for nothing.")
 

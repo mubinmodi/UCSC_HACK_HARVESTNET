@@ -1,5 +1,6 @@
 """Real deterministic calculators; no stand-in inheritance or model arithmetic."""
 from dataclasses import asdict
+import math
 from datetime import timedelta
 from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt
 from harvestnet_agents.fair_share import fair_share, load_fair_share_table
@@ -63,6 +64,16 @@ class Calculators:
     def gap_after_plan(self, gap_lb, planned_lb):
         gap, planned = number(gap_lb), number(planned_lb)
         return self.log("gap_after_plan", {"gap_lb": gap, "planned_lb": planned}, GapAfterPlan(max(0, gap-planned), max(0, planned-gap)))
+
+    def adjust_pounds(self, current_lb, change_lb):
+        current=number(current_lb)
+        if isinstance(change_lb,bool):
+            raise ValueError('pound adjustment must be finite')
+        change=float(change_lb)
+        if not math.isfinite(change):
+            raise ValueError('pound adjustment must be finite')
+        result=number(max(0,current+change))
+        return self.log('adjust_pounds',{'current_lb':current,'change_lb':change},result)
 
     def arrival_time(self, departs_at, travel_minutes):
         return self.log("arrival_time", {"departs_at": departs_at.isoformat(), "travel_minutes": number(travel_minutes)}, departs_at + timedelta(minutes=travel_minutes))
