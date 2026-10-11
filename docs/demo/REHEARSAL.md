@@ -1,0 +1,117 @@
+# Demo rehearsal checklist (ticket #25)
+
+The rehearsal is a human task. This page says who does what, how long each part takes, and what
+to switch to when something fails. The words to say are in `docs/demo/SCRIPT.md`. The slides are
+`docs/demo/slides.html`. The backup is the recorded replay, `docs/demo/replay.html`.
+
+Ticket #25 stays open until the team has rehearsed on the deployed system and ticked the boxes
+below.
+
+## The deployed system
+
+| Screen | URL |
+|---|---|
+| Household page | https://18-217-110-223.sslip.io/household/ |
+| Donor page and food bank dashboards | https://18-217-110-223.sslip.io/donor-dashboard/ |
+| Results strip | https://18-217-110-223.sslip.io/results-strip/ |
+| API (health check) | https://18-217-110-223.sslip.io/api/health |
+| Backup, no network needed | `docs/demo/replay.html`, opened from a laptop |
+
+All five answered with HTTP 200 on October 11, 2026, and the API reported `mode: synthetic`.
+Check them again before each run. If the deployed system or the network fails, switch to the
+recorded replay (see the fallback table below).
+
+## Roles
+
+One person can hold more than one role. Agree on names before the first run.
+
+| Role | Does | Suggested owner |
+|---|---|---|
+| **Presenter** | Says the script, moves the slides, keeps time | Frontend person (lead for #25) |
+| **Caller** | Makes the Spanish voice call on a phone (moment 1), or types into the household page if voice is down | Anyone who speaks Spanish |
+| **Operator** | Drives the donor page and the food bank dashboards, and flips the Beeceptor cooler switch (moments 2, 3, 5) | Full-stack C (platform) |
+| **Approvers** | Approve as the market manager and the city and eastside managers, through n8n or the dashboards (moments 4, 5) | Full-stack A and B |
+| **Timekeeper and backup** | Holds a stopwatch, calls "skip ahead" at the marks, and opens the replay if the network fails | Anyone not presenting |
+
+## Timings (target 2:50, hard stop 3:00)
+
+| Mark | Moment | Screen | Level |
+|---|---|---|---|
+| 0:00 | Opening | Slides 1 to 3 | |
+| 0:15 | 1. Household call in Spanish | Voice line, then slide 6 | Level 1 |
+| 0:40 | 2. Farmers market reports surplus | Donor page | Level 1 |
+| 0:55 | 3. Agents negotiate | Version history | Level 3 |
+| 1:25 | 4. Live approval | n8n message or dashboard | Level 3 |
+| 1:40 | 5. Cooler fails | Beeceptor switch, city dashboard | Level 2 |
+| 2:10 | 6. Household gets a text | Household page or phone | Evidence |
+| 2:25 | 7. Results strip | Results strip | Evidence |
+| 2:45 | Close | Slide 16 | |
+
+If a moment runs 10 seconds over its mark, skip to the next one. For negotiation, show the finished
+version history instead of waiting.
+
+## Before each run
+
+- [ ] Check the deployed system: https://18-217-110-223.sslip.io/api/health returns
+      `"status": "ok"`.
+- [ ] Check that the results strip shows numbers labeled synthetic:
+      https://18-217-110-223.sslip.io/results-strip/ (the API serves
+      `/api/results?scenario_id=normal-afternoon`). If it shows none, the deployment needs
+      `python -m harvestnet_core evaluate core_fixtures/*.json` run against its database
+      (see `docs/core/README.md`).
+- [ ] Check that the replay is current: `python -m harvestnet_core.demo_replay --check` prints
+      "recording matches the code". If not, run it without `--check` and commit.
+- [ ] Open, in order: the slides, https://18-217-110-223.sslip.io/household/,
+      https://18-217-110-223.sslip.io/donor-dashboard/ (donor, then the city and eastside
+      dashboards), https://18-217-110-223.sslip.io/results-strip/, and `docs/demo/replay.html`
+      (kept in a background tab).
+- [ ] Reset the cooler switch to working, and start from a fresh scenario.
+- [ ] Check the phone for the voice line, and the phones or inboxes that receive n8n messages.
+- [ ] Spending cap: set `CLAUDE_RUN_CAP_USD` only if the team agreed to live Claude calls
+      (`docs/platform/DEPLOYMENT.md`). Zero means rules and templates only. Say so if asked.
+
+## Fallback switches
+
+Use a fallback as soon as a step fails. Each fallback is labeled on screen. Say the label out loud.
+
+| If this fails | Switch to | How | Say |
+|---|---|---|---|
+| **Beeceptor** (organization systems, cooler switch) | Recorded fixtures | The platform serves its recorded synthetic copy and reports `mode: replay` with a reason (`docs/platform/CONTRACTS.md`). The local demo switch at `python -m harvestnet_platform.demo` flips the cooler. | "These readings are a recorded copy." |
+| **ElevenLabs** (voice line) | Text | The Caller types the same answers into the household page, which uses the same read-back and consent question. Or use the platform's text intake. | "Voice is down, so we use the web page. Same questions, same read-back." |
+| **n8n** (approvals and texts) | Local approval | Each Approver opens the local review link and presses Approve (`docs/platform/APPROVALS.md`). Show the text body on the household page. | "This is the local approval page. Each manager still approves the exact version." |
+| **AGNTCY** (A2A and Directory) | In-process | Choose `InProcess` before starting a run. Never switch in the middle of a run (`docs/platform/DEPLOYMENT.md`). The cooler dashboard flags Directory results from "local_directory_fallback". | "Messages are going in process today, not over AGNTCY." |
+| **Claude** (cap reached or outage) | Rules-based negotiators | Nothing to do. Negotiators fall back to their rules-based move. | "These moves come from the rules-based negotiators." |
+| **The network, or the whole system** | Recorded replay | Open `docs/demo/replay.html` from a laptop. It needs no network. Use the arrow keys, and L for Spanish or English. Keep the slides for framing. | "This is a recorded replay of the same scenario, made from our code. It is not live." |
+
+## The replay page
+
+- It is labeled **RECORDED REPLAY** on every step and says the data is synthetic.
+- It follows the demo: household request, offer, moves with reasons, versions, holds and approvals,
+  the cooler failure with reason cards, the households' new texts, then pickups and results.
+- It differs from the shipped scenario in one way, which the page states: the eastside manager
+  answers after 10 minutes, not 15. With 15, the core refuses the late answer and the romaine waits
+  for a human. The page shows that outcome too, in the results step.
+- To refresh it after a code change, run `python -m harvestnet_core.demo_replay` (from the repo
+  root, with `agents/src` on `PYTHONPATH` and `HARVESTNET_PLATFORM_SOURCE=.`).
+  `core_tests/test_demo_replay.py` fails if it is stale.
+
+## Rehearsal record (fill in)
+
+Copy this block for each run.
+
+```text
+Date and time:
+Where (deployed URL or local):
+Total time:
+Who held each role:
+Moments that ran over:
+Fallbacks used, and whether each worked (Beeceptor / voice / n8n / AGNTCY / replay):
+Problems to fix before the next run:
+```
+
+## Ticket #25 checklist
+
+- [ ] The demo runs end to end in under 3 minutes, on the deployed system.
+- [ ] Each moment matches its slide (what it proves). The slide numbers are in the timings table.
+- [x] A labeled recorded replay exists (`docs/demo/replay.html`, `docs/demo/replay/recording.json`).
+- [ ] Every sponsor fallback works during rehearsal (the table above, one run each).
