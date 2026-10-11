@@ -50,7 +50,8 @@ VARIANT_MINUTES = {'eastside': 10}
 HOUSEHOLD_PAGE = 'https://households.example.invalid'
 START, END = '<script type="application/json" id="recording">', '</script>'
 REQUEST_FIELDS = ('language', 'household_size', 'pickup_windows', 'limited_fridge', 'neighborhood', 'cant_eat', 'snap')
-RESULT_FIELDS = ('method', 'status', 'produce_wasted_lb', 'worst_served_coverage', 'households_reached', 'invalid_commitments')
+RESULT_FIELDS = ('method', 'status', 'collected_by_households_lb', 'committed_to_food_banks_lb', 'produce_wasted_lb',
+                 'uncollected_by_scenario_households_lb', 'worst_served_coverage', 'households_reached', 'invalid_commitments')
 
 
 def demo_fixture(fixture):

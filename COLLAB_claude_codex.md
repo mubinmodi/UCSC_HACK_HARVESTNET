@@ -1062,6 +1062,13 @@ The user decided that food banks may bid past their households' fair-share gap o
 
 Simulated result (synthetic numbers): in the normal-afternoon scenario, unclaimed produce drops from 818 lb (249 lb apples, 169 lb romaine, 400 lb potatoes) to 0 lb. Fair-share figures don't change, and extra pounds are recorded apart from fair share.
 
+## User direction (October 11, 2026): committed produce is not wasted; n8n Cloud; AGNTCY Directory on the server, recorded by Claude
+
+- **Produce wasted (design §16, Decided):** pounds with no pathway at the scenario end: not collected by a household, and not committed to a food bank whose held storage and pickup hours let it hand the produce out before it stops being usable (profile usable life, ADR 0003). A commitment that spoils first, such as cold produce left in a failed cooler, still counts. Each pound counts once; results now carry `collected_by_households_lb`, `committed_to_food_banks_lb`, `produce_wasted_lb`, and the old number as `uncollected_by_scenario_households_lb`.
+- Simulated result, normal afternoon (synthetic numbers): first-come-first-served 877 → 0 lb wasted, nearest food bank 869 → 0 lb, rules-based negotiators 869 → 0 lb. LLM negotiators were not run. Coverage and households reached don't change.
+- **n8n** runs on n8n Cloud.
+- **The AGNTCY Directory** runs on the AWS instance.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*

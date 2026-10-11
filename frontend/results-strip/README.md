@@ -33,6 +33,12 @@ their own.
 - **The page calculates nothing.** It shows the API's numbers as sent. The only formatting is showing
   coverage (sent as a share, such as 0.25) as a percent. A missing number shows "Not measured yet", and
   a method the API marks `not_run` shows "Not run" with the API's reason.
+- **Produce wasted** follows design section 16 (decided by the user October 11, 2026): pounds with no
+  pathway at the scenario end. Under it, each card shows where every pound went, as the API sent it:
+  collected by households, committed to food banks, wasted. Then, in small type, the earlier measure
+  (not collected by the scenario's households). `src/split.ts` holds these labels and the legend in
+  English and Spanish; `npm test` checks them. A part the API doesn't send shows "Not measured yet".
+  Pounds are shown with at most one decimal.
 - The banner appears whenever the API says `measured: false` or `synthetic: true`.
 - Each card also follows its own method's `status` and `measured` (the evaluation runner's labels,
   `docs/core/README.md` #24), because a response can be `measured: true` while one method isn't:
