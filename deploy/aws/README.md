@@ -11,6 +11,8 @@ One small EC2 machine runs the whole stack with Docker Compose. `setup.sh` creat
 
 ## Run it
 
+All settings and optional provider keys are listed in `deploy/aws/env.template`. Copy it to `deploy/aws/.env` (gitignored), fill it in, then load it with `set -a; . deploy/aws/.env; set +a` before the commands below.
+
 ```sh
 ALERT_EMAIL=you@example.org deploy/aws/setup.sh --dry-run   # see the plan first
 ALERT_EMAIL=you@example.org deploy/aws/setup.sh
