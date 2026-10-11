@@ -615,13 +615,13 @@ ACCEPT_REPLIES = {Language.EN: ("yes",), Language.ES: ("sí", "si")}
 _NOTICE = {
     Language.EN: {
         "changed": "Your pickup changed.",
-        "reply": "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another household.",
-        "decline": "Can't make it? Reply CAN'T MAKE IT and your portion goes to another household.",
+        "reply": "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another family.",
+        "decline": "Can't make it? Reply CAN'T MAKE IT and your portion goes to another family.",
     },
     Language.ES: {
         "changed": "Su recogida cambió.",
-        "reply": "Responda SÍ para conservarla, o NO PUEDO IR para rechazarla. Si la rechaza, su porción pasa a otro hogar.",
-        "decline": "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otro hogar.",
+        "reply": "Responda SÍ para conservarla, o NO PUEDO IR para rechazarla. Si la rechaza, su porción pasa a otra familia.",
+        "decline": "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otra familia.",
     },
 }
 
@@ -675,8 +675,9 @@ def household_change_notices(
     ``households`` are request records: ``request_code``, ``language``,
     ``chosen_food_banks``, and ``portions`` (``produce_id``, ``pounds``,
     ``food_bank_id``) as the portion calculator assigns them under the new version.
-    ``item_names[language][produce_id]`` gives display names; English falls back to the
-    produce profile's name, and any other language must be given.
+    ``item_names[language][produce_id]`` gives display names. Otherwise the produce profile's
+    reviewed name for that language is used (``name``, or ``name_es`` for Spanish); a name the
+    profile doesn't have must be given.
     """
     status = approval_status(new_version, approvals)
     if not status.all_named_approved:
@@ -750,8 +751,11 @@ def _item_name(pid: str, language: Language, names: Mapping[str, Mapping[str, st
     given = (names.get(language.value) or {}).get(pid)
     if given:
         return given
-    if language is Language.EN and pid in profiles:
-        return profiles.get(pid).name.lower()
+    if pid in profiles:
+        try:
+            return profiles.get(pid).display_name(language.value).lower()
+        except KeyError:
+            pass
     raise FlowInputError(f"no {language.value} name for {pid}; it must be given, not guessed")
 
 

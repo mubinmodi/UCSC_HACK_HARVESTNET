@@ -11,6 +11,7 @@ import copy
 import hashlib
 import json
 from datetime import datetime
+from importlib import resources
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -26,6 +27,7 @@ from harvestnet_agents.cooler_failure_flow import (
     read_cooler_signal,
     run_cooler_failure_flow,
 )
+from harvestnet_agents.profiles import load_profiles
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cooler_failure_flow"
 LA = ZoneInfo("America/Los_Angeles")
@@ -399,12 +401,12 @@ def test_affected_households_get_a_new_text_in_their_language():
     assert en.message == (
         "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 4 lb romaine lettuce. "
         "Your code is K7Q2. Please wash produce before eating. "
-        "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another household."
+        "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another family."
     )
     assert es.message == (
-        "Su recogida cambió. Listo para recoger en Eastside food bank, de 6 a 8 p. m.: 6 lb lechuga romana. "
+        "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 6 lb de lechuga romana. "
         "Su código es M3R8. Por favor lave los productos antes de comerlos. "
-        "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otro hogar."
+        "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otra familia."
     )
 
 
@@ -457,8 +459,18 @@ def test_portions_above_what_the_version_moves_are_rejected():
 def test_missing_translation_is_not_guessed():
     scen = scenario()
     nv = run().new_version
+    data = json.loads(resources.files("harvestnet_agents").joinpath("data", "produce_profiles.json").read_text())
+    for raw in data["profiles"]:
+        raw.pop("name_es", None)
     with pytest.raises(FlowInputError):
-        household_change_notices(nv, all_approved(nv), scen["households"], item_names={})
+        household_change_notices(nv, all_approved(nv), scen["households"], item_names={}, profiles=load_profiles(data))
+
+
+def test_spanish_names_come_from_the_reviewed_profiles():
+    scen = scenario()
+    nv = run().new_version
+    es = household_change_notices(nv, all_approved(nv), scen["households"], item_names={})[1]
+    assert "6 lb de lechuga romana" in es.message
 
 
 # --- #23 checklist: the fixture passes every rule check Lane B can run locally -------------

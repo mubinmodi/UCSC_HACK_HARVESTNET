@@ -100,7 +100,7 @@ describe('household page against the contract examples', () => {
     await user.click(screen.getByRole('button', { name: 'One more person' }));
     expect(await screen.findByText('Synthetic share: 99 lb a week.')).toBeInTheDocument();
     expect(calls[0].url.searchParams.get('household_size')).toBe('1');
-    expect(screen.getByText('The fair-share table is still a placeholder.')).toBeInTheDocument();
+    expect(screen.getByText('This amount is an example for now.')).toBeInTheDocument();
   });
 
   it('labels example data from the skeleton', async () => {
@@ -156,7 +156,7 @@ describe('household page against the contract examples', () => {
     expect(within(city).getByText('Keep cold')).toBeInTheDocument();
     expect(within(city).getByText('Use within 2 days')).toBeInTheDocument();
     const eastside = screen.getByRole('checkbox', { name: 'Eastside food bank' }).closest('.bank-card') as HTMLElement;
-    expect(within(eastside).getByText('Nothing committed here yet.')).toBeInTheDocument();
+    expect(within(eastside).getByText('Nothing confirmed here yet.')).toBeInTheDocument();
   });
 
   it('shows a plain error with "Try again" when the API is busy, and recovers', async () => {
@@ -177,7 +177,7 @@ describe('household page against the contract examples', () => {
     const { calls } = mockApi();
     render(<App />);
     await user.click(screen.getByRole('button', { name: 'Cambiar a español' }));
-    expect(screen.getByRole('heading', { level: 1, name: 'Acerca de tu hogar' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Sobre su hogar' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('es');
     await user.click(screen.getByRole('button', { name: 'Una persona más' }));
     await screen.findByText(body('get_fair_share').wording);
