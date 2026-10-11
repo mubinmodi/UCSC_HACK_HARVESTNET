@@ -482,8 +482,9 @@ setup_instance() {
 
 # ---------------------------------------------------------------------------
 deploy_commands() { # the script SSM Run Command executes on the instance (no secrets in it)
+  # SSM's AWS-RunShellScript runs this with /bin/sh (dash), which has no pipefail; the script has no pipes.
   cat <<EOF
-set -euo pipefail
+set -eu
 cloud-init status --wait >/dev/null 2>&1 || true
 test -f /var/lib/harvestnet/bootstrap-done || { echo 'instance bootstrap did not finish; see /var/log/harvestnet-bootstrap.log'; exit 1; }
 release_dir=/opt/harvestnet/releases/$RELEASE
