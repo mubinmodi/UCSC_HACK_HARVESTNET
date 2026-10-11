@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 8: Where Levels 1 and 2 show up</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 8 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Where Levels 1 and 2 show up</h1>
+<p class="lede">The evidence for the supporting levels, and the question "where's Level 2?"</p>
+<div class="win"><b>After this lesson</b>You can point to concrete Level 1 and Level 2 evidence in the demo.</div>
+
+<h2>What the levels require</h2>
+<p><strong>Level 1:</strong> specialized agents with distinct capabilities collaborate on a task. <strong>Level 2:</strong> agents find collaborators by capability, respond to at least one unexpected failure or change, and explain why each was chosen. We claim Level 3 and show these two as supporting evidence.</p>
+<p class="cite">Source: <a href="../../docs/CHALLENGE.md">the Cisco challenge statement</a>.</p>
+
+<h2>Level 1 in HarvestNet</h2>
+<p>Inside each organization, specialists feed the negotiator. A food bank has demand, storage, hours, truck, and distribution specialists. A donor has inventory, condition, deadline, and drop-off specialists. The negotiator has to weigh findings that conflict. For example, its storage specialist reports space for 200 lb, but its distribution specialist reports that only 120 lb can go out before it spoils.</p>
+
+<h2>Level 2 in HarvestNet</h2>
+<p>The city food bank's cooler fails. Its agent:</p>
+<ul>
+<li>searches the AGNTCY Directory for food banks with cold space</li>
+<li>asks each candidate about its availability</li>
+<li>writes a <strong>reason card for every candidate</strong>, including the ones it rejects</li>
+</ul>
+<p>Example reason card: <em>"Rural food bank: has cold space, but pickup ends at 6 pm, so its households can't collect romaine tonight. Not chosen."</em></p>
+<p><strong>The produce profile decides what has to move:</strong> romaine needs cold, but apples and potatoes can stay where they are.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Mock as Beeceptor cooler status
+    participant City as City food bank agent
+    participant Room as AGNTCY room
+    participant Dir as AGNTCY Directory
+    participant Others as Other food bank agents
+    participant Donor as Donor agent
+    participant N8 as n8n approvals
+    participant Notify as n8n alerts
+    Mock-&gt;&gt;City: Walk-in cooler above safe temperature
+    City-&gt;&gt;City: Specialists check which items need cold, romaine yes, apples no
+    City-&gt;&gt;Room: Disruption, cannot hold 200 lb romaine tonight
+    City-&gt;&gt;Dir: Find food banks with cold space for 200 lb, pickup tonight, reachable
+    Dir--&gt;&gt;City: Candidate food banks
+    City-&gt;&gt;Others: Ask for cold space and pickup windows
+    Others--&gt;&gt;City: Answers or refusals
+    City-&gt;&gt;City: Reason card for every candidate
+    City-&gt;&gt;Room: Version 4, romaine moves to eastside using the city truck
+    Others-&gt;&gt;Room: Eastside accepts 150 lb, counter for the rest
+    Donor-&gt;&gt;Room: No change needed, already delivered
+    Others-&gt;&gt;N8: Eastside manager approves version 5
+    City-&gt;&gt;N8: City manager approves the truck run
+    N8-&gt;&gt;Room: All approvals for version 5
+    Room-&gt;&gt;Notify: Affected households get a new food bank, time, and code
+    alt No food bank can take it in time
+        Room-&gt;&gt;Notify: Same-day offer to city households who can come tonight
+        Notify-&gt;&gt;Room: Anything left is unclaimed with reasons
+    end</pre></div><figcaption>Level 2 in action: the cooler fails, the Directory finds other food banks, and every candidate gets a reason card. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>The hard question</h2>
+<div class="qa"><p class="q">"Where's your Level 2?"</p><p class="a">When a food bank's cooler fails, its agent finds a replacement by capability through the Directory, explains every candidate with a reason card, and re-runs approvals. Only the items that actually need cold get moved.</p></div>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 19 (Level mapping), and Workflow 4 in section 9.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 19, then Workflow 4.</p>
+  <p><strong>Previous:</strong> <a href="0007-the-five-workflows.html">Lesson 7: The five workflows</a> · <strong>Next:</strong> <a href="0009-no-invented-numbers.html">Lesson 9: No invented numbers</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 5: Produce profiles and matching</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 5 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Produce profiles and matching</h1>
+<p class="lede">Why agents read profiles instead of crop names, and the rules that keep produce from being wasted.</p>
+<div class="win"><b>After this lesson</b>You can explain how a mixed batch gets split item by item, and the rules that decide where each item goes.</div>
+
+<h2>The produce profile</h2>
+<p>Every item has a profile that answers a few questions:</p>
+<ul>
+<li>Does it need a fridge?</li>
+<li>How many days does it last cold, and at room temperature?</li>
+<li>What temperature should it travel and be stored at?</li>
+<li>What's its condition grade?</li>
+<li>What units is it counted in?</li>
+</ul>
+<p>Agents read these fields, never the crop's name. So the same rules work for apples, romaine, potatoes, or anything else (<a href="../../docs/adr/0003-food-behavior-lives-in-food-profiles.md">ADR 0003</a>).</p>
+<p><strong>The classic example:</strong> tomatoes are damaged by cold. A rule that said "fresh produce goes in a refrigerated truck" would be wrong for tomatoes. The profile gets this right without any special-case code.</p>
+<p class="cite">Real profile values should come from sources such as the <a href="https://postharvest.ucdavis.edu/produce-facts-sheets/strawberry">UC Davis produce fact sheets</a>. The values in the design are illustrative.</p>
+
+<h2>What households tell us</h2>
+<p>Household size (which sets its fair share), when it can pick up, whether its fridge space is limited, its neighborhood, anything it can't eat, and optionally whether it receives SNAP. Households then choose which food banks they'll use.</p>
+
+<h2>Split item by item</h2>
+<p>A batch is usually mixed. Take one batch of apples, romaine, and potatoes:</p>
+<ul>
+<li><strong>Romaine</strong> needs a fridge and spoils fast, so it goes to the city food bank, which has a walk-in cooler and evening pickup the same day. The city food bank collects it in its refrigerated truck.</li>
+<li><strong>Apples and potatoes</strong> keep without a fridge, so most go to the rural food bank, whose households are furthest below fair share. The donor drops them off.</li>
+</ul>
+
+<h2>The rules</h2>
+<ul>
+<li><strong>Hard rule:</strong> produce goes only to food banks whose households can collect it before it spoils, given their pickup times. Produce that needs a fridge goes to households with limited fridge space only for same-day pickup, in household-sized amounts.</li>
+<li><strong>Advocate preference:</strong> produce goes first to the food bank with the biggest fair-share gap.</li>
+<li><strong>No silent waste:</strong> every pound ends up somewhere recorded: picked up, released to another household, or unclaimed with a reason. Items that spoil fastest are matched first.</li>
+</ul>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, sections 5 and 8, and <a href="../../docs/adr/0007-focus-on-raw-fresh-produce.md">ADR 0007</a>.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, sections 5 and 8.</p>
+  <p><strong>Previous:</strong> <a href="0004-fair-share-and-snap.html">Lesson 4: Fair share and SNAP</a> · <strong>Next:</strong> <a href="0006-how-a-deal-becomes-final.html">Lesson 6: How a deal becomes final</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+</body>
+</html>

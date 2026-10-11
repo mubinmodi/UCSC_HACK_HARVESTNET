@@ -1,0 +1,44 @@
+/* HarvestNet course: a calm, printable reading page. One column, wide margins for side notes. */
+:root {
+  --paper: #fbfaf7;
+  --ink: #1d2422;
+  --muted: #5c6763;
+  --rule: #dedbd3;
+  --accent: #b8233b;
+  --leaf: #2d6a4d;
+  --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #121615; --ink: #e5eae7; --muted: #9aa6a1; --rule: #2c3431; --accent: #f0697e; --leaf: #74c39a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--serif); font-size: 19px; line-height: 1.6; padding: 48px 20px 80px; }
+main { max-width: 680px; margin: 0 auto; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { font-weight: 600; font-size: 2.1rem; line-height: 1.15; margin: 8px 0 6px; text-wrap: balance; }
+h2 { font-weight: 600; font-size: 1.3rem; margin: 40px 0 8px; text-wrap: balance; }
+p { margin: 0 0 14px; }
+.lede { font-size: 1.12rem; color: var(--muted); font-style: italic; }
+.win { border-left: 3px solid var(--leaf); padding: 6px 0 6px 16px; margin: 22px 0; }
+.win b { font-family: var(--sans); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--leaf); display: block; margin-bottom: 2px; }
+.qa { margin: 22px 0; }
+.qa .q { font-family: var(--sans); font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+.qa .a { margin: 0; }
+.test { border: 1px solid var(--rule); padding: 16px 20px; margin: 22px 0; font-size: 1.05rem; }
+.test b { color: var(--accent); }
+ul { padding-left: 1.2em; }
+li { margin-bottom: 6px; }
+.note { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+.cite { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: .85em; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 14px; color: var(--muted); }
+footer p { margin: 0 0 8px; }
+@media print { body { background: #fff; font-size: 12pt; padding: 0; } a { color: var(--ink); } }
+figure.diagram { margin: 26px 0; }
+figure.diagram .figbox { overflow-x: auto; border: 1px solid var(--rule); background: #fff; padding: 12px; border-radius: 4px; }
+figure.diagram pre.mermaid { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre; color: #333; }
+figure.diagram svg { max-width: none; }
+figure.diagram figcaption { font-family: var(--sans); font-size: 14px; color: var(--muted); margin-top: 6px; }

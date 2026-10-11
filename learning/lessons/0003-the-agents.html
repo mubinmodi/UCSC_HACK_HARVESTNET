@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 3: The agents and what each one wants</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 3 of 13 · <a href="../index.html">Course index</a></div>
+<h1>The agents and what each one wants</h1>
+<p class="lede">Four agent roles, what each wants, and who gets a vote.</p>
+<div class="win"><b>After this lesson</b>You can name each agent, what it wants, what its specialists check, and whether it has a vote.</div>
+
+<h2>Donor agent (one per donor)</h2>
+<p>It represents a farm, packer, distributor, grocer, farmers market, or a food bank with extra produce. It wants the produce used instead of thrown away, with as little extra work as possible. Its specialists check the inventory, the condition and days left, the pickup deadline, and whether the donor can drop the produce off. <strong>It votes for its own organization.</strong> Proposed model: Claude Sonnet 5.5.</p>
+
+<h2>Food bank agent (one per food bank)</h2>
+<p>It wants produce its households will actually collect and use, without straining its truck or storage. Its specialists check:</p>
+<ul>
+<li><strong>Demand:</strong> counts only. Household sizes, pickup windows, how many have limited fridge space, and how far below fair share they are.</li>
+<li><strong>Storage:</strong> cold and dry space.</li>
+<li><strong>Hours:</strong> pickup windows.</li>
+<li><strong>Truck:</strong> whether it's available.</li>
+<li><strong>Distribution:</strong> whether each item can go out before it spoils.</li>
+</ul>
+<p><strong>It votes for its own organization.</strong> Proposed model: Claude Opus 5.5, because it handles the hardest trade-offs.</p>
+
+<h2>Advocate agent</h2>
+<p>It speaks for households as a group, using pooled counts only. It pushes produce toward the food bank whose households are furthest below fair share, using USDA Food Access Research Atlas context. <strong>It has no vote:</strong> it can only propose changes. Proposed model: Claude Opus 5.5.</p>
+
+<h2>Front-desk assistant</h2>
+<p>It's the web page and voice line that households talk to. It takes requests and reports only produce that's already committed. <strong>It's not a negotiator</strong> and never allocates anything. Proposed model: Claude Sonnet 5.5, which also handles Spanish.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">flowchart TB
+    In["Message in&lt;br/&gt;checked sender and version"] --&gt; Spec["Specialists · D&lt;br/&gt;facts and limits"]
+    Data["Own data&lt;br/&gt;Beeceptor, produce profiles, fair-share table, OSRM"] --&gt; Spec
+    Spec --&gt; Neg["Negotiator · L&lt;br/&gt;suggests a move and a reason"]
+    Neg --&gt; Val["Validator · D&lt;br/&gt;rechecks every number"]
+    Val --&gt;|"invalid"| Neg
+    Val --&gt;|"commits nothing"| Out["Send and log"]
+    Val --&gt;|"would commit"| Hold["Hold own resource&lt;br/&gt;expires"]
+    Hold --&gt; Human["Own human approves · H&lt;br/&gt;through n8n"]
+    Human --&gt; Out</pre></div><figcaption>Inside every agent: specialists feed the negotiator, the validator checks numbers, the human approves. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>Where they disagree</h2>
+<ul>
+<li><strong>Food banks compete</strong> for limited produce and cold space.</li>
+<li><strong>Donors</strong> would rather a food bank collect the produce. <strong>Food banks</strong> would rather the donor drop it off.</li>
+<li><strong>The advocate</strong> pushes toward the biggest fair-share gap, even when another food bank is closer.</li>
+</ul>
+<p>Those are real competing goals, which is exactly what Level 3 asks for.</p>
+
+<h2>Humans who approve</h2>
+<p><strong>Donor staff</strong> approve before any produce is promised, and approve any drop-off. <strong>Food bank managers</strong> approve large deliveries, anything marked "use soon," and every truck run. There are no drivers and no coordinator (<a href="../../docs/adr/0009-food-banks-only-snap-fair-share.md">ADR 0009</a>).</p>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 6.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 6 (The agents).</p>
+  <p><strong>Previous:</strong> <a href="0002-the-30-second-pitch.html">Lesson 2: The 30-second pitch</a> · <strong>Next:</strong> <a href="0004-fair-share-and-snap.html">Lesson 4: Fair share and SNAP</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>

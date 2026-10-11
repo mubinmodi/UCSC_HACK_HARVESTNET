@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HarvestNet at a Glance</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  body { font-size: 16px; line-height: 1.5; }
+  main { max-width: 760px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 6px; font-family: var(--sans); letter-spacing: .02em; }
+  ul { margin: 0 0 8px; }
+  li { margin-bottom: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 28px; }
+  .grid > div { min-width: 0; }
+</style>
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Reference · <a href="../index.html">Course index</a></div>
+<h1>HarvestNet at a glance</h1>
+<p class="lede">Surplus fresh produce reaches low-income households at food banks they choose, instead of going to waste. Donor and food bank agents negotiate the split, guided by a SNAP-style fair share. There's no central decider.</p>
+
+<div class="test">One line: <b>"Every organization keeps its own keys: nothing in HarvestNet can commit a donor or a food bank to a deal it didn't approve."</b></div>
+
+<div class="grid">
+<div>
+<h2>Agents</h2>
+<ul>
+<li><strong>Donor:</strong> wants produce gone with little effort. Votes for itself.</li>
+<li><strong>Food bank:</strong> wants produce its households will use. Votes for itself.</li>
+<li><strong>Advocate:</strong> pushes toward the biggest fair-share gap. No vote.</li>
+<li><strong>Front-desk assistant:</strong> takes requests. Never allocates.</li>
+</ul>
+<h2>Humans who approve</h2>
+<ul>
+<li>Donor staff: promises and drop-offs.</li>
+<li>Food bank managers: large deliveries, "use soon" produce, truck runs.</li>
+</ul>
+<h2>SNAP, three ways</h2>
+<ul>
+<li><strong>Fair share:</strong> weekly pounds by household size. A published shared rule that assigns nothing.</li>
+<li><strong>Eligibility signal:</strong> optional, self-reported, never changes the share.</li>
+<li><strong>Produce programs:</strong> farmers markets as donors, plus Market Match tips.</li>
+</ul>
+</div>
+<div>
+<h2>Matching rules</h2>
+<ul>
+<li>Agents read produce profiles, never crop names.</li>
+<li>Split each batch item by item, and agree who moves it (the donor drops off, or the food bank collects).</li>
+<li>Only to households that can collect before the produce spoils. Fridge-only produce goes to limited-fridge households same-day only.</li>
+<li>Every pound gets a recorded pathway. No silent waste.</li>
+</ul>
+<h2>When a deal is final</h2>
+<ul>
+<li>Every named organization has approved the same version, and every hold is valid.</li>
+<li>Any change creates a new version, so approvals must be given again.</li>
+<li>Three rounds with no new terms: preserved disagreement.</li>
+<li>Deadline: unclaimed, with a reason. Never an auto-commit.</li>
+</ul>
+<h2>Levels</h2>
+<ul>
+<li><strong>L1:</strong> specialists inside each agent.</li>
+<li><strong>L2:</strong> a cooler fails, then Directory rediscovery with reason cards.</li>
+<li><strong>L3:</strong> donors and food banks negotiate with no central decider, compared against first-come-first-served.</li>
+</ul>
+</div>
+</div>
+
+<h2>Review red flags</h2>
+<p>A central decider, an auto-commit, an invented number, an approval not tied to a version, a crop name in a rule, private household data reaching an agent, silent waste, or promising produce that isn't committed yet.</p>
+
+<footer><p>Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, <a href="../../docs/adr/">docs/adr/</a>. Proposed items (exact models, fair-share numbers, headline metrics) may still change.</p></footer>
+</main>
+</body>
+</html>

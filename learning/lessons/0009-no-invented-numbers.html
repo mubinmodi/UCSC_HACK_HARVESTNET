@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 9: No invented numbers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 9 of 13 · <a href="../index.html">Course index</a></div>
+<h1>No invented numbers</h1>
+<p class="lede">How the design stops the AI from making up quantities, and how to check a teammate's work for it.</p>
+<div class="win"><b>After this lesson</b>You can explain the five number rules and spot a violation in a review.</div>
+
+<h2>Why it matters</h2>
+<p>An agent that invents "we have room for 300 lb" can commit a food bank to something it can't do. It also makes every result meaningless. So numbers come only from calculators and data, never from the AI (<a href="../../docs/adr/0002-ai-cannot-invent-numbers.md">ADR 0002</a>).</p>
+
+<h2>The five rules</h2>
+<ul>
+<li><strong>Calculators run first.</strong> Every number a decision needs, such as storage space, fair-share balances, and days left, is computed before the AI is called and handed to it as a labeled fact.</li>
+<li><strong>Any extra number comes from a calculator tool.</strong> If the AI needs, say, the pounds left after a split, it calls a tool with a strict schema. It never does arithmetic in its own text.</li>
+<li><strong>Every number in a message gets checked.</strong> Each number in an outgoing message must match a calculator result for the current version. If one doesn't, the message isn't sent.</li>
+<li><strong>Fallback after two failures.</strong> The agent sends a template sentence built only from calculator results, and the failure is logged.</li>
+<li><strong>Failures are counted.</strong> Number-check failures show up as a metric in evaluation. That's honest evidence for judges.</li>
+</ul>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">flowchart TB
+    In["Message in&lt;br/&gt;checked sender and version"] --&gt; Spec["Specialists · D&lt;br/&gt;facts and limits"]
+    Data["Own data&lt;br/&gt;Beeceptor, produce profiles, fair-share table, OSRM"] --&gt; Spec
+    Spec --&gt; Neg["Negotiator · L&lt;br/&gt;suggests a move and a reason"]
+    Neg --&gt; Val["Validator · D&lt;br/&gt;rechecks every number"]
+    Val --&gt;|"invalid"| Neg
+    Val --&gt;|"commits nothing"| Out["Send and log"]
+    Val --&gt;|"would commit"| Hold["Hold own resource&lt;br/&gt;expires"]
+    Hold --&gt; Human["Own human approves · H&lt;br/&gt;through n8n"]
+    Human --&gt; Out</pre></div><figcaption>Where the number check sits: the validator rechecks every number before anything leaves the agent. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>What the AI is for</h2>
+<p>Reading messy input (a voice call or a typed note), suggesting moves, and explaining them in plain words. A rules-based negotiator uses the same calculators, which is what makes the AI-versus-rules comparison fair.</p>
+
+<h2>Red flags in a teammate's code</h2>
+<ul>
+<li>A prompt that asks the model to "work out" quantities, portions, or times.</li>
+<li>A model's text sent to another agent without the number check.</li>
+<li>Fair-share portions computed anywhere other than the calculator.</li>
+</ul>
+<p class="cite">Source: <a href="../../docs/adr/0002-ai-cannot-invent-numbers.md">ADR 0002</a>, including its Consequences section.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/adr/0002-ai-cannot-invent-numbers.md">ADR 0002</a>, the whole file (it's short).</p>
+  <p><strong>Previous:</strong> <a href="0008-level-1-and-level-2.html">Lesson 8: Where Levels 1 and 2 show up</a> · <strong>Next:</strong> <a href="0010-proving-it-works.html">Lesson 10: Proving it works</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 12: Leading the build</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 12 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Leading the build</h1>
+<p class="lede">The build order, a way to split the work, and what to catch in reviews.</p>
+<div class="win"><b>After this lesson</b>You can split the build across your team and spot changes that break the design.</div>
+
+<h2>Build order, and why</h2>
+<ul>
+<li><strong>1. Records and rules-based negotiation in one process.</strong> The core has to work before any AI or sponsor is added.</li>
+<li><strong>2. Produce profiles and the fair-share calculator.</strong> Every matching rule depends on them.</li>
+<li><strong>3. Web pages</strong> for households, donors, and food banks.</li>
+<li><strong>4. Deploy to AWS early,</strong> so n8n and ElevenLabs can call in.</li>
+<li><strong>5. AGNTCY:</strong> A2A, the Directory, and the cooler-failure scenario.</li>
+<li><strong>6. LLM negotiators and the assistant,</strong> with calculator tools and number checks.</li>
+<li><strong>7. n8n, then the ElevenLabs voice line.</strong></li>
+<li><strong>8. Evaluation runs,</strong> dashboards, and demo rehearsal.</li>
+</ul>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 18.</p>
+
+<h2>A way to split the work (suggestion)</h2>
+<ul>
+<li><strong>Person A: protocol and records.</strong> Draft versions, holds, approvals, stop rules, calculators.</li>
+<li><strong>Person B: agents.</strong> Donor, food bank, and advocate negotiators, rules-based first, then LLM.</li>
+<li><strong>Person C: households and the web.</strong> Pages, the front-desk assistant, ElevenLabs.</li>
+<li><strong>Person D: infrastructure and evidence.</strong> AWS, AGNTCY, Beeceptor, n8n, the evaluation runner.</li>
+</ul>
+
+<h2>Red flags to catch in review</h2>
+<ul>
+<li><strong>A central decider sneaking in:</strong> anything that commits an organization without that organization's own approval.</li>
+<li><strong>An auto-commit,</strong> for example "if no answer by 5 pm, assign it to the nearest food bank."</li>
+<li><strong>An invented number:</strong> a quantity or time coming from model text instead of a calculator.</li>
+<li><strong>An approval not tied to a version.</strong></li>
+<li><strong>Crop names in rules,</strong> such as "if crop == romaine." Use the profile instead.</li>
+<li><strong>Private data reaching an agent:</strong> anything beyond counts about households.</li>
+<li><strong>Silent waste:</strong> produce with no recorded pathway.</li>
+<li><strong>Promising produce that isn't committed yet.</strong></li>
+</ul>
+<p class="note">Writing code still needs your go-ahead, per CLAUDE.md.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 18, then <a href="../../docs/adr/0001-no-supervisor-between-organizations.md">ADR 0001</a> and <a href="../../docs/adr/0002-ai-cannot-invent-numbers.md">ADR 0002</a>.</p>
+  <p><strong>Previous:</strong> <a href="0011-architecture-and-stack.html">Lesson 11: Architecture and stack</a> · <strong>Next:</strong> <a href="0013-the-demo.html">Lesson 13: The 3-minute demo</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+</body>
+</html>

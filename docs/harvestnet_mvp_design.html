@@ -1,0 +1,1033 @@
+<title>HarvestNet MVP Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one readable column like a field manual; wide diagrams and tables scroll in their own frames; section labels styled like produce lot tags. */
+:root {
+  --paper: #f5f8f6;
+  --panel: #ffffff;
+  --ink: #16201d;
+  --muted: #56645f;
+  --rule: #d3dcd8;
+  --berry: #b8233b;
+  --leaf: #2d6a4d;
+  --cold: #285d84;
+  --tint-berry: #f8e7ea;
+  --tint-leaf: #e3f0e8;
+  --tint-cold: #e3edf5;
+  --tint-muted: #eaefed;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101715; --panel: #17201d; --ink: #e4ebe8; --muted: #9aa9a3; --rule: #2a3633;
+    --berry: #f0697e; --leaf: #74c39a; --cold: #84b6dd;
+    --tint-berry: #3a1a20; --tint-leaf: #17311f; --tint-cold: #172a3a; --tint-muted: #1f2a27;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101715; --panel: #17201d; --ink: #e4ebe8; --muted: #9aa9a3; --rule: #2a3633;
+  --berry: #f0697e; --leaf: #74c39a; --cold: #84b6dd;
+  --tint-berry: #3a1a20; --tint-leaf: #17311f; --tint-cold: #172a3a; --tint-muted: #1f2a27;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  padding-inline: 20px;
+  padding-block: 0 64px;
+}
+.wrap { max-width: 900px; margin: 0 auto; }
+p, li { max-width: 70ch; }
+h1, h2, h3, h4 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); font-weight: 800; font-stretch: 112%; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.45rem, 3.6vw, 1.9rem); font-weight: 750; font-stretch: 108%; }
+h3 { font-size: 1.14rem; font-weight: 700; font-stretch: 104%; }
+h4 { font-size: 1rem; font-weight: 700; font-stretch: 102%; }
+a { color: var(--cold); }
+strong { font-weight: 600; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--tint-muted); padding: 0.05em 0.35em; border-radius: 3px; }
+
+.cover { padding-block: 56px 36px; border-bottom: 2px solid var(--ink); display: grid; gap: 18px; }
+.cover .kicker { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cover .tagline { font-family: var(--display); font-size: clamp(1.15rem, 2.8vw, 1.45rem); font-weight: 600; font-stretch: 104%; color: var(--berry); max-width: 32ch; }
+.cover .lede { font-size: 1.08rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.facts span b { color: var(--ink); font-weight: 500; }
+
+.toc { padding-block: 26px; border-bottom: 1px solid var(--rule); }
+.toc ol { margin: 10px 0 0; padding: 0; list-style: none; columns: 2 260px; column-gap: 32px; }
+.toc li { font-size: 0.95rem; padding-block: 2px; break-inside: avoid; }
+.toc li span { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); display: inline-block; width: 2.4em; }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover, .toc a:focus-visible { color: var(--berry); text-decoration: underline; }
+
+section { padding-block: 40px 8px; display: grid; gap: 16px; }
+.tag { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tag::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--berry); }
+section > p, section > ul, section > ol { margin: 0; }
+ul, ol { padding-left: 1.3em; }
+li + li { margin-top: 4px; }
+
+.callout { border-left: 3px solid var(--berry); background: var(--panel); padding: 14px 18px; border-radius: 0 6px 6px 0; display: grid; gap: 6px; }
+.callout p, .callout ul { margin: 0; }
+.callout.cold { border-left-color: var(--cold); }
+.callout.leaf { border-left-color: var(--leaf); }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 560px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--tint-muted); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; }
+.plain td:first-child { font-weight: 400; }
+td.num, .num { font-variant-numeric: tabular-nums; }
+
+.chip { display: inline-block; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; }
+.chip.decided { background: var(--tint-leaf); color: var(--leaf); }
+.chip.proposed { background: var(--tint-cold); color: var(--cold); }
+.chip.open { background: var(--tint-berry); color: var(--berry); }
+.badge { display: inline-block; font-family: var(--mono); font-weight: 500; font-size: 0.72rem; min-width: 1.6em; text-align: center; border-radius: 4px; padding: 0 3px; }
+.badge.L { background: var(--tint-berry); color: var(--berry); }
+.badge.D { background: var(--tint-cold); color: var(--cold); }
+.badge.W { background: var(--tint-muted); color: var(--muted); }
+.badge.H { background: var(--tint-leaf); color: var(--leaf); }
+
+figure { margin: 0; display: grid; gap: 8px; }
+.figbox { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; }
+pre.mermaid { margin: 0; font-family: var(--mono); font-size: 0.78rem; line-height: 1.45; white-space: pre; color: var(--ink); background: transparent; }
+pre.mermaid svg { max-width: 100%; height: auto; }
+figcaption { font-size: 0.86rem; color: var(--muted); }
+figcaption b { color: var(--ink); font-weight: 600; }
+
+.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; counter-reset: step; }
+.steps > li { counter-increment: step; display: grid; grid-template-columns: 2.2em minmax(0, 1fr); gap: 12px; max-width: none; }
+.steps > li::before { content: counter(step); font-family: var(--mono); font-weight: 500; font-size: 0.85rem; color: var(--berry); border: 1.5px solid var(--berry); border-radius: 50%; width: 1.9em; height: 1.9em; display: grid; place-items: center; }
+.steps > li > div { min-width: 0; }
+.steps h4 { margin-bottom: 3px; }
+.steps p { margin: 0; }
+.steps ul { margin: 6px 0 0; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.card p, .card ul { margin: 0; }
+.example { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+
+.agent { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; }
+.agent header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.agent .model { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+.agent dl { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 0.92rem; }
+.agent dt { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.agent dd { margin: 0; min-width: 0; }
+.agent dd ul { margin: 0; padding-left: 1.1em; }
+@media (max-width: 560px) { .agent dl { grid-template-columns: minmax(0, 1fr); } .agent dt { padding-top: 6px; } }
+
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 20px; margin: 0; }
+.glossary div { min-width: 0; }
+.glossary dt { font-weight: 600; font-family: var(--display); font-stretch: 104%; }
+.glossary dd { margin: 2px 0 0; font-size: 0.92rem; color: var(--muted); }
+
+footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted); display: grid; gap: 8px; }
+footer p { margin: 0; }
+
+:focus-visible { outline: 2px solid var(--berry); outline-offset: 2px; }
+@media (max-width: 520px) { body { font-size: 15px; } .cover { padding-block: 36px 28px; } }
+
+@page { size: Letter; margin: 15mm 14mm 17mm; }
+@media print {
+  body { padding-inline: 0; padding-block: 0; font-size: 10pt; background: #ffffff; }
+  .wrap { max-width: none; }
+  .cover { padding-block: 0 20px; }
+  section { padding-block: 20px 4px; }
+  figure, .card, .callout, .steps > li, tr, .agent { break-inside: avoid; }
+  .tag { break-after: avoid; }
+  h2, h3, h4 { break-after: avoid; }
+  table { min-width: 0; }
+  .tablebox, .figbox { overflow: visible; }
+  a { color: var(--ink); text-decoration: none; }
+}
+</style>
+<style>section h3{margin-top:10px} section > p, section > ul, section > ol{margin:0}section ol, section ul{display:grid;gap:4px} .lede-status{font-size:.92rem;color:var(--muted)}</style>
+<div class="wrap"><header class="cover"><div class="kicker">Team design document · UCSC AI Hackathon · Cisco Cloud Track</div><h1>HarvestNet MVP</h1><p class="tagline">Every organization keeps its own keys. The food still moves.</p><p class="lede">Surplus fresh fruit and vegetables from any food organization reach low-income households instead of going to waste. Households collect at food banks they choose, guided by a SNAP-style fair share. Donor and food bank agents negotiate how each batch is split, item by item, and who moves it. Households ask and confirm by web page or phone.</p><div class="facts"><span>Challenge: <b>Level 3</b></span><span>Region: <b>Central Coast California</b></span><span>Status: <b>design, no code yet</b></span><span>Updated: <b>October 10, 2026</b></span></div><div class="lede-status"><p><strong>October 10, 2026. Proposed by Claude from the user's decisions in ADRs 0006–0009.</strong> This is the design for the smaller, buildable version of HarvestNet: <strong>raw fresh produce</strong> for <strong>low-income households</strong>, collected at <strong>food banks the household chooses</strong>, with a <strong>SNAP-style fair share</strong>. It keeps the general architecture of the frozen v1 framework (ADRs 0001–0005, with the full whole-chain framework now in <code>future scope</code>). Everything here is design only. No code has been written, and implementation still needs the user's go-ahead.</p>
+<p>Status labels: <strong>Decided</strong> means the user confirmed it. <strong>Proposed</strong> means it's Claude's design, open for review by Codex and the user. All example numbers are synthetic.</p></div></header><nav class="toc" aria-label="Contents"><span class="tag">Contents</span><ol><li><span>01</span><a href="#s1">Purpose</a></li><li><span>02</span><a href="#s2">Scope</a></li><li><span>03</span><a href="#s3">Who uses it</a></li><li><span>04</span><a href="#s4">The SNAP connection</a></li><li><span>05</span><a href="#s5">The produce profile</a></li><li><span>06</span><a href="#s6">The agents</a></li><li><span>07</span><a href="#s7">Architecture</a></li><li><span>08</span><a href="#s8">How a surplus lot gets shared</a></li><li><span>09</span><a href="#s9">Workflows</a></li><li><span>10</span><a href="#s10">Screens</a></li><li><span>11</span><a href="#s11">Records</a></li><li><span>12</span><a href="#s12">Privacy and produce safety</a></li><li><span>13</span><a href="#s13">Sponsors</a></li><li><span>14</span><a href="#s14">Models and cost (Proposed, unmeasured)</a></li><li><span>15</span><a href="#s15">Deployment on AWS (Proposed)</a></li><li><span>16</span><a href="#s16">Proving it works</a></li><li><span>17</span><a href="#s17">Demo, about 3 minutes (Proposed)</a></li><li><span>18</span><a href="#s18">Build order (Proposed)</a></li><li><span>19</span><a href="#s19">Level mapping</a></li><li><span>20</span><a href="#s20">Open questions for Codex and the user</a></li></ol></nav><section id="s1"><span class="tag">01 · Purpose</span><h2>Purpose</h2>
+<p><strong>HarvestNet stops fresh fruit and vegetables from going to waste by getting surplus produce from any food organization to low-income households, who collect it at food banks they choose.</strong> Decided.</p>
+<p>Farms, packers, distributors, grocers, and farmers markets regularly end up with good produce they can't sell: an over-ordered pallet, cosmetic rejects, the last of a market day. It spoils within days. Nearby, low-income families would use it.</p>
+<p>The hard part is splitting it fairly and fast:
+- A food bank in a low-access area may get far less than one near the donors.
+- A family that works until 6 pm can't collect lettuce at 2 pm.
+- A small donor has no truck.
+- When a food bank's walk-in cooler fails, the greens in it are lost.</p>
+<p>HarvestNet gives each donor and each food bank its own AI agent. The agents negotiate how each batch of produce is split, item by item, and who moves it. An advocate agent speaks for the households furthest below their <strong>fair share</strong>. That share works like a SNAP benefit: a weekly produce amount that grows with household size.</p>
+<p>Households ask for produce by web page or phone call, choose the food banks they'll collect from, and confirm when they're coming.</p>
+<p><strong>Tagline:</strong> Every organization keeps its own keys. The food still moves.</p>
+</section><section id="s2"><span class="tag">02 · Scope</span><h2>Scope</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>In the MVP</th>
+<th>Deferred (kept on the network map as "ready to plug in")</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw fresh produce: fruit and vegetables, whole or packed</td>
+<td>Cooked or prepared meals</td>
+</tr>
+<tr>
+<td>Low-income households</td>
+<td>Shelters, people experiencing homelessness (ADR 0008)</td>
+</tr>
+<tr>
+<td>Food banks as the only pickup sites</td>
+<td>Community fridges, volunteer drivers, coordinator role (ADR 0009)</td>
+</tr>
+<tr>
+<td>Donors of any produce type, through one general donor template</td>
+<td>Field gleaning and harvest economics</td>
+</tr>
+<tr>
+<td>Transport by the donor or the food bank, decided per deal</td>
+<td>Rescue fund and all money flows</td>
+</tr>
+<tr>
+<td>SNAP-style weekly fair share by household size</td>
+<td>Cross-dock and processor roles</td>
+</tr>
+<tr>
+<td>Optional, self-reported SNAP/CalFresh participation</td>
+<td>Compost or animal-feed partners for unusable produce</td>
+</tr>
+<tr>
+<td>Link with SNAP produce programs (farmers markets as donors, Market Match referrals)</td>
+<td>Home delivery</td>
+</tr>
+<tr>
+<td>Advocate agent for households' combined requests</td>
+<td>Live shadow runs and the 14-family test catalog</td>
+</tr>
+<tr>
+<td>Produce profiles, item-by-item drafts, holds, approvals, stop rules</td>
+<td>Multi-city regions</td>
+</tr>
+<tr>
+<td>Food bank storage failure with rediscovery (Level 2)</td>
+<td></td>
+</tr>
+<tr>
+<td>Comparison against first-come-first-served</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Region: Central Coast California (Decided). Sponsors: Cisco AGNTCY, Beeceptor, ElevenLabs, and n8n. No NVIDIA Brev (Decided).</p>
+</section><section id="s3"><span class="tag">03 · Who uses it</span><h2>Who uses it</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>User</th>
+<th>What they do</th>
+<th>How they reach HarvestNet</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Household</strong> (low-income)</td>
+<td>Gives household size, pickup times, fridge space, and anything it can't eat. Optionally says it receives SNAP/CalFresh. Chooses food banks. Hears or sees what's ready. Confirms pickup.</td>
+<td>Mobile web page, or the ElevenLabs voice line. Text alerts through n8n. No app, no account, no name.</td>
+<td><span class="chip decided">Decided</span></td>
+</tr>
+<tr>
+<td><strong>Donor staff</strong> (farm, packer, distributor, grocer, farmers market, food bank with produce overflow)</td>
+<td>Report surplus produce. Say whether they can drop it off. Approve the plan.</td>
+<td>The same web page, or the voice line</td>
+<td><span class="chip proposed">Proposed</span></td>
+</tr>
+<tr>
+<td><strong>Food bank manager</strong></td>
+<td>Sets storage, pickup hours, and truck availability. Approves incoming produce. Sees disagreements. Marks pickups.</td>
+<td>Food bank dashboard, plus n8n approval messages</td>
+<td><span class="chip proposed">Proposed</span></td>
+</tr>
+</tbody>
+</table></div>
+<p>There's no driver role and no coordinator role (ADR 0009). Households <strong>collect from food banks only</strong>, and no home addresses are collected. Decided.</p>
+</section><section id="s4"><span class="tag">04 · The SNAP connection</span><h2>The SNAP connection</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>What it means</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fair share</strong></td>
+<td>Each household has a weekly produce amount that grows with household size, like a SNAP benefit. It's the fairness yardstick: agents aim to bring every household toward its fair share, starting with whoever is furthest below.</td>
+<td>Decided (idea). The table below is Proposed.</td>
+</tr>
+<tr>
+<td><strong>SNAP as an eligibility signal</strong></td>
+<td>A household may say it receives SNAP/CalFresh. It's optional and self-reported, with no proof. Food banks can use it under their own rules: many pantries accept SNAP participation as a sign of eligibility (verify with each food bank).</td>
+<td>Decided (idea). Handling is Proposed.</td>
+</tr>
+<tr>
+<td><strong>SNAP produce programs</strong></td>
+<td>Farmers markets join as donors, so unsold produce at market close comes to HarvestNet. Pickup texts can tell SNAP households where their CalFresh dollars are matched for fresh produce, such as California's Market Match at farmers markets. Verify current participating markets.</td>
+<td>Decided (idea). Details are Proposed.</td>
+</tr>
+</tbody>
+</table></div>
+<h3>Fair-share table (Proposed, synthetic numbers)</h3>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Household size</th>
+<th>Weekly fair share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 person</td>
+<td>4 lb</td>
+</tr>
+<tr>
+<td>2 people</td>
+<td>7 lb</td>
+</tr>
+<tr>
+<td>3 people</td>
+<td>10 lb</td>
+</tr>
+<tr>
+<td>4 people</td>
+<td>12 lb</td>
+</tr>
+<tr>
+<td>Each additional person</td>
+<td>+2 lb</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Who sets it:</strong> the participating food banks agree to the table and publish it before any negotiation, as a shared policy. It's versioned, and calculators apply it. It isn't a central decider. It doesn't assign any produce, and every food bank and donor still decides for itself. It's the measure everyone negotiates against, and the advocate's main argument.</p>
+<p><strong>Does a SNAP household get more?</strong> Proposed: no. The fair share depends only on household size. SNAP participation is an eligibility signal for food banks, not a bigger share. That keeps the rule simple and avoids rewarding people for disclosing something sensitive.</p>
+</section><section id="s5"><span class="tag">05 · The produce profile</span><h2>The produce profile</h2>
+<p>Every produce item has a <strong>food profile</strong> (ADR 0003). The agents read profiles instead of crop names, so the same rules work for strawberries, potatoes, or anything else.</p>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Why it matters</th>
+<th>Example: apples</th>
+<th>Example: romaine</th>
+<th>Example: potatoes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Needs a fridge</strong></td>
+<td>Households with little cold storage need produce that keeps at room temperature</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Days usable: cold / room temperature</strong></td>
+<td>How fast it must reach households, and which pickup windows still work</td>
+<td>Several weeks / about a week</td>
+<td>About a week / under a day</td>
+<td>Weeks / weeks</td>
+</tr>
+<tr>
+<td><strong>Transport and storage temperature</strong></td>
+<td>Whether the vehicle needs cold, and whether cold would damage it (tomatoes)</td>
+<td>Cool</td>
+<td>Cold</td>
+<td>Cool, not cold</td>
+</tr>
+<tr>
+<td><strong>Condition grade</strong></td>
+<td>Good, use soon, or not for people</td>
+<td>From the donor's check</td>
+<td>From the donor's check</td>
+<td>From the donor's check</td>
+</tr>
+<tr>
+<td><strong>Units</strong></td>
+<td>Pounds, cases, or items, converted by calculators</td>
+<td>lb, case</td>
+<td>lb, case</td>
+<td>lb, sack</td>
+</tr>
+</tbody>
+</table></div>
+<p>The example values are illustrative, not sourced. Real profiles cite postharvest references such as the UC Davis produce fact sheets, or are labeled as assumptions. The actual lot's condition is separate evidence from the donor.</p>
+</section><section id="s6"><span class="tag">06 · The agents</span><h2>The agents</h2>
+<p>Every organization runs the same blueprint (ADR 0001, ADR 0002):
+- Specialists check facts with calculators.
+- A negotiator suggests moves and explains them.
+- A validator rechecks every number.
+- The organization holds its own resources.
+- Its own human approves commitments.</p>
+<p><strong>No agent sits above the others.</strong></p>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Agent</th>
+<th>Represents</th>
+<th>Wants</th>
+<th>Specialists (calculators)</th>
+<th>Model (Proposed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Donor agent</strong> (one per donor)</td>
+<td>A farm, packer, distributor, grocer, farmers market, or food bank with overflow</td>
+<td>Produce used, not thrown away. As little extra work as possible.</td>
+<td><strong>Inventory</strong>: items, quantity, units. <strong>Condition</strong>: grade and days left. <strong>Pickup deadline</strong>: when it must leave. <strong>Drop-off</strong>: can the donor deliver, when, and with what vehicle?</td>
+<td>Claude Sonnet 5.5</td>
+</tr>
+<tr>
+<td><strong>Food bank agent</strong> (one per food bank)</td>
+<td>A food bank where households collect</td>
+<td>Produce its households will collect and use, with the least strain on its truck and storage</td>
+<td><strong>Demand</strong>: requests that chose this food bank, as counts only (household sizes, pickup windows, limited-fridge counts, how far below fair share). <strong>Storage</strong>: cold and dry space over time. <strong>Hours</strong>: pickup windows. <strong>Truck</strong>: whether its truck is free to collect, and with a cooler. <strong>Distribution</strong>: can it hand out each item before it spoils?</td>
+<td>Claude Opus 5.5</td>
+</tr>
+<tr>
+<td><strong>Advocate agent</strong></td>
+<td>Households' combined requests (no individual data)</td>
+<td>Every household moving toward its fair share, starting with the furthest below</td>
+<td><strong>Fair-share gap</strong>: per food bank, how far its households are below fair share this week. <strong>Access context</strong>: USDA Food Access Research Atlas for low-access areas. <strong>Amendment check</strong>: how a proposed change affects the gap and waste.</td>
+<td>Claude Opus 5.5</td>
+</tr>
+<tr>
+<td><strong>Front-desk assistant</strong> (not a negotiator)</td>
+<td>The web page and voice line</td>
+<td>Clear, kind, accurate answers</td>
+<td>Uses only recorded food bank hours, committed produce, fair-share balances, and pickup codes. It never allocates food.</td>
+<td>Claude Sonnet 5.5 (handles Spanish on the voice line)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Agents that <strong>decide for their own organization</strong>: donors and food banks. The <strong>advocate</strong> proposes and argues but has no vote. The <strong>front-desk assistant</strong> only takes requests and gives information.</p>
+<h3>The real disagreements</h3>
+<ul>
+<li><strong>Food banks compete</strong> for limited produce and want the items their households can use.</li>
+<li><strong>Donors want the produce gone</strong> with minimal effort, so they'd rather a food bank collects. <strong>Food banks would rather the donor drops off</strong>, to save their truck for other runs.</li>
+<li><strong>The advocate</strong> pushes produce toward the food bank whose households are furthest below fair share, even when another food bank is closer to the donor.</li>
+</ul>
+<h3>What each agent says yes to (Proposed)</h3>
+<ul>
+<li><strong>Donor:</strong> the produce leaves before its deadline, every item has a destination or is clearly marked unclaimed, and any drop-off fits its vehicle and time.</li>
+<li><strong>Food bank:</strong> each item fits its storage at arrival time and arrives before pickup hours. Its households can collect it before it spoils. Any collection fits its truck schedule.</li>
+<li><strong>Advocate:</strong> never accepts or rejects. On its turn, it may propose a change that shrinks the largest fair-share gap or reduces waste, citing pooled counts.</li>
+</ul>
+<h3>When a human must approve (Proposed)</h3>
+<ul>
+<li><strong>Donor staff:</strong> before any produce is promised, and for any drop-off.</li>
+<li><strong>Food bank manager:</strong> for any delivery above the food bank's set limit, for anything graded "use soon," and for any truck run.</li>
+<li><strong>Condition doubt</strong> (bruising, soft spots, a broken cold chain for greens, any recall notice): the donor or food bank manager checks before the produce is offered.</li>
+</ul>
+</section><section id="s7"><span class="tag">07 · Architecture</span><h2>Architecture</h2>
+<figure><div class="figbox"><pre class="mermaid">flowchart LR
+    subgraph People["Low-income households"]
+        Web["Mobile web page"]
+        Phone["Voice line · ElevenLabs"]
+    end
+    Desk["Front-desk assistant · L&lt;br/&gt;takes requests, gives pickup info"]
+    Web --&gt; Desk
+    Phone --&gt; Desk
+    Desk --&gt; Requests["Request records&lt;br/&gt;no names, fair-share balance"]
+
+    subgraph Donors["Produce donors"]
+        D1["Donor agent: grocer"]
+        D2["Donor agent: farmers market"]
+    end
+    subgraph Banks["Food banks households chose"]
+        B1["Food bank agent: city"]
+        B2["Food bank agent: rural"]
+        B3["Food bank agent: eastside"]
+    end
+    Advocate["Advocate agent&lt;br/&gt;fair-share gaps, no vote"]
+    Policy["Fair-share table&lt;br/&gt;published by the food banks"]
+
+    subgraph Net["Cisco AGNTCY"]
+        Room["Negotiation room&lt;br/&gt;A2A messages"]
+        Dir["Directory&lt;br/&gt;find food banks by capability"]
+    end
+
+    D1 &lt;--&gt; Room
+    D2 &lt;--&gt; Room
+    B1 &lt;--&gt; Room
+    B2 &lt;--&gt; Room
+    B3 &lt;--&gt; Room
+    Advocate &lt;--&gt; Room
+    Requests --&gt; Advocate
+    Requests --&gt; B1
+    Requests --&gt; B2
+    Requests --&gt; B3
+    Policy -.-&gt; Advocate
+    Policy -.-&gt; Requests
+    B1 -.-&gt; Dir
+
+    Room --&gt; Records["Shared records&lt;br/&gt;draft versions, holds, approvals, outcomes"]
+    Records --&gt; Notify["n8n&lt;br/&gt;text alerts and approvals"]
+    Notify --&gt; Web
+    Records --&gt; Dash["Donor and food bank dashboards"]
+    Records --&gt; Eval["Evaluation runner"]
+    Mocks["Beeceptor&lt;br/&gt;mock inventory, storage, cooler status, truck schedule"] -.-&gt; D1
+    Mocks -.-&gt; B1</pre></div><figcaption><b>Diagram 1. Architecture.</b></figcaption></figure>
+<p><strong>How to read it:</strong></p>
+<ul>
+<li>Households never talk to the negotiators. They talk to the <strong>front-desk assistant</strong>, which records <strong>requests</strong> with no names and tracks each household's <strong>fair-share balance</strong> for the week.</li>
+<li>Requests flow to the <strong>food banks the household chose</strong> (as counts) and to the <strong>advocate</strong> (as pooled fair-share gaps).</li>
+<li><strong>Donor and food bank agents negotiate</strong> in the AGNTCY room, including who moves the produce. The <strong>Directory</strong> finds food banks by capability, for example cold space, when one fails.</li>
+<li>The <strong>fair-share table</strong> is a published shared policy, applied by calculators. It's not an agent and decides nothing.</li>
+<li>Everything lands in <strong>shared records</strong>. <strong>n8n</strong> turns records into text alerts and approvals. <strong>Dashboards</strong> and the <strong>evaluation runner</strong> read records but can't change decisions.</li>
+<li><strong>Beeceptor</strong> stands in for each organization's own systems: inventory, storage, cooler status, and truck schedule.</li>
+</ul>
+<h3>Inside every agent</h3>
+<figure><div class="figbox"><pre class="mermaid">flowchart TB
+    In["Message in&lt;br/&gt;checked sender and version"] --&gt; Spec["Specialists · D&lt;br/&gt;facts and limits"]
+    Data["Own data&lt;br/&gt;Beeceptor, produce profiles, fair-share table, OSRM"] --&gt; Spec
+    Spec --&gt; Neg["Negotiator · L&lt;br/&gt;suggests a move and a reason"]
+    Neg --&gt; Val["Validator · D&lt;br/&gt;rechecks every number"]
+    Val --&gt;|"invalid"| Neg
+    Val --&gt;|"commits nothing"| Out["Send and log"]
+    Val --&gt;|"would commit"| Hold["Hold own resource&lt;br/&gt;expires"]
+    Hold --&gt; Human["Own human approves · H&lt;br/&gt;through n8n"]
+    Human --&gt; Out</pre></div><figcaption><b>Diagram 2. Inside every agent.</b></figcaption></figure>
+<p>The AI never produces a number on its own (ADR 0002). Calculators run first, including fair-share balances. Any extra number comes from a calculator tool call. Every number in an outgoing message is checked against calculator results, and after two failed checks the agent sends a template sentence instead.</p>
+</section><section id="s8"><span class="tag">08 · How a surplus lot gets shared</span><h2>How a surplus lot gets shared</h2>
+<h3>Requests become demand</h3>
+<ol>
+<li>A household tells the front-desk assistant:
+   - <strong>how many people</strong> it has, which sets its weekly <strong>fair share</strong>
+   - <strong>when it can pick up</strong>
+   - whether its <strong>fridge space is limited</strong>
+   - its <strong>rough area</strong>
+   - anything it <strong>can't eat</strong>
+   - optionally, whether it <strong>receives SNAP/CalFresh</strong></li>
+<li>The assistant shows <strong>food banks nearby</strong> with pickup hours that fit. The household <strong>chooses</strong> one or more. Its request is attached to those food banks.</li>
+<li>Each food bank agent sees <strong>counts only</strong>. Example: "42 households, 130 people, 25 can only pick up after 6 pm, 18 with limited fridge space, together 310 lb below fair share this week." The advocate sees the same counts across all food banks.</li>
+</ol>
+<h3>Split item by item, and agree who moves it</h3>
+<p>A surplus lot is usually <strong>mixed</strong>, for example apples, romaine, and potatoes. The draft agreement splits it <strong>item by item</strong> and states <strong>who moves each part</strong>: the donor drops it off, or the food bank collects it.</p>
+<p>Example:
+- <strong>Romaine</strong> (needs a fridge, spoils fast) goes to the <strong>city food bank</strong>, which has a walk-in cooler and same-day evening pickup. The city food bank collects it in its refrigerated truck.
+- <strong>Potatoes and apples</strong> (keep without a fridge) go mostly to the <strong>rural food bank</strong>, whose households are furthest below fair share. The donor drops them off on the way.</p>
+<h3>The fairness and no-waste rules</h3>
+<ul>
+<li><strong>Hard rule (Proposed):</strong> produce goes only to food banks whose households can collect it before it spoils, given their pickup windows. Produce that needs a fridge goes to limited-fridge households only for same-day pickup, in household-sized amounts.</li>
+<li><strong>Fair share:</strong> no household's received total goes above its fair share while another household at the same food bank is below it. Surplus beyond everyone's fair share can still go out rather than waste.</li>
+<li><strong>Advocate preference:</strong> produce goes first to the food bank with the largest fair-share gap, using Food Access Atlas context to show low-access areas.</li>
+<li><strong>No silent waste:</strong> every pound of every item ends in a recorded pathway: picked up, released to another household, or unclaimed with a reason. Shorter-lived items get matched first.</li>
+<li><strong>Fair-share coverage:</strong> the share of its weekly fair share a household has received. <strong>Worst-served coverage</strong> is the lowest average across food banks.</li>
+</ul>
+<h3>The draft agreement</h3>
+<p>Each surplus lot gets <strong>one shared, numbered draft agreement</strong>. It says:
+- how much of each item goes to which food bank
+- who moves it, and when
+- the storage needed</p>
+<p>Agents edit it in turns, each with a reason. Any change creates a new version, and old approvals don't carry over.</p>
+<figure><div class="figbox"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Offered
+    Offered --&gt; Negotiating: food banks respond
+    Negotiating --&gt; Negotiating: amendment, new version
+    Negotiating --&gt; Held: all owners place holds
+    Held --&gt; Committed: every named party approves this version
+    Held --&gt; Negotiating: a hold expires or someone changes terms
+    Negotiating --&gt; Disagreement: 3 rounds with no new terms
+    Negotiating --&gt; Unclaimed: deadline passes with no commitment
+    Committed --&gt; Moving: donor drops off or food bank collects
+    Moving --&gt; AtFoodBank: food bank receives
+    AtFoodBank --&gt; Collected: households confirm pickup
+    Committed --&gt; Negotiating: a food bank's storage fails
+    AtFoodBank --&gt; Negotiating: storage fails before pickup
+    Disagreement --&gt; [*]
+    Unclaimed --&gt; [*]
+    Collected --&gt; [*]</pre></div><figcaption><b>Diagram 3. Lifecycle of a draft agreement.</b></figcaption></figure>
+<h3>Stop rules (from the frozen framework)</h3>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agreement</td>
+<td>Every named party approves the same version, so it becomes a commitment</td>
+</tr>
+<tr>
+<td>Ask a human</td>
+<td>Any condition doubt, or any change to a committed plan</td>
+</tr>
+<tr>
+<td>Keep the disagreement</td>
+<td>3 rounds with no new terms. The involved donor and food bank dashboards show the options and each agent's reason</td>
+</tr>
+<tr>
+<td>Deadline</td>
+<td>No commitment by the donor's deadline means the produce is unclaimed, with reasons recorded. <strong>Nothing is ever committed automatically.</strong></td>
+</tr>
+</tbody>
+</table></div>
+</section><section id="s9"><span class="tag">09 · Workflows</span><h2>Workflows</h2>
+<h3>Workflow 1: a household asks for produce</h3>
+<figure><div class="figbox"><pre class="mermaid">sequenceDiagram
+    actor Household as Household
+    participant Channel as Web page or voice line
+    participant Desk as Front-desk assistant · L
+    participant Check as Request and fair-share checks · D
+    participant Rec as Request records
+    participant Notify as n8n alerts
+    Household-&gt;&gt;Channel: Family of 4, near Watsonville, after 6 pm, small fridge, we get CalFresh
+    Channel-&gt;&gt;Desk: Transcript or form entries
+    Desk-&gt;&gt;Check: Draft request with size, pickup window, fridge, area, SNAP yes
+    Check--&gt;&gt;Desk: Valid request, fair share 12 lb this week
+    Desk-&gt;&gt;Household: Read-back and consent question
+    Household-&gt;&gt;Desk: Confirms
+    Desk-&gt;&gt;Rec: Save request with a short code, no name
+    Desk-&gt;&gt;Household: Food banks nearby with evening pickup
+    Household-&gt;&gt;Desk: Chooses rural food bank and city food bank
+    alt Produce is already committed at a chosen food bank
+        Desk-&gt;&gt;Household: Pickup time, food bank, items, and code
+    else Nothing yet
+        Desk-&gt;&gt;Household: You are on the list, we will text you
+        Rec-&gt;&gt;Notify: Alert when produce is committed at a chosen food bank
+        Notify-&gt;&gt;Household: Text with food bank, time, items, and code
+    end</pre></div><figcaption><b>Diagram 4. Workflow 1: a household asks for produce.</b></figcaption></figure>
+<ul>
+<li>On the voice line, ElevenLabs reads everything back. The household can answer in English or Spanish.</li>
+<li>The SNAP answer is <strong>optional</strong>. "Prefer not to say" is always offered, and the answer never changes the fair share.</li>
+<li>The assistant only reports <strong>committed</strong> produce. It never promises produce that's still being negotiated.</li>
+</ul>
+<h3>Workflow 2: a donor reports surplus produce, and agents split it</h3>
+<figure><div class="figbox"><pre class="mermaid">sequenceDiagram
+    actor Staff as Farmers market manager
+    participant Donor as Donor agent
+    participant Room as AGNTCY room
+    participant Banks as Food bank agents
+    participant Adv as Advocate agent
+    participant N8 as n8n approvals
+    Staff-&gt;&gt;Donor: Market closing, 300 lb apples, 200 lb romaine, 400 lb potatoes, gone by 3 pm
+    Donor-&gt;&gt;Donor: Specialists check profiles, condition, deadline, drop-off ability
+    Donor-&gt;&gt;Room: Surplus offer version 1, can drop off one load to the south side only
+    Room-&gt;&gt;Banks: Offer arrives
+    Banks-&gt;&gt;Banks: Check demand counts, fair-share gaps, storage, hours, truck
+    Banks-&gt;&gt;Room: Bids, city wants romaine and will collect, rural wants all potatoes and apples
+    Room-&gt;&gt;Adv: Offer and bids
+    Adv-&gt;&gt;Room: Proposed change, rural gets 250 lb apples because its gap is largest
+    Banks-&gt;&gt;Room: Eastside counter, wants 50 lb apples, has no truck today
+    Donor-&gt;&gt;Room: Version 3, drop-off to rural and eastside on one route, city collects romaine
+    Banks-&gt;&gt;Room: Accept or counter
+    Note over Room: Repeat in turns until agreement or a stop rule
+    Donor-&gt;&gt;N8: Market manager approves version 3 and the drop-off
+    Banks-&gt;&gt;N8: Food bank managers approve deliveries and the city truck run
+    N8-&gt;&gt;Room: All approvals for version 3
+    Room-&gt;&gt;Room: Record the commitment</pre></div><figcaption><b>Diagram 5. Workflow 2: a donor reports surplus produce, and agents split it.</b></figcaption></figure>
+<ul>
+<li>Food banks bid only what their own calculators allow: storage at arrival time, pickup hours, truck availability, and households who can collect each item before it spoils.</li>
+<li><strong>Who moves it is negotiated.</strong> The donor offers one drop-off route, and the city food bank uses its refrigerated truck for the romaine.</li>
+<li>The advocate can only <strong>propose</strong>. Food banks and the donor decide.</li>
+<li>If some of an item has no taker, it's recorded as <strong>unclaimed</strong> with a reason, never dropped silently.</li>
+</ul>
+<h3>Workflow 3: pickup and confirmation</h3>
+<figure><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Rec as Shared records
+    participant N8 as n8n alerts
+    participant Mover as Donor drop-off or food bank truck
+    participant Bank as Food bank agent and manager
+    actor Household as Household
+    Rec-&gt;&gt;N8: Commitment recorded
+    N8-&gt;&gt;Mover: Run details, time, and storage needs
+    Mover-&gt;&gt;Bank: Delivers produce
+    Bank-&gt;&gt;Rec: Received 250 lb apples and 400 lb potatoes at 4:10 pm
+    Rec-&gt;&gt;Rec: Calculate each household portion up to its fair share
+    Rec-&gt;&gt;N8: Produce is at the rural food bank
+    N8-&gt;&gt;Household: 8 lb apples and potatoes ready, 6 to 8 pm, your code
+    Household-&gt;&gt;Bank: Shows code at pickup
+    Bank-&gt;&gt;Rec: Pickup confirmed, fair-share balance updated
+    alt Household replies it cannot come
+        Household-&gt;&gt;N8: Cannot make it
+        N8-&gt;&gt;Rec: Release the portion
+        Rec-&gt;&gt;N8: Offer it to the next household furthest below fair share
+    end
+    opt Household said it receives SNAP
+        N8-&gt;&gt;Household: Tip, your CalFresh dollars are matched at a nearby farmers market
+    end</pre></div><figcaption><b>Diagram 6. Workflow 3: pickup and confirmation.</b></figcaption></figure>
+<ul>
+<li>Each household's portion is <strong>calculated up to its fair share</strong>, never guessed by an AI.</li>
+<li>A <strong>pickup confirmation</strong> counts a household as <strong>actually reached</strong> and updates its weekly balance.</li>
+<li>A released portion goes to the next household furthest below fair share at that food bank.</li>
+<li>The <strong>SNAP produce-program tip</strong> goes only to households that said they receive SNAP, and only if a participating market is nearby. Verify participating markets before showing any.</li>
+</ul>
+<h3>Workflow 4: a food bank's cooler fails (Level 2)</h3>
+<figure><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Mock as Beeceptor cooler status
+    participant City as City food bank agent
+    participant Room as AGNTCY room
+    participant Dir as AGNTCY Directory
+    participant Others as Other food bank agents
+    participant Donor as Donor agent
+    participant N8 as n8n approvals
+    participant Notify as n8n alerts
+    Mock-&gt;&gt;City: Walk-in cooler above safe temperature
+    City-&gt;&gt;City: Specialists check which items need cold, romaine yes, apples no
+    City-&gt;&gt;Room: Disruption, cannot hold 200 lb romaine tonight
+    City-&gt;&gt;Dir: Find food banks with cold space for 200 lb, pickup tonight, reachable
+    Dir--&gt;&gt;City: Candidate food banks
+    City-&gt;&gt;Others: Ask for cold space and pickup windows
+    Others--&gt;&gt;City: Answers or refusals
+    City-&gt;&gt;City: Reason card for every candidate
+    City-&gt;&gt;Room: Version 4, romaine moves to eastside using the city truck
+    Others-&gt;&gt;Room: Eastside accepts 150 lb, counter for the rest
+    Donor-&gt;&gt;Room: No change needed, already delivered
+    Others-&gt;&gt;N8: Eastside manager approves version 5
+    City-&gt;&gt;N8: City manager approves the truck run
+    N8-&gt;&gt;Room: All approvals for version 5
+    Room-&gt;&gt;Notify: Affected households get a new food bank, time, and code
+    alt No food bank can take it in time
+        Room-&gt;&gt;Notify: Same-day offer to city households who can come tonight
+        Notify-&gt;&gt;Room: Anything left is unclaimed with reasons
+    end</pre></div><figcaption><b>Diagram 7. Workflow 4: a food bank cooler fails.</b></figcaption></figure>
+<ul>
+<li><strong>Reason card example:</strong> "Rural food bank: has cold space, but pickup ends at 6 pm. Its households can't collect romaine tonight. Not chosen."</li>
+<li><strong>The produce profile decides what has to move.</strong> Romaine must leave the failed cooler; apples and potatoes can stay.</li>
+<li>Households who chose the city food bank get a text with the new location. If they didn't choose eastside, they can reply to accept or decline, and their portion is released if they decline.</li>
+<li>Every changed plan needs <strong>fresh approvals</strong>.</li>
+</ul>
+<h3>Workflow 5: condition doubt or no agreement</h3>
+<figure><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Donor as Donor agent
+    participant Bank as Food bank agent
+    actor Human as Food bank manager or donor staff
+    participant Dash as Dashboards
+    Donor-&gt;&gt;Bank: Offer, romaine with 1 day left, cold chain unknown
+    Bank-&gt;&gt;Bank: Profile check fails or record is missing
+    Bank-&gt;&gt;Human: Condition check needed
+    alt Human confirms it is good with a record
+        Human-&gt;&gt;Bank: Approved as use today
+    else Not good or no record
+        Human-&gt;&gt;Bank: Declined
+        Bank-&gt;&gt;Dash: Item declined, reason recorded
+    end
+    Note over Bank,Dash: After 3 rounds without new terms, the involved dashboards show a preserved disagreement</pre></div><figcaption><b>Diagram 8. Workflow 5: condition doubt or no agreement.</b></figcaption></figure>
+<p>A <strong>recalled lot</strong> is never offered. Produce that isn't fit for people is recorded as declined. Sending it to compost or animal feed is a deferred feature.</p>
+</section><section id="s10"><span class="tag">10 · Screens</span><h2>Screens</h2>
+<h3>Household: mobile web page (Decided channel, Proposed layout)</h3>
+<ol>
+<li><strong>About your household.</strong>
+   - How many people. The page shows the weekly fair share, for example "Your household's fresh produce share: 12 lb a week."
+   - When you can pick up.
+   - <em>Is your fridge space limited?</em>
+   - Neighborhood, and anything you can't eat.
+   - <em>Do you receive SNAP/CalFresh?</em> (Yes / No / Prefer not to say)
+   - Language (English or Spanish), and an optional phone number for texts.</li>
+<li><strong>Choose your food banks.</strong> Food banks nearby with pickup hours that fit, and what's committed there now. Badges such as <em>Keep cold</em> and <em>Use within 2 days</em>.</li>
+<li><strong>Your pickup.</strong>
+   - Food bank, time window, items and pounds, and a short code.
+   - This week's balance, for example "8 of 12 lb received."
+   - A <em>Can't make it</em> button.</li>
+</ol>
+<p>Large text and one question per screen. It works on old phones and slow connections, and stores nothing in the browser beyond the current session.</p>
+<h3>Voice line (ElevenLabs)</h3>
+<p>"Hi, this is HarvestNet. I can help your household get free fresh fruit and vegetables. How many people are in your household? When can you pick up? Is your fridge space limited? What neighborhood are you near? If you'd like, you can tell me whether you receive CalFresh, or skip that question." Then:
+1. A read-back and a consent question.
+2. The fair share for the household.
+3. Nearby food banks to choose from.
+4. The pickup code, read out twice.</p>
+<h3>Donor page</h3>
+<p>Report surplus:
+- items, picked from produce profiles
+- quantity and unit for each
+- condition grade
+- deadline
+- any recall notice
+- <strong>whether the donor can drop off</strong>, and where and when</p>
+<p>Then the lot's live status, item by item: offered, negotiating, committed with who moves it, delivered, households reached, unclaimed.</p>
+<h3>Food bank dashboard</h3>
+<ul>
+<li><strong>Today's capacity:</strong> cold and dry storage, pickup hours, truck schedule, and cooler status.</li>
+<li><strong>Incoming offers:</strong> the current draft, an <strong>Accept / Counter / Decline</strong> decision, and the agent's suggested reason.</li>
+<li><strong>Fair-share gap</strong> for this food bank's households, as counts only.</li>
+<li><strong>Disagreements</strong> involving this food bank, with each side's reason.</li>
+<li><strong>Expected arrivals,</strong> and a pickup list where staff enter codes.</li>
+</ul>
+</section><section id="s11"><span class="tag">11 · Records</span><h2>Records</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Record</th>
+<th>Contents</th>
+<th>Written by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Request</td>
+<td>Short code, household size, weekly fair share, received this week, pickup windows, limited fridge yes or no, neighborhood, can't-eat list, SNAP yes / no / not said, chosen food banks, consent, expiry</td>
+<td>Front-desk assistant and calculators</td>
+</tr>
+<tr>
+<td>Fair-share table</td>
+<td>Household size to weekly pounds, version, published date</td>
+<td>The participating food banks, together</td>
+</tr>
+<tr>
+<td>Surplus offer</td>
+<td>Donor, items with produce profile, quantity and unit, condition grade, days left, deadline, recall check, drop-off ability</td>
+<td>Donor agent</td>
+</tr>
+<tr>
+<td>Food bank status</td>
+<td>Cold and dry storage over time, pickup hours, truck schedule, cooler status, demand counts, fair-share gap</td>
+<td>Food bank agent</td>
+</tr>
+<tr>
+<td>Draft agreement</td>
+<td>Lot, split by item and food bank, who moves each part and when, storage needs, version, proposer, reason</td>
+<td>Any participant</td>
+</tr>
+<tr>
+<td>Hold</td>
+<td>Resource (storage, truck time, donor drop-off slot, lot), amount, interval, version, expiry</td>
+<td>Only that resource's owner</td>
+</tr>
+<tr>
+<td>Approval</td>
+<td>Who, organization, exact version, decision</td>
+<td>That organization's human, through n8n</td>
+</tr>
+<tr>
+<td>Pickup notice</td>
+<td>Request code, food bank, items and pounds, window, version</td>
+<td>n8n, from the commitment</td>
+</tr>
+<tr>
+<td>Pickup confirmation</td>
+<td>Request code, food bank, time, collected or released, balance update</td>
+<td>Food bank staff, or the household</td>
+</tr>
+<tr>
+<td>Outcome</td>
+<td>Each item's pathway (picked up, released to another household, unclaimed, or declined) with pounds and reasons</td>
+<td>Shared records</td>
+</tr>
+</tbody>
+</table></div>
+</section><section id="s12"><span class="tag">12 · Privacy and produce safety</span><h2>Privacy and produce safety</h2>
+<p>Households in need deserve their data handled with care. Proposed defaults:</p>
+<ul>
+<li><strong>No names, no addresses, no accounts.</strong> A request is a short code plus the fields above.</li>
+<li><strong>The SNAP answer is optional and sensitive.</strong></li>
+<li>It's self-reported, with no proof, and "prefer not to say" is always available.</li>
+<li>It never changes the fair share.</li>
+<li>Agents see it only as counts.</li>
+<li>It's deleted with the request.</li>
+<li><strong>No income questions or verification.</strong> Food banks keep their own eligibility rules.</li>
+<li><strong>Phone numbers are optional,</strong> used only for alerts, and deleted when the request expires.</li>
+<li><strong>Requests expire after 7 days</strong>, matching the weekly fair share. Results keep only counts.</li>
+<li><strong>Consent</strong> is asked in plain words before saving, on both the web page and the voice line.</li>
+<li><strong>Agents never see individual households.</strong></li>
+<li><strong>Untrusted input:</strong> whatever a household or donor types or says is treated as information, never as an instruction to an agent.</li>
+<li><strong>Produce safety:</strong></li>
+<li>Donors grade condition, and recalled lots are never offered.</li>
+<li>Cold-dependent items need a known cold chain, and a failed cooler triggers Workflow 4.</li>
+<li>Anything uncertain goes to a human.</li>
+<li>Households see a "wash before eating" note.</li>
+</ul>
+</section><section id="s13"><span class="tag">13 · Sponsors</span><h2>Sponsors</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Sponsor</th>
+<th>Role in the MVP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Cisco AGNTCY</strong></td>
+<td>A2A messages in the negotiation room, and Directory discovery of food banks by capability. Skip SLIM group chat, which is marked experimental.</td>
+</tr>
+<tr>
+<td><strong>ElevenLabs</strong></td>
+<td>The voice line for households and donors, with English and Spanish read-back</td>
+</tr>
+<tr>
+<td><strong>n8n</strong></td>
+<td>Text alerts to households, approval requests to donor staff and food bank managers, the <em>Can't make it</em> release, SNAP produce-program tips</td>
+</tr>
+<tr>
+<td><strong>Beeceptor</strong></td>
+<td>Mock donor inventory, food bank storage, cooler status, and truck schedules, with a switch that makes a cooler fail</td>
+</tr>
+<tr>
+<td><strong>AWS</strong></td>
+<td>Hosting</td>
+</tr>
+<tr>
+<td><strong>Claude API</strong></td>
+<td>Negotiators, the advocate, and the front-desk assistant</td>
+</tr>
+</tbody>
+</table></div>
+<p>None of them decides anything (ADR 0004).</p>
+</section><section id="s14"><span class="tag">14 · Models and cost (Proposed, unmeasured)</span><h2>Models and cost (Proposed, unmeasured)</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Model</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Food bank agents, advocate</td>
+<td>Claude Opus 5.5</td>
+<td>The hardest trade-offs: items, fair-share gaps, storage, and trucks</td>
+</tr>
+<tr>
+<td>Donor agents</td>
+<td>Claude Sonnet 5.5</td>
+<td>Mostly offers, drop-off terms, and explanations</td>
+</tr>
+<tr>
+<td>Front-desk assistant</td>
+<td>Claude Sonnet 5.5</td>
+<td>Kind, clear conversation, including Spanish</td>
+</tr>
+<tr>
+<td>Scoring results</td>
+<td>No AI</td>
+<td>Every metric is calculated</td>
+</tr>
+</tbody>
+</table></div>
+<p>A mixed lot with one donor, three food banks, and the advocate takes roughly 15–25 agent moves. That's about <strong>$0.50–1.00 per lot</strong>, or roughly 100–200 lots on the $100 credit. Rules-based runs and replays cost nothing. These are estimates, not measurements.</p>
+</section><section id="s15"><span class="tag">15 · Deployment on AWS (Proposed)</span><h2>Deployment on AWS (Proposed)</h2>
+<ul>
+<li>One EC2 machine running Docker Compose.</li>
+<li>One container per organization agent (donors, food banks, advocate), plus the web app and API, the AGNTCY Directory, and Postgres.</li>
+<li>One public HTTPS address, so n8n Cloud and ElevenLabs can call in.</li>
+<li>Keys in AWS Secrets Manager.</li>
+<li>n8n, Beeceptor, and ElevenLabs run on the sponsors' own servers.</li>
+</ul>
+</section><section id="s16"><span class="tag">16 · Proving it works</span><h2>Proving it works</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>What it shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Normal afternoon</td>
+<td>A mixed lot is split item by item, transport is agreed, households are notified and confirm</td>
+</tr>
+<tr>
+<td>More produce than storage</td>
+<td>Fast-spoiling items are matched first. Food banks disagree over cold space. Waste is visible.</td>
+</tr>
+<tr>
+<td>More households than produce</td>
+<td>The advocate pushes produce toward the largest fair-share gap</td>
+</tr>
+<tr>
+<td>Cooler fails</td>
+<td>Level 2: rediscovery of food banks with cold space, reason cards, fresh approvals, households re-notified</td>
+</tr>
+<tr>
+<td>Condition doubt or no agreement</td>
+<td>A human check, and declined or unclaimed items with reasons. Nothing faked.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Compared methods:</strong></p>
+<ul>
+<li><strong>First-come-first-served,</strong> where the first food bank to claim gets the whole lot.</li>
+<li><strong>Nearest food bank.</strong></li>
+<li><strong>Rules-based negotiators.</strong></li>
+<li><strong>LLM negotiators.</strong></li>
+</ul>
+<p>All four run on the same inputs.</p>
+<p><strong>Metrics:</strong></p>
+<ul>
+<li><strong>Produce wasted:</strong> pounds unclaimed or spoiled. Proposed as a headline.</li>
+<li><strong>Worst-served fair-share coverage:</strong> the lowest average share of fair share received, across food banks. Proposed as the second headline.</li>
+<li><strong>Households actually reached,</strong> counted by pickup confirmations.</li>
+<li><strong>Pickup-window match:</strong> produce collected before it spoils.</li>
+<li>Time to commitment.</li>
+<li>Invalid commitments (must be zero).</li>
+<li>Number-check failures.</li>
+</ul>
+<p><strong>Report whatever the numbers show.</strong> Decided.</p>
+</section><section id="s17"><span class="tag">17 · Demo, about 3 minutes (Proposed)</span><h2>Demo, about 3 minutes (Proposed)</h2>
+<ol>
+<li>A parent calls the voice line in Spanish: family of four, near Watsonville, can pick up after 6 pm, small fridge, receives CalFresh. They hear their fair share (12 lb a week) and choose the rural and city food banks.</li>
+<li>A farmers market manager reports end-of-day surplus: 300 lb of apples, 200 lb of romaine, 400 lb of potatoes.</li>
+<li>Food bank agents bid item by item. The advocate argues for more apples to the rural food bank, whose households are furthest below fair share. The donor offers one drop-off route, and the city food bank collects the romaine in its refrigerated truck. The draft changes on screen, with reasons.</li>
+<li>Managers approve live through n8n.</li>
+<li>The city food bank's cooler fails (Beeceptor switch). Its agent finds eastside through the Directory, with reason cards. The romaine moves, everyone re-approves, and affected households get a text.</li>
+<li>The parent gets a text: 8 lb of apples and potatoes at the rural food bank, 6 to 8 pm, with a code. Plus a tip about Market Match at a nearby farmers market.</li>
+<li>The results strip shows pounds wasted, fair-share coverage, and households reached, against first-come-first-served.</li>
+</ol>
+</section><section id="s18"><span class="tag">18 · Build order (Proposed)</span><h2>Build order (Proposed)</h2>
+<ol>
+<li><strong>Records and rules-based negotiation in one process:</strong> one donor, three food banks, and the advocate. Item-by-item drafts, transport terms, holds, approvals, stop rules.</li>
+<li><strong>Produce profiles and the fair-share calculator,</strong> with the matching rules.</li>
+<li><strong>Web pages</strong> for households, donors, and food banks, on top of those records.</li>
+<li><strong>Deploy to AWS early,</strong> so n8n and ElevenLabs can reach it.</li>
+<li><strong>AGNTCY:</strong> A2A between agent containers, plus Directory, plus the cooler-failure scenario with Beeceptor.</li>
+<li><strong>LLM negotiators and the front-desk assistant,</strong> with calculator tools and number checks.</li>
+<li><strong>n8n</strong> alerts and approvals, then the <strong>ElevenLabs</strong> voice line.</li>
+<li><strong>Evaluation runs</strong> on the five scenarios, then the dashboards and demo rehearsal.</li>
+</ol>
+</section><section id="s19"><span class="tag">19 · Level mapping</span><h2>Level mapping</h2>
+<div class="tablebox"><table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Evidence in the MVP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Level 1</td>
+<td>Specialists inside each agent (demand, storage, hours, truck, condition, fair-share gap) feed its negotiator</td>
+</tr>
+<tr>
+<td>Level 2</td>
+<td>A food bank's cooler fails. Directory rediscovery of food banks with cold space, with reason cards for every candidate. The produce profile decides which items must move.</td>
+</tr>
+<tr>
+<td>Level 3</td>
+<td>Donor and food bank agents with competing goals negotiate one item-by-item draft, including who moves the produce, with no central decider. The advocate argues from fair-share gaps. Results are compared with first-come-first-served, and the system knows when to stop, keep a disagreement, or ask a human.</td>
+</tr>
+</tbody>
+</table></div>
+</section><section id="s20"><span class="tag">20 · Open questions for Codex and the user</span><h2>Open questions for Codex and the user</h2>
+<ol>
+<li>Are the fair-share pounds in the table reasonable starting values? They're synthetic. Real food banks could set them.</li>
+<li>Should "produce wasted" and "worst-served fair-share coverage" both be headline measures?</li>
+<li>Should households be able to choose more than one food bank? The design currently allows it.</li>
+<li>Should the SNAP produce-program tip appear in the demo, given that participating markets must be verified first?</li>
+<li>Does the frozen framework need any change for households participating directly, or for the fair-share table as a shared policy?</li>
+</ol></section><footer><p>Source: <code>docs/MVP_DESIGN.md</code> in the HarvestNet folder, built on ADRs 0001–0009, <code>CONTEXT.md</code>, and the frozen v1 framework. All example numbers are synthetic. Cost figures are estimates. Nothing here has been built or tested yet.</p></footer></div>

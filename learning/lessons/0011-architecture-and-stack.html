@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 11: Architecture and stack</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 11 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Architecture and stack</h1>
+<p class="lede">What runs where, and what each sponsor does.</p>
+<div class="win"><b>After this lesson</b>You can sketch the architecture from memory and give each sponsor's role in one line.</div>
+
+<h2>The pieces</h2>
+<ul>
+<li><strong>Households:</strong> mobile web page or voice line, then the front-desk assistant, which saves request records with no names.</li>
+<li><strong>Agents:</strong> one for each donor and each food bank, plus the advocate. They negotiate in the AGNTCY room over A2A messages.</li>
+<li><strong>Directory:</strong> finds food banks by capability, for example when a cooler fails.</li>
+<li><strong>Shared records:</strong> draft versions, holds, approvals, and outcomes.</li>
+<li><strong>n8n:</strong> turns records into text alerts and approval requests.</li>
+<li><strong>Dashboards and the evaluation runner:</strong> read the records but can't change any decision.</li>
+<li><strong>Beeceptor:</strong> stands in for each organization's own systems: inventory, storage, cooler status, and truck schedule.</li>
+</ul>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">flowchart LR
+    subgraph People["Low-income households"]
+        Web["Mobile web page"]
+        Phone["Voice line · ElevenLabs"]
+    end
+    Desk["Front-desk assistant · L&lt;br/&gt;takes requests, gives pickup info"]
+    Web --&gt; Desk
+    Phone --&gt; Desk
+    Desk --&gt; Requests["Request records&lt;br/&gt;no names, fair-share balance"]
+
+    subgraph Donors["Produce donors"]
+        D1["Donor agent: grocer"]
+        D2["Donor agent: farmers market"]
+    end
+    subgraph Banks["Food banks households chose"]
+        B1["Food bank agent: city"]
+        B2["Food bank agent: rural"]
+        B3["Food bank agent: eastside"]
+    end
+    Advocate["Advocate agent&lt;br/&gt;fair-share gaps, no vote"]
+    Policy["Fair-share table&lt;br/&gt;published by the food banks"]
+
+    subgraph Net["Cisco AGNTCY"]
+        Room["Negotiation room&lt;br/&gt;A2A messages"]
+        Dir["Directory&lt;br/&gt;find food banks by capability"]
+    end
+
+    D1 &lt;--&gt; Room
+    D2 &lt;--&gt; Room
+    B1 &lt;--&gt; Room
+    B2 &lt;--&gt; Room
+    B3 &lt;--&gt; Room
+    Advocate &lt;--&gt; Room
+    Requests --&gt; Advocate
+    Requests --&gt; B1
+    Requests --&gt; B2
+    Requests --&gt; B3
+    Policy -.-&gt; Advocate
+    Policy -.-&gt; Requests
+    B1 -.-&gt; Dir
+
+    Room --&gt; Records["Shared records&lt;br/&gt;draft versions, holds, approvals, outcomes"]
+    Records --&gt; Notify["n8n&lt;br/&gt;text alerts and approvals"]
+    Notify --&gt; Web
+    Records --&gt; Dash["Donor and food bank dashboards"]
+    Records --&gt; Eval["Evaluation runner"]
+    Mocks["Beeceptor&lt;br/&gt;mock inventory, storage, cooler status, truck schedule"] -.-&gt; D1
+    Mocks -.-&gt; B1</pre></div><figcaption>HarvestNet architecture. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>Sponsors, one line each</h2>
+<ul>
+<li><strong>Cisco AGNTCY:</strong> A2A messages and Directory discovery. Skip SLIM group chat, which is marked experimental.</li>
+<li><strong>ElevenLabs:</strong> the voice line, with English and Spanish read-back.</li>
+<li><strong>n8n:</strong> alerts, approvals, and the "can't make it" release.</li>
+<li><strong>Beeceptor:</strong> mock systems, plus the switch that makes a cooler fail.</li>
+<li><strong>AWS:</strong> hosting. <strong>Claude API:</strong> the agents and the assistant.</li>
+</ul>
+<p>None of them decides anything (<a href="../../docs/adr/0004-sponsors-are-organization-systems-not-deciders.md">ADR 0004</a>).</p>
+<p class="cite">See the <a href="https://github.com/agntcy/app-sdk">AGNTCY app-sdk README</a> and the <a href="https://a2a-protocol.org/latest/specification/">A2A specification</a>.</p>
+
+<h2>On AWS</h2>
+<p>One EC2 machine running Docker Compose. Each organization's agent gets its own container, alongside the web app and API, the AGNTCY Directory, and Postgres. There's one public HTTPS address, so n8n and ElevenLabs can reach the system, and keys are kept in Secrets Manager. n8n, Beeceptor, and ElevenLabs stay on the sponsors' own servers.</p>
+
+<h2>Models</h2>
+<p>Opus 5.5 for food banks and the advocate, Sonnet 5.5 for donors and the front desk, and no AI for scoring. This assignment is proposed.</p>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, sections 7, 13, 14, and 15.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 7 and its architecture diagram.</p>
+  <p><strong>Previous:</strong> <a href="0010-proving-it-works.html">Lesson 10: Proving it works</a> · <strong>Next:</strong> <a href="0012-leading-the-build.html">Lesson 12: Leading the build</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>

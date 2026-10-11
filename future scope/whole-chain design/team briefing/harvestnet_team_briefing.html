@@ -1,0 +1,1192 @@
+<title>HarvestNet Team Briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one readable column like a field manual; wide diagrams and tables scroll in their own frames; section labels styled like produce lot tags. */
+:root {
+  --paper: #f5f8f6;
+  --panel: #ffffff;
+  --ink: #16201d;
+  --muted: #56645f;
+  --rule: #d3dcd8;
+  --berry: #b8233b;
+  --leaf: #2d6a4d;
+  --cold: #285d84;
+  --tint-berry: #f8e7ea;
+  --tint-leaf: #e3f0e8;
+  --tint-cold: #e3edf5;
+  --tint-muted: #eaefed;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101715; --panel: #17201d; --ink: #e4ebe8; --muted: #9aa9a3; --rule: #2a3633;
+    --berry: #f0697e; --leaf: #74c39a; --cold: #84b6dd;
+    --tint-berry: #3a1a20; --tint-leaf: #17311f; --tint-cold: #172a3a; --tint-muted: #1f2a27;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101715; --panel: #17201d; --ink: #e4ebe8; --muted: #9aa9a3; --rule: #2a3633;
+  --berry: #f0697e; --leaf: #74c39a; --cold: #84b6dd;
+  --tint-berry: #3a1a20; --tint-leaf: #17311f; --tint-cold: #172a3a; --tint-muted: #1f2a27;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+  padding-inline: 20px;
+  padding-block: 0 64px;
+}
+.wrap { max-width: 900px; margin: 0 auto; }
+p, li { max-width: 70ch; }
+h1, h2, h3, h4 { font-family: var(--display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); font-weight: 800; font-stretch: 112%; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.45rem, 3.6vw, 1.9rem); font-weight: 750; font-stretch: 108%; }
+h3 { font-size: 1.14rem; font-weight: 700; font-stretch: 104%; }
+h4 { font-size: 1rem; font-weight: 700; font-stretch: 102%; }
+a { color: var(--cold); }
+strong { font-weight: 600; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--tint-muted); padding: 0.05em 0.35em; border-radius: 3px; }
+
+.cover { padding-block: 56px 36px; border-bottom: 2px solid var(--ink); display: grid; gap: 18px; }
+.cover .kicker { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cover .tagline { font-family: var(--display); font-size: clamp(1.15rem, 2.8vw, 1.45rem); font-weight: 600; font-stretch: 104%; color: var(--berry); max-width: 32ch; }
+.cover .lede { font-size: 1.08rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.facts span b { color: var(--ink); font-weight: 500; }
+
+.toc { padding-block: 26px; border-bottom: 1px solid var(--rule); }
+.toc ol { margin: 10px 0 0; padding: 0; list-style: none; columns: 2 260px; column-gap: 32px; }
+.toc li { font-size: 0.95rem; padding-block: 2px; break-inside: avoid; }
+.toc li span { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); display: inline-block; width: 2.4em; }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover, .toc a:focus-visible { color: var(--berry); text-decoration: underline; }
+
+section { padding-block: 40px 8px; display: grid; gap: 16px; }
+.tag { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tag::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--berry); }
+section > p, section > ul, section > ol { margin: 0; }
+ul, ol { padding-left: 1.3em; }
+li + li { margin-top: 4px; }
+
+.callout { border-left: 3px solid var(--berry); background: var(--panel); padding: 14px 18px; border-radius: 0 6px 6px 0; display: grid; gap: 6px; }
+.callout p, .callout ul { margin: 0; }
+.callout.cold { border-left-color: var(--cold); }
+.callout.leaf { border-left-color: var(--leaf); }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 560px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--tint-muted); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; }
+.plain td:first-child { font-weight: 400; }
+td.num, .num { font-variant-numeric: tabular-nums; }
+
+.chip { display: inline-block; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; }
+.chip.decided { background: var(--tint-leaf); color: var(--leaf); }
+.chip.proposed { background: var(--tint-cold); color: var(--cold); }
+.chip.open { background: var(--tint-berry); color: var(--berry); }
+.badge { display: inline-block; font-family: var(--mono); font-weight: 500; font-size: 0.72rem; min-width: 1.6em; text-align: center; border-radius: 4px; padding: 0 3px; }
+.badge.L { background: var(--tint-berry); color: var(--berry); }
+.badge.D { background: var(--tint-cold); color: var(--cold); }
+.badge.W { background: var(--tint-muted); color: var(--muted); }
+.badge.H { background: var(--tint-leaf); color: var(--leaf); }
+
+figure { margin: 0; display: grid; gap: 8px; }
+.figbox { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; }
+pre.mermaid { margin: 0; font-family: var(--mono); font-size: 0.78rem; line-height: 1.45; white-space: pre; color: var(--ink); background: transparent; }
+pre.mermaid svg { max-width: 100%; height: auto; }
+figcaption { font-size: 0.86rem; color: var(--muted); }
+figcaption b { color: var(--ink); font-weight: 600; }
+
+.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; counter-reset: step; }
+.steps > li { counter-increment: step; display: grid; grid-template-columns: 2.2em minmax(0, 1fr); gap: 12px; max-width: none; }
+.steps > li::before { content: counter(step); font-family: var(--mono); font-weight: 500; font-size: 0.85rem; color: var(--berry); border: 1.5px solid var(--berry); border-radius: 50%; width: 1.9em; height: 1.9em; display: grid; place-items: center; }
+.steps > li > div { min-width: 0; }
+.steps h4 { margin-bottom: 3px; }
+.steps p { margin: 0; }
+.steps ul { margin: 6px 0 0; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.card p, .card ul { margin: 0; }
+.example { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+
+.agent { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: grid; gap: 10px; }
+.agent header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.agent .model { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
+.agent dl { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 0.92rem; }
+.agent dt { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.agent dd { margin: 0; min-width: 0; }
+.agent dd ul { margin: 0; padding-left: 1.1em; }
+@media (max-width: 560px) { .agent dl { grid-template-columns: minmax(0, 1fr); } .agent dt { padding-top: 6px; } }
+
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 20px; margin: 0; }
+.glossary div { min-width: 0; }
+.glossary dt { font-weight: 600; font-family: var(--display); font-stretch: 104%; }
+.glossary dd { margin: 2px 0 0; font-size: 0.92rem; color: var(--muted); }
+
+footer { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); font-size: 0.85rem; color: var(--muted); display: grid; gap: 8px; }
+footer p { margin: 0; }
+
+:focus-visible { outline: 2px solid var(--berry); outline-offset: 2px; }
+@media (max-width: 520px) { body { font-size: 15px; } .cover { padding-block: 36px 28px; } }
+
+@page { size: Letter; margin: 15mm 14mm 17mm; }
+@media print {
+  body { padding-inline: 0; padding-block: 0; font-size: 10pt; background: #ffffff; }
+  .wrap { max-width: none; }
+  .cover { padding-block: 0 20px; }
+  section { padding-block: 20px 4px; }
+  figure, .card, .callout, .steps > li, tr, .agent { break-inside: avoid; }
+  .tag { break-after: avoid; }
+  h2, h3, h4 { break-after: avoid; }
+  table { min-width: 0; }
+  .tablebox, .figbox { overflow: visible; }
+  a { color: var(--ink); text-decoration: none; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="cover">
+  <div class="kicker">Team briefing · UCSC AI Hackathon · Cisco Cloud Track</div>
+  <h1>HarvestNet</h1>
+  <p class="tagline">Every organization keeps its own keys. The food still moves.</p>
+  <p class="lede">A network where independent organizations across the food supply chain negotiate what happens to surplus food: who receives it, how it moves, and who pays. Each organization has its own AI negotiator, backed by calculators. Nobody in the middle decides for anyone else.</p>
+  <div class="facts">
+    <span>Challenge: <b>When AI Agents Disagree, Level 3</b></span>
+    <span>Region: <b>Central Coast California</b></span>
+    <span>Status: <b>design v1 frozen, no code yet</b></span>
+    <span>Updated: <b>October 10, 2026</b></span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <span class="tag">Contents</span>
+  <ol>
+    <li><span>01</span><a href="#problem">The problem</a></li>
+    <li><span>02</span><a href="#challenge">The challenge and our level</a></li>
+    <li><span>03</span><a href="#stakeholders">Who takes part</a></li>
+    <li><span>04</span><a href="#solution">The solution</a></li>
+    <li><span>05</span><a href="#network">Architecture: the full network</a></li>
+    <li><span>06</span><a href="#inside">Inside every organization</a></li>
+    <li><span>07</span><a href="#sources">Food-source agents</a></li>
+    <li><span>08</span><a href="#recipients">Recipient, fund, and advocate agents</a></li>
+    <li><span>09</span><a href="#movers">Transport, storage, and processing agents</a></li>
+    <li><span>10</span><a href="#orchestration">Agent orchestration</a></li>
+    <li><span>11</span><a href="#flowA">Workflow A: voice to a checked offer</a></li>
+    <li><span>12</span><a href="#flowB">Workflow B: disruption and replacement</a></li>
+    <li><span>13</span><a href="#flowC">Workflow C: shared funding</a></li>
+    <li><span>14</span><a href="#records">Records, privacy, and evaluation runs</a></li>
+    <li><span>15</span><a href="#profiles">Food profiles</a></li>
+    <li><span>16</span><a href="#data">Data and API contracts</a></li>
+    <li><span>17</span><a href="#sponsors">Sponsors and tech stack</a></li>
+    <li><span>18</span><a href="#models">Models, budget, and cloud</a></li>
+    <li><span>19</span><a href="#evaluation">How we prove it works</a></li>
+    <li><span>20</span><a href="#guardrails">Guardrails</a></li>
+    <li><span>21</span><a href="#status">Decided, proposed, open</a></li>
+    <li><span>22</span><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<section id="problem">
+  <span class="tag">01 · The problem</span>
+  <h2>Good food is wasted because too many separate yeses are needed at once</h2>
+  <p>Surplus food often goes to waste even though people nearby need it. The cause is usually not a lack of food. It's that several independent organizations must all agree at the same time:</p>
+  <ul>
+    <li>The <strong>farm</strong> won't pay to pick a crop unless someone covers the cost.</li>
+    <li>The <strong>food bank</strong> has limited cold space, volunteers, and budget.</li>
+    <li>The <strong>truck</strong> must be the right kind and free at the right time. Some foods need cold; some, like tomatoes, are damaged by it.</li>
+    <li><strong>Someone has to pay</strong>, and grant money is limited.</li>
+  </ul>
+  <p>Today this is arranged by phone and email. When one piece changes, such as a truck breaking down, the whole plan can fall apart, and the food is lost.</p>
+  <div class="callout cold"><p>Existing tools mostly list surplus and let whoever claims first take it, or use one central matcher that decides for everyone. HarvestNet takes a different approach: the organizations negotiate with each other directly, and each one keeps control of its own money, food, and schedule.</p></div>
+</section>
+
+<section id="challenge">
+  <span class="tag">02 · The challenge</span>
+  <h2>We are entering Level 3: collective intelligence</h2>
+  <p>Cisco's challenge, "When AI Agents Disagree," asks teams to choose one of three levels. We claim <strong>Level 3</strong>: at least three independent agents with competing goals negotiate and try to reach agreement <strong>without a central decision-maker</strong>. The other two levels appear inside our project as evidence.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Level</th><th>What it asks</th><th>Where it shows up in HarvestNet</th></tr></thead>
+    <tbody>
+      <tr><td>Level 1: AI team</td><td>Specialized agents collaborate on a task</td><td>Specialists inside each organization (cost, storage, route) produce assessments that can disagree before the negotiator decides (sections 06–09)</td></tr>
+      <tr><td>Level 2: Adaptive team</td><td>Discover collaborators, adapt to failure, explain choices</td><td>When a truck fails, a Directory search finds replacements, with a reason card for every candidate (section 12)</td></tr>
+      <tr><td>Level 3: Collective intelligence</td><td>Competing agents negotiate with no central decider; show the effect of new information; compare to a baseline; know when to stop or ask a human</td><td>Organizations negotiate one shared draft agreement per event, adapt after failures, and results are compared with first-come-first-served (sections 10–13, 19)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Judges score functionality, innovation, agent intelligence, engineering, demonstration, and learning and evidence. We must submit a working demo, an architecture overview, implementation details, and results with lessons learned.</p>
+</section>
+
+<section id="stakeholders">
+  <span class="tag">03 · Who takes part</span>
+  <h2>Stakeholders and what each one wants</h2>
+  <p>Each row is an independent <strong>organization</strong>. It controls its own resources and approves its own commitments. The <strong>walk-away option</strong> is what it gets if there's no deal; a deal has to beat it.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Organization</th><th>Wants</th><th>Main limits</th><th>Walk-away option</th></tr></thead>
+    <tbody>
+      <tr><td>Farm</td><td>Costs covered; no harvested food wasted</td><td>Crew and cooling capacity; harvests only committed food</td><td>Leave the crop unharvested, or sell to a processor</td></tr>
+      <tr><td>Distributor, grocery, restaurant</td><td>Avoid disposal cost; get receipts</td><td>Paperwork: rejection reason, date codes, allergen and holding records</td><td>Pay for disposal or compost</td></tr>
+      <tr><td>Food bank, pantry, shelter</td><td>Food its community can actually use</td><td>Cold space over time, receiving windows, budget, shelf life</td><td>Receive nothing from this event</td></tr>
+      <tr><td>Trucker</td><td>Paid trips it can really run</td><td>Capacity, temperature range, driver hours, no double booking</td><td>Other jobs</td></tr>
+      <tr><td>Cross-dock</td><td>Paid use of its cold warehouse space</td><td>Space over time, compatible storage zones</td><td>Leave the space empty</td></tr>
+      <tr><td>Processor (for example jam)</td><td>Usable input at a fair price</td><td>Input specification, its own budget</td><td>Buy elsewhere</td></tr>
+      <tr><td>Rescue fund</td><td>Its money doing the most good by its published rule</td><td>Pool size, eligibility</td><td>Keep money for other requests</td></tr>
+      <tr><td>Advocate</td><td>Better coverage for least-served communities</td><td>No resources and no vote; it can only propose and cite evidence</td><td>Not applicable</td></tr>
+    </tbody>
+  </table></div>
+  <div class="two">
+    <div class="card"><h3>The coordinator: our first user</h3><p>A person at a food-rescue nonprofit who watches the network. Their screen has a <strong>needs-attention list</strong>, a <strong>network map</strong>, an <strong>event panel</strong> showing each change with who made it and why, a click-through into any organization's permitted explanations, and a <strong>results strip</strong>. They contact the responsible people. <strong>They decide nothing on anyone's behalf.</strong></p></div>
+    <div class="card"><h3>Humans who approve</h3><p>Each organization has its own approvers: the farmer for costs and field work, a food bank manager for large deliveries, each carrier for its reservation, the fund for its spending, and a food-safety reviewer for anything uncertain. A deal can't become final without them.</p></div>
+  </div>
+</section>
+
+<section id="solution">
+  <span class="tag">04 · The solution</span>
+  <h2>Each organization gets its own AI negotiator, and nobody sits above them</h2>
+  <p>Every organization runs its own <strong>negotiator</strong>, backed by <strong>specialists</strong> that check facts with calculators. The negotiators talk through a shared network and edit one shared <strong>draft agreement</strong> per surplus event. Each accepts or rejects for its own organization only. A deal becomes final, a <strong>commitment</strong>, only when every organization named in it approves the exact same version and every resource hold is still valid.</p>
+  <div class="two">
+    <div class="card"><span class="example">Works for any food</span><p>Nothing about a specific crop is built into the agents. Every food has a <strong>food profile</strong> (section 15). Change the food and the decisions change, because the agents read the profile.</p></div>
+    <div class="card"><span class="example">Covers the whole chain</span><p>The demo runs four surplus events at once: farm strawberries, rejected distributor lettuce, grocery dairy, and restaurant meals. A network map shows every supply-chain stage, labeled as demonstrated, profile-ready, or proposed.</p></div>
+    <div class="card"><span class="example">Disagreement is allowed</span><p>If organizations can't all agree, the result is a <strong>preserved disagreement</strong>: the coordinator sees the options and each side's reasons. Nothing is ever committed automatically.</p></div>
+    <div class="card"><span class="example">Different from coffeeAGNTCY</span><p>The organizers' Lungo demo has a supervisor agent directing the others. We use the same AGNTCY building blocks but remove the supervisor and give every organization its own interests, so they have to negotiate.</p></div>
+  </div>
+  <h3>What is frozen, and what changes with every run</h3>
+  <p>The design separates rules that must always hold from things that vary. The rules are frozen as v1; everything else is a versioned input, and the outcome is computed by each run, not scripted.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Layer</th><th>What belongs here</th><th>Who controls it</th></tr></thead>
+    <tbody>
+      <tr><td>Guardrails</td><td>Organization authority; sourced numbers; valid holds and approvals; counting each pound once</td><td>The framework enforces them; no negotiator can waive them</td></tr>
+      <tr><td>Food profiles</td><td>Food properties, handling requirements, required assessments, candidate pathways, sources</td><td>Authorized profile maintainers; versioned and reviewed</td></tr>
+      <tr><td>Organization policies</td><td>Spending limits, mandate, receiving preferences, accepted pathways, what it will disclose, ranking rules</td><td>The organization that owns the resources</td></tr>
+      <tr><td>Observations</td><td>Prices, routes, telematics, inventory, requests, quotes, human declarations</td><td>Identified sources, with timestamps and uncertainty</td></tr>
+      <tr><td>Evaluation settings</td><td>Recorded inputs, injected faults, clocks, seeds, stopping limits, policy variants</td><td>The test runner, declared before comparing methods</td></tr>
+      <tr><td>Results</td><td>Proposals, commitments, receipts, coverage, costs, disagreements, losses</td><td>Derived from the recorded run; never chosen to fit a story</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="network">
+  <span class="tag">05 · Architecture: the full network</span>
+  <h2>Separate organizations, one communication room, no central decider</h2>
+  <p>Diagram labels: <span class="badge L">L</span> an LLM role, <span class="badge D">D</span> a deterministic calculator that gives the same answer every time, <span class="badge W">W</span> ordinary workflow, adapter, or storage, <span class="badge H">H</span> an authorized human. In Codex's diagrams, "internal subagents" means the <strong>specialists</strong>; a specialist doesn't have to be another LLM.</p>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart TB
+    Person["Farmer / field worker · H"]
+    Voice["ElevenLabs&lt;br/&gt;Transcription + spoken read-back"]
+    Person &lt;--&gt;|"confirm reported facts"| Voice
+    Voice &lt;--&gt; Farm
+
+    subgraph Sources["Food-source organizations — separate private runtimes"]
+        Farm["Farm negotiator · L"]
+        Distributor["Distributor negotiator · L"]
+        Grocery["Grocery negotiator · L"]
+        Restaurant["Restaurant negotiator · L"]
+    end
+
+    subgraph Network["Cisco AGNTCY — communication and discovery"]
+        Directory["Directory · capability records&lt;br/&gt;Discovery returns candidates"]
+        Room["A2A messages over SLIM&lt;br/&gt;Event negotiation room"]
+        Order["Message ordering · W&lt;br/&gt;No allocation authority"]
+        Directory -.-&gt;|"addresses and capabilities"| Room
+        Order --- Room
+    end
+
+    Farm &lt;--&gt; Room
+    Distributor &lt;--&gt; Room
+    Grocery &lt;--&gt; Room
+    Restaurant &lt;--&gt; Room
+
+    subgraph Partners["Partner organizations — separate private runtimes"]
+        Recipient["Recipient negotiator · L&lt;br/&gt;Each food bank, pantry, shelter"]
+        Carrier["Transport negotiator · L&lt;br/&gt;Each carrier separately"]
+        Crossdock["Cross-dock negotiator · L"]
+        Processor["Processor negotiator · L"]
+        Fund["Rescue fund negotiator · L"]
+        Advocate["Advocate · L&lt;br/&gt;Advisory amendments"]
+    end
+
+    Room &lt;--&gt; Recipient
+    Room &lt;--&gt; Carrier
+    Room &lt;--&gt; Crossdock
+    Room &lt;--&gt; Processor
+    Room &lt;--&gt; Fund
+    Room &lt;--&gt; Advocate
+
+    Room --&gt; Records["Shared records · W&lt;br/&gt;Versioned drafts, attributed decisions, outcomes"]
+    Records --&gt; Coordinator["Coordinator UI&lt;br/&gt;Attention, reasons, approvals, outcomes"]
+    Room -.-&gt; Observe["AGNTCY Observe / OpenTelemetry&lt;br/&gt;Redacted traces and usage"]
+    Records --&gt; Eval["Evaluation harness&lt;br/&gt;Replay, faults, baselines, coverage"]
+    Observe --&gt; Eval</pre></div>
+    <figcaption><b>Diagram 1. Full network and sponsor placement.</b> From Codex, <code>docs/ARCHITECTURE_DIAGRAMS.md</code>. Lines are messages, not food movement or delegated authority.</figcaption>
+  </figure>
+  <h3>How to read it</h3>
+  <ul>
+    <li><strong>Food sources</strong> (farm, distributor, grocery, restaurant) and <strong>partners</strong> (recipients, carriers, cross-dock, processor, fund, advocate) each run as a separate private program with its own identity, private data, local workflow, and authority over its own resources.</li>
+    <li>The <strong>Cisco AGNTCY network</strong> in the middle has three parts. The <strong>Directory</strong> holds capability records and returns candidates. The <strong>room</strong> carries A2A messages over SLIM for each event. <strong>Message ordering</strong> keeps everyone seeing the same order. None of them can allocate anything.</li>
+    <li>The farmer reaches the farm's negotiator through <strong>ElevenLabs</strong> (speech to text, plus a spoken read-back to confirm facts).</li>
+    <li>Every message lands in <strong>shared records</strong>: versioned drafts, decisions with who made them, and outcomes. The <strong>coordinator screen</strong> reads from these records.</li>
+    <li><strong>AGNTCY Observe / OpenTelemetry</strong> collects redacted traces and usage. The <strong>evaluation harness</strong> uses the records and traces for replay, injected faults, baselines, and coverage.</li>
+    <li><strong>Beeceptor and n8n sit inside each organization</strong> (Diagram 2). They are not network-wide services that own anyone's budget or approvals.</li>
+  </ul>
+  <div class="tablebox"><table>
+    <thead><tr><th>Layer</th><th>What it is</th><th>Can it decide for anyone?</th></tr></thead>
+    <tbody>
+      <tr><td>Organizations</td><td>One running program each: negotiator, specialists, private data, its own approvals</td><td>Only for itself</td></tr>
+      <tr><td>AGNTCY network</td><td>Negotiation room (A2A over SLIM), Directory, message ordering</td><td>No</td></tr>
+      <tr><td>Shared records</td><td>Every deal version, who said what, and outcomes, kept for replay</td><td>No</td></tr>
+      <tr><td>Coordinator screen</td><td>Needs-attention list, network map, event panel, results strip</td><td>No; the coordinator watches and contacts people</td></tr>
+      <tr><td>Evaluation harness</td><td>Replays runs, injects failures, compares methods</td><td>No; test access only</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="inside">
+  <span class="tag">06 · Inside every organization</span>
+  <h2>The same blueprint runs separately inside every organization</h2>
+  <p>This blueprint is copied once for the farm, each recipient, each carrier, the cross-dock, the processor, the fund, the distributor, the grocery store, and the restaurant. Each copy has its own identity, tools, state, and authority. <strong>LangGraph runs the local workflow; no extra LLM supervisor is needed.</strong></p>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart TB
+    NetworkIn["AGNTCY inbound message&lt;br/&gt;event + draft version + sender"]
+    subgraph Org["ONE organization — identity, tools, state and authority"]
+        Ingress["Ingress checks · W&lt;br/&gt;Identity, schema, duplicates, version"]
+        Graph["LangGraph local workflow · W&lt;br/&gt;Assess → propose → validate → approve"]
+        Bee["Own Beeceptor endpoints&lt;br/&gt;Labeled inventory / fleet / finance mocks"]
+        Public["Public-data adapters · W&lt;br/&gt;AMS / OSRM / Atlas as needed"]
+        Profiles["Versioned food profiles + local policy"]
+        Specialists["Internal specialists · D&lt;br/&gt;Organization-specific assessments"]
+        State["Private state · W&lt;br/&gt;Budgets, preferences, evidence, local log"]
+        Negotiator["Negotiator · L&lt;br/&gt;Suggest terms and explain choices"]
+        Validate["Local validator · D&lt;br/&gt;Evidence, units, feasibility, authority"]
+        Holds["Owner's hold ledger · W&lt;br/&gt;Atomic local reservation + expiry"]
+        Approval["Own n8n workflow · W&lt;br/&gt;Exact terms + authenticated callback"]
+        Human["Organization's approver · H"]
+        Decision["Decision recorder · W&lt;br/&gt;Recheck version, evidence and holds"]
+        Outbox["Validated outbox · W&lt;br/&gt;Attributed message + retry identity"]
+
+        Ingress --&gt; Graph
+        Graph --&gt; Specialists
+        Bee --&gt; Specialists
+        Public --&gt; Specialists
+        Profiles --&gt; Specialists
+        State &lt;--&gt; Graph
+        Specialists --&gt;|"facts, feasible options, reasons"| Negotiator
+        Graph --&gt; Negotiator
+        Negotiator --&gt; Validate
+        Validate --&gt;|"invalid: revise or refuse"| Graph
+        Validate --&gt;|"valid proposal / refusal"| Outbox
+        Validate --&gt;|"candidate commitment"| Holds
+        Holds --&gt; Approval
+        Approval --&gt; Human
+        Human --&gt;|"approve or deny current terms"| Approval
+        Approval --&gt; Decision
+        Decision --&gt;|"stale or denied"| Graph
+        Decision --&gt;|"current approval or reasoned denial"| Outbox
+        Decision --&gt; State
+        Holds &lt;--&gt; State
+    end
+    NetworkIn --&gt; Ingress
+    Outbox --&gt; NetworkOut["A2A over SLIM&lt;br/&gt;Proposal, hold result, approval, disruption"]
+    NetworkOut --&gt; Receipt["All required current approvals + valid holds&lt;br/&gt;Permit recording a commitment"]</pre></div>
+    <figcaption><b>Diagram 2. Inside every resource-owning organization.</b> From Codex. Shows execution order and approval gates.</figcaption>
+  </figure>
+  <h3>Every component, in the order a message meets it</h3>
+  <ol class="steps">
+    <li><div><h4>Ingress checks <span class="badge W">W</span></h4><p>Is the sender who it claims to be? Is the message in the right format? Is it a duplicate? Does it refer to the current draft version?</p></div></li>
+    <li><div><h4>LangGraph local workflow <span class="badge W">W</span></h4><p>Runs the fixed order: assess, propose, validate, approve. It reads and updates the organization's <strong>private state</strong>: budgets, preferences, evidence, and its local log.</p></div></li>
+    <li><div><h4>Inputs to the specialists</h4><p>Three sources: the organization's <strong>own Beeceptor endpoints</strong> (labeled mock inventory, fleet, or finance systems); <strong>public-data adapters</strong> (USDA AMS, OSRM, Food Access Atlas, as needed); and <strong>versioned food profiles plus local policy</strong>.</p></div></li>
+    <li><div><h4>Internal specialists <span class="badge D">D</span></h4><p>Each produces facts, feasible options, and reasons for one concern (sections 07–09 list them per organization).</p></div></li>
+    <li><div><h4>Negotiator <span class="badge L">L</span></h4><p>Suggests terms and explains choices, using only the specialists' results. Any quantity or trade-off it proposes is recalculated before anything leaves.</p></div></li>
+    <li><div><h4>Local validator <span class="badge D">D</span></h4><p>Checks evidence, units, feasibility, and authority. If invalid, the suggestion goes back to be revised or turned into a refusal. A valid proposal or refusal goes to the outbox. A candidate commitment goes to the hold ledger.</p></div></li>
+    <li><div><h4>Owner's hold ledger <span class="badge W">W</span></h4><p>Places an atomic local reservation on the organization's own resource (truck time, cold space, crew, or money), tied to this draft version, with an expiry.</p></div></li>
+    <li><div><h4>Own n8n workflow and approver <span class="badge W">W</span> <span class="badge H">H</span></h4><p>Sends the exact terms to the organization's own human, who approves or denies the current terms. The decision comes back through an authenticated callback.</p></div></li>
+    <li><div><h4>Decision recorder <span class="badge W">W</span></h4><p>Rechecks the version, evidence, and holds. If the terms have gone stale or the human denied them, it returns to the workflow. A current approval or a reasoned denial goes to the outbox.</p></div></li>
+    <li><div><h4>Validated outbox <span class="badge W">W</span></h4><p>Sends the attributed message, with a retry identity so duplicates can't create a second commitment, over A2A/SLIM.</p></div></li>
+  </ol>
+  <div class="callout cold">
+    <p><strong>When does a deal become final?</strong> Only when <em>all</em> required current approvals and valid holds are present. Transport success, an n8n callback, or one organization's approval alone is not enough. The final check records an already authorized agreement; it never chooses one. If a confirmation is uncertain, the resources stay unavailable until reconciled.</p>
+  </div>
+  <div class="callout">
+    <p><strong>No hallucinated numbers</strong> (user decision, ADR 0002):</p>
+    <ul>
+      <li>Calculators run first and hand the AI labeled results.</li>
+      <li>If the AI needs another number, it must call a calculator tool with a strict schema. It never does math in its own text.</li>
+      <li>Every number in an outgoing message must match a calculator result or sourced fact for the current version, or the message is blocked.</li>
+      <li>After two failures, the organization sends a template sentence built only from calculator results. The failure is logged and counted.</li>
+    </ul>
+  </div>
+  <p>The <strong>advocate</strong> uses the same ingress, assessment, validation, and outbox pattern, but has no holds and no acceptance vote.</p>
+</section>
+
+<section id="sources">
+  <span class="tag">07 · Food-source agents</span>
+  <h2>Farm, distributor, grocery, and restaurant</h2>
+  <p>Each source's negotiator proposes how much to release, when it's ready, which pathways are acceptable, its cost contribution, and its conditions, based on its specialists' assessments. Local policy decides acceptance; no fixed scenario numbers are built into these specialists.</p>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart LR
+    subgraph Farm["Farm organization"]
+        FM["Market specialist · D&lt;br/&gt;Comparable AMS observations"]
+        FC["Cost specialist · D&lt;br/&gt;Harvest, packing, cooling costs"]
+        FH["Harvest specialist · D&lt;br/&gt;Crew, equipment, batch readiness"]
+        FF["Handling specialist · D&lt;br/&gt;Profile, condition, cooling capacity"]
+        FN["Farm negotiator · L&lt;br/&gt;Quantity, timing, cost coverage"]
+        FM --&gt; FN
+        FC --&gt; FN
+        FH --&gt; FN
+        FF --&gt; FN
+    end
+    subgraph Distributor["Distributor organization"]
+        DI["Lot specialist · D&lt;br/&gt;Stock, rejection evidence, packaging"]
+        DH["Handling specialist · D&lt;br/&gt;Profile, storage, exposure history"]
+        DD["Dock specialist · D&lt;br/&gt;Collection window, dock capacity"]
+        DC["Cost specialist · D&lt;br/&gt;Handling and authorized contribution"]
+        DN["Distributor negotiator · L&lt;br/&gt;Release terms and collection"]
+        DI --&gt; DN
+        DH --&gt; DN
+        DD --&gt; DN
+        DC --&gt; DN
+    end
+    subgraph Grocery["Grocery organization"]
+        GI["Inventory specialist · D&lt;br/&gt;SKU, lot, dates, package integrity"]
+        GH["Handling specialist · D&lt;br/&gt;Product profile and cold history"]
+        GR["Release specialist · D&lt;br/&gt;Pickup window and required records"]
+        GC["Cost specialist · D&lt;br/&gt;Authorized contribution and expenses"]
+        GN["Grocery negotiator · L&lt;br/&gt;Eligible lot and transfer terms"]
+        GI --&gt; GN
+        GH --&gt; GN
+        GR --&gt; GN
+        GC --&gt; GN
+    end
+    subgraph Restaurant["Restaurant organization"]
+        RI["Meal specialist · D&lt;br/&gt;Recipe, allergens, confirmed portions"]
+        RH["Holding specialist · D&lt;br/&gt;Preparation and exposure records"]
+        RP["Packing specialist · D&lt;br/&gt;Containers and collection readiness"]
+        RC["Cost specialist · D&lt;br/&gt;Packing and transfer contribution"]
+        RN["Restaurant negotiator · L&lt;br/&gt;Meal handoff and serving window"]
+        RI --&gt; RN
+        RH --&gt; RN
+        RP --&gt; RN
+        RC --&gt; RN
+    end</pre></div>
+    <figcaption><b>Diagram 3. Food-source negotiators and internal specialists.</b> From Codex. Arrows mean assessments supplied to the negotiator.</figcaption>
+  </figure>
+
+  <article class="agent">
+    <header><h3>Farm</h3><span class="model">Negotiator: Claude Opus 5.5 <span class="chip proposed">Proposed</span> · Voice intake: Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Turn surplus into a checked offer; negotiate quantity, timing, and cost coverage; approve field work.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Market</strong>: comparable USDA AMS observations for this crop, grade, packaging, and market. Explains whether the price is really comparable.</li>
+        <li><strong>Cost</strong>: harvest, packing, and cooling costs.</li>
+        <li><strong>Harvest</strong>: crew, equipment, and batch readiness.</li>
+        <li><strong>Handling</strong>: food profile, lot condition, cooling capacity.</li></ul></dd>
+      <dt>Reads</dt><dd>Its own Beeceptor systems (crew, inventory, cost records), USDA AMS adapter, food profiles, the farmer's confirmed voice facts.</dd>
+      <dt>Writes</dt><dd>Only its own hold ledger (crew and preparation capacity), its outbox, and its own n8n approval requests.</dd>
+      <dt>Sends</dt><dd>Surplus offer; amendments; accept or reject with reasons; hold results; approvals.</dd>
+      <dt>Says yes when</dt><dd>Payments cover recovery cost for every committed pound, and pickup is confirmed. It harvests only committed food.</dd>
+      <dt>Asks a human</dt><dd>Any cost commitment or field-work start; uncertain lot condition.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Distributor</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Release a commercially rejected load with its evidence, and arrange collection.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Lot</strong>: stock, rejection evidence, packaging.</li>
+        <li><strong>Handling</strong>: food profile, storage, exposure history.</li>
+        <li><strong>Dock</strong>: collection window, dock capacity.</li>
+        <li><strong>Cost</strong>: handling cost and authorized contribution.</li></ul></dd>
+      <dt>Says yes when</dt><dd>Releasing costs less than disposal, the rejection reason is documented with no unresolved safety issue, and the paperwork is complete.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Grocery store</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Release an eligible near-date lot and agree transfer terms.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Inventory</strong>: product, lot, dates, package integrity.</li>
+        <li><strong>Handling</strong>: product profile and cold history.</li>
+        <li><strong>Release</strong>: pickup window and required records.</li>
+        <li><strong>Cost</strong>: authorized contribution and expenses.</li></ul></dd>
+      <dt>Says yes when</dt><dd>The lot is eligible, records are complete, and the transfer costs less than disposal.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Restaurant</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Hand off prepared meals within a serving window.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Meal</strong>: recipe, allergens, confirmed portions.</li>
+        <li><strong>Holding</strong>: preparation and exposure records.</li>
+        <li><strong>Packing</strong>: containers and collection readiness.</li>
+        <li><strong>Cost</strong>: packing and transfer contribution.</li></ul></dd>
+      <dt>Says yes when</dt><dd>Holding records are complete and the recipient can serve in time. Meals need a recipe-specific profile.</dd>
+    </dl>
+  </article>
+  <p><strong>The voice intake role</strong> is an extra LLM step for the farm only, for pulling facts out of messy speech. It isn't a separate decision-maker and doesn't need its own running agent. The person confirms what was extracted, and anything unknown stays marked unknown. Structured sources are parsed by ordinary code. Where records can't establish food condition, a human still inspects it.</p>
+</section>
+
+<section id="recipients">
+  <span class="tag">08 · Recipient, fund, and advocate agents</span>
+  <h2>Who receives food, who pays, and who speaks for the least-served</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart LR
+    subgraph Recipient["Each food bank / pantry / shelter"]
+        BD["Demand specialist · D&lt;br/&gt;Declared requests and prior receipts"]
+        BS["Storage specialist · D&lt;br/&gt;Compatible space over time"]
+        BR["Receiving specialist · D&lt;br/&gt;Staff and appointment windows"]
+        BP["Distribution specialist · D&lt;br/&gt;Ability to distribute or serve"]
+        BB["Budget specialist · D&lt;br/&gt;Contribution and receiving costs"]
+        BN["Recipient negotiator · L&lt;br/&gt;Quantity, window, contribution"]
+        BD --&gt; BN
+        BS --&gt; BN
+        BR --&gt; BN
+        BP --&gt; BN
+        BB --&gt; BN
+    end
+    subgraph Fund["Rescue fund organization"]
+        FE["Eligibility specialist · D&lt;br/&gt;Expenses and conditional acceptance"]
+        FU["Urgency specialist · D&lt;br/&gt;Remaining feasible decision time"]
+        FV["Coverage specialist · D&lt;br/&gt;Declared cohort and prior receipts"]
+        FB["Finance specialist · D&lt;br/&gt;Cash, earmarks, holds, eligible grants"]
+        FN["Fund negotiator · L&lt;br/&gt;Explain policy and propose grant terms"]
+        FE --&gt; FN
+        FU --&gt; FN
+        FV --&gt; FN
+        FB --&gt; FN
+    end
+    subgraph Advocate["Advocate — advisory participant"]
+        AC["Context specialist · D&lt;br/&gt;Atlas area evidence with provenance"]
+        AV["Coverage specialist · D&lt;br/&gt;Permitted requests and receipts"]
+        AA["Amendment assessor · D&lt;br/&gt;Compare candidate coverage changes"]
+        AN["Advocate · L&lt;br/&gt;Evidence-backed amendments and reasons"]
+        AC --&gt; AN
+        AV --&gt; AN
+        AA --&gt; AN
+    end</pre></div>
+    <figcaption><b>Diagram 4. Recipients, fund, and advocate.</b> From Codex.</figcaption>
+  </figure>
+
+  <article class="agent">
+    <header><h3>Food bank, pantry, or shelter (each one separately)</h3><span class="model">Negotiator: Claude Opus 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Bid for quantity, delivery window, and contribution; approve receipt.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Demand</strong>: its declared requests and prior receipts.</li>
+        <li><strong>Storage</strong>: compatible space over time.</li>
+        <li><strong>Receiving</strong>: staff and appointment windows.</li>
+        <li><strong>Distribution</strong>: ability to distribute or serve before the food profile's usable life ends.</li>
+        <li><strong>Budget</strong>: contribution and receiving costs.</li></ul></dd>
+      <dt>Says yes when</dt><dd>The usable food it can distribute is worth more to it than its pledge plus receiving costs, within all its limits.</dd>
+      <dt>Asks a human</dt><dd>Large deliveries above its manager's threshold; anything beyond its budget authority.</dd>
+      <dt>Note</dt><dd>A food bank, pantry, and shelter share procedures but have different food profiles, capabilities, and policies. Each has its own state and approvals.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Rescue fund</h3><span class="model">Negotiator: Claude Haiku 5.5, with calculator tools <span class="chip decided">Decided</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Explain its policy and propose grant terms. <strong>Its ranking is computed by its published policy; the LLM can't change the ranking or invent funding.</strong></dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Eligibility</strong>: required expenses and the recipient's conditional acceptance.</li>
+        <li><strong>Urgency</strong>: remaining feasible decision time.</li>
+        <li><strong>Coverage</strong>: the declared recipient cohort and prior receipts.</li>
+        <li><strong>Finance</strong>: cash, earmarks, holds, eligible grants.</li></ul></dd>
+      <dt>Policy</dt><dd>Urgent eligible transfers first, then least-served communities <span class="chip decided">Decided</span>. Detailed ranking rule in section 13 <span class="chip proposed">Proposed</span>.</dd>
+      <dt>Writes</dt><dd>Only its own cash hold ledger (expiring provisional grant holds).</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Advocate (advisory)</h3><span class="model">Negotiator: Claude Opus 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Propose evidence-backed amendments that raise coverage for the least-served, and explain why.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Context</strong>: USDA Food Access Research Atlas area evidence, with its source.</li>
+        <li><strong>Coverage</strong>: permitted requests and receipts.</li>
+        <li><strong>Amendment assessor</strong>: compares how candidate changes affect coverage.</li></ul></dd>
+      <dt>Limits</dt><dd>No holds, no acceptance vote, no veto. It can compare disclosed information but can't read private budgets or certify another organization's feasibility.</dd>
+    </dl>
+  </article>
+</section>
+
+<section id="movers">
+  <span class="tag">09 · Transport, storage, and processing agents</span>
+  <h2>Trucks, the cross-dock, and the processor</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart LR
+    subgraph Carrier["Each transport organization"]
+        TF["Fleet specialist · D&lt;br/&gt;Availability, capacity, driver limits"]
+        TT["Telemetry specialist · D&lt;br/&gt;Cargo exposure and profile checks"]
+        TR["Route specialist · D&lt;br/&gt;OSRM + loading and return allowances"]
+        TQ["Quote specialist · D&lt;br/&gt;Owner pricing and occupied interval"]
+        TN["Transport negotiator · L&lt;br/&gt;Offer service and report disruption"]
+        TF --&gt; TN
+        TT --&gt; TN
+        TR --&gt; TN
+        TQ --&gt; TN
+    end
+    subgraph Crossdock["Cross-dock organization"]
+        XO["Occupancy specialist · D&lt;br/&gt;Space and dock use over time"]
+        XH["Compatibility specialist · D&lt;br/&gt;Profiles, zones, handling"]
+        XL["Connection specialist · D&lt;br/&gt;Incoming and onward commitments"]
+        XC["Cost specialist · D&lt;br/&gt;Handling and storage charges"]
+        XN["Cross-dock negotiator · L&lt;br/&gt;Storage interval and transfer terms"]
+        XO --&gt; XN
+        XH --&gt; XN
+        XL --&gt; XN
+        XC --&gt; XN
+    end
+    subgraph Processor["Processor organization"]
+        PI["Input specialist · D&lt;br/&gt;Actual lot versus input specification"]
+        PY["Process specialist · D&lt;br/&gt;Capacity, readiness, sourced yield"]
+        PB["Budget specialist · D&lt;br/&gt;Purchase and processing economics"]
+        PN["Processor negotiator · L&lt;br/&gt;Input purchase and collection terms"]
+        PI --&gt; PN
+        PY --&gt; PN
+        PB --&gt; PN
+    end</pre></div>
+    <figcaption><b>Diagram 5. Transport, storage, and processing.</b> From Codex. The same transport blueprint applies separately to the original carrier, the replacement, the cooled van, and the prepared-meal carrier.</figcaption>
+  </figure>
+
+  <article class="agent">
+    <header><h3>Trucker (each carrier separately)</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Offer service, quote trips, grant or decline holds, and report disruptions.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Fleet</strong>: availability, capacity, driver limits.</li>
+        <li><strong>Telemetry</strong>: cargo temperature exposure, checked against the food profile.</li>
+        <li><strong>Route</strong>: OSRM drive time plus loading and return allowances.</li>
+        <li><strong>Quote</strong>: owner pricing and the occupied time interval.</li></ul></dd>
+      <dt>Says yes when</dt><dd>The quote covers the trip and the hold fits its schedule without overlapping another commitment.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Cross-dock</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Offer cold storage between two legs of a trip, for example when a distributor must clear its dock before a pantry can receive.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Occupancy</strong>: space and dock use over time.</li>
+        <li><strong>Compatibility</strong>: food profiles, storage zones, handling.</li>
+        <li><strong>Connection</strong>: incoming and onward commitments.</li>
+        <li><strong>Cost</strong>: handling and storage charges.</li></ul></dd>
+      <dt>Says yes when</dt><dd>There's compatible space for the whole interval and the onward leg and receiving are already secured.</dd>
+    </dl>
+  </article>
+
+  <article class="agent">
+    <header><h3>Processor</h3><span class="model">Negotiator: Claude Sonnet 5.5 <span class="chip proposed">Proposed</span></span></header>
+    <dl>
+      <dt>Job</dt><dd>Bid to buy input it can use, and arrange collection.</dd>
+      <dt>Specialists</dt><dd><ul>
+        <li><strong>Input</strong>: the actual lot against its input specification.</li>
+        <li><strong>Process</strong>: capacity, readiness, sourced yield.</li>
+        <li><strong>Budget</strong>: purchase and processing economics.</li></ul></dd>
+      <dt>Says yes when</dt><dd>The lot meets its specification at a price below its value. Raw input weight is never counted as finished product or donated food.</dd>
+    </dl>
+  </article>
+
+  <div class="callout leaf">
+    <p><strong>How discovery works.</strong> Discovery is a procedure <em>inside the organization that needs a service</em>, not a central LLM:</p>
+    <ol>
+      <li>Query the AGNTCY Directory with capability requirements.</li>
+      <li>Ask each candidate for its own current quote.</li>
+      <li>Assess the candidates.</li>
+      <li>Write a reason card for every one, chosen or rejected.</li>
+    </ol>
+    <p>The requester proposes a choice; the chosen provider still controls its own hold and approval.</p>
+  </div>
+  <p>Packers, animal-feed recipients, and compost operators are proposed expansion roles. They reuse the same blueprint with their own eligibility, capacity, timing, cost, and handling assessments, but those aren't claimed as ready.</p>
+</section>
+
+<section id="orchestration">
+  <span class="tag">10 · Agent orchestration</span>
+  <h2>Who coordinates the agents? No one above them</h2>
+  <div class="two">
+    <div class="card"><h3>Inside an organization</h3><p>A <strong>LangGraph</strong> workflow runs Diagram 2 in a fixed order. It's the organization's own process and acts only for that organization.</p></div>
+    <div class="card"><h3>Between organizations</h3><p>No conductor. Coordination comes from shared rules everyone follows: one draft agreement per event, a published turn order for amendments, holds controlled by each resource's owner, and approval of the exact same version by every named organization.</p></div>
+  </div>
+  <h3>How a deal moves through the harness</h3>
+  <div class="tablebox"><table>
+    <thead><tr><th>Stage</th><th>What happens</th><th>What's kept as evidence</th></tr></thead>
+    <tbody>
+      <tr><td>Observe</td><td>Take in API responses, changes, and confirmed human declarations</td><td>Source records, times, units, live/cached/synthetic labels</td></tr>
+      <tr><td>Assess locally</td><td>Specialists calculate feasible quantities, costs, routes, handling, and deadlines under local policy</td><td>Inputs, profile and policy versions, calculations, uncertainty, refusal reasons</td></tr>
+      <tr><td>Propose and validate</td><td>A negotiator drafts complete terms and explains its reasoning; deterministic checks approve or reject the outgoing offer</td><td>Draft version, proposer, terms, reasons, validation results</td></tr>
+      <tr><td>Exchange and revise</td><td>Negotiators amend one shared numbered draft per event, by a declared turn policy</td><td>Messages, reason cards, version history, accepted and rejected amendments</td></tr>
+      <tr><td>Hold and approve</td><td>Owners reserve resources; affected organizations and required humans review the same current terms</td><td>Version-specific holds, expiries, identities, approvals and denials</td></tr>
+      <tr><td>Record commitment</td><td>Recheck current evidence, resource availability, and matching approvals; record the authorized result</td><td>The exact approved agreement and its obligations</td></tr>
+      <tr><td>Track fulfillment</td><td>Record actions, custody changes, receipts, distribution, and actual costs</td><td>Actual vs. projected outcomes, source-lot accounting</td></tr>
+      <tr><td>Recover or stop</td><td>Reassess affected obligations after changes; renegotiate with new approvals, or preserve the disagreement</td><td>Released holds, reconciled uncertain actions, surviving commitments, stop reasons</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Holds, versions, and running several events at once</h3>
+  <ul>
+    <li>A <strong>hold</strong> is placed only by a resource's owner and is tied to one event, one draft version, a quantity, an occupied time interval, and an expiry.</li>
+    <li>Each owner checks <strong>all</strong> its events for overlaps, so two deals can't book the same truck or spend the same dollar.</li>
+    <li>A declared acquisition and release procedure keeps a deal from holding half its resources forever.</li>
+    <li><strong>Any change to the terms</strong> creates a new version, and the affected organizations must approve again. Old approvals don't carry over.</li>
+    <li>A missing acknowledgment is <strong>not</strong> proof something failed. Duplicate or delayed messages must not create duplicate commitments. Uncertain resources are frozen until reconciled, and an existing commitment is never released just because a timer ran out.</li>
+  </ul>
+  <h3>Stop rules</h3>
+  <div class="tablebox"><table>
+    <thead><tr><th>Rule</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>Agreement</td><td>Every named organization approves the same version and all holds are valid, so it becomes a commitment</td></tr>
+      <tr><td>Ask a human</td><td>Any food-safety doubt, spending beyond an organization's authority, or a change to an approved commitment</td></tr>
+      <tr><td>Keep the disagreement</td><td>Demo policy: three complete rounds with no new terms. The coordinator sees the options and reasons. This is a setting, not a built-in limit.</td></tr>
+      <tr><td>Deadline</td><td>No commitment by the last safe time means the food stays unharvested or unclaimed, with reasons. <strong>Nothing is ever committed automatically.</strong></td></tr>
+    </tbody>
+  </table></div>
+  <h3>How a negotiator picks its move <span class="chip proposed">Proposed</span></h3>
+  <div class="tablebox"><table>
+    <thead><tr><th>Situation</th><th>Move</th></tr></thead>
+    <tbody>
+      <tr><td>The deal breaks one of my hard limits</td><td>Reject, naming the limit; on my turn, propose a fix if one exists</td></tr>
+      <tr><td>It meets my limits and beats my walk-away option</td><td>Accept, unless I can see a better version others would plausibly accept</td></tr>
+      <tr><td>It's acceptable but could be better for me</td><td>On my turn, propose one change that doesn't break anyone's published limits</td></tr>
+      <tr><td>Food safety is uncertain, or the money is beyond my authority</td><td>Ask my human</td></tr>
+    </tbody>
+  </table></div>
+  <p>Scoring weights, walk-away rules, and deadline pressure come from <code>docs/AGENT_BEHAVIOR.md</code>. They're example organization policy, not fixed rules, and a deadline never grants consent.</p>
+</section>
+
+<section id="flowA">
+  <span class="tag">11 · Workflow A</span>
+  <h2>Voice to a checked surplus offer</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">sequenceDiagram
+    actor Farmer
+    participant Voice as ElevenLabs STT / TTS
+    participant Intake as Farm intake role · L
+    participant Checks as Farm specialists + validator · D
+    participant Farm as Farm local workflow + negotiator
+    participant Net as AGNTCY A2A / SLIM
+    Farmer-&gt;&gt;Voice: Audio report of surplus
+    Voice-&gt;&gt;Intake: Transcript and source reference
+    Intake-&gt;&gt;Checks: Draft facts with units and missing fields
+    Checks--&gt;&gt;Intake: Validated fields or clarification needs
+    Intake-&gt;&gt;Voice: Read-back of exact checked facts
+    Voice-&gt;&gt;Farmer: Spoken confirmation request
+    Farmer-&gt;&gt;Farm: Confirm or correct facts
+    alt Facts incomplete or corrected
+        Farm-&gt;&gt;Checks: Revalidate#59; repeat confirmation as needed
+    else Confirmed checked surplus offer
+        Farm-&gt;&gt;Checks: Market, cost, readiness, handling assessment
+        Checks--&gt;&gt;Farm: Evidence-backed feasible offer
+        Farm-&gt;&gt;Net: Validated surplus offer with provenance
+    end
+    Note over Farmer,Net: Intake confirmation authorizes the reported facts#59; commitment approval comes later</pre></div>
+    <figcaption><b>Diagram 6. Workflow A: voice to a checked offer.</b> From Codex.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><div><h4>The farmer calls</h4><p>For example: "About four pallets of strawberries, some soft, need them gone by Thursday." ElevenLabs turns the audio into a transcript with a source reference.</p></div></li>
+    <li><div><h4>The intake role drafts facts</h4><p>The LLM pulls out quantities, units, dates, and location, and lists anything missing. It never guesses a missing number.</p></div></li>
+    <li><div><h4>Calculators check the draft</h4><p>The farm's specialists and validator return checked fields or say what needs clarifying.</p></div></li>
+    <li><div><h4>Spoken read-back</h4><p>ElevenLabs reads the exact checked facts back ("I heard 10,000 lb, about 1,000 lb soft, pickup Thursday. Correct?"). The farmer confirms or corrects, and corrections loop back for revalidation.</p></div></li>
+    <li><div><h4>Assessment and offer</h4><p>Once confirmed, the farm's market, cost, readiness, and handling specialists assess the lot, and the farm sends a validated surplus offer, with sources, over AGNTCY.</p></div></li>
+  </ol>
+  <div class="callout cold"><p>Confirming the facts only authorizes the <em>reported facts</em>. Approving a commitment happens later, through the farm's approval workflow.</p></div>
+</section>
+
+<section id="flowB">
+  <span class="tag">12 · Workflow B</span>
+  <h2>Disruption, discovery, and renewed approvals</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Bee as Carrier Beeceptor endpoint
+    participant Truck as Carrier telemetry specialist · D
+    participant Net as AGNTCY A2A / SLIM
+    participant Local as Affected organization workflows
+    participant Dir as AGNTCY Directory
+    participant Candidates as Candidate transport organizations
+    participant N8 as Each organization's n8n workflow
+    actor Humans as Each responsible human
+    participant Log as Agreement records + coordinator view
+    Bee-&gt;&gt;Truck: Labeled reading, cargo identity, observation time
+    Truck-&gt;&gt;Truck: Profile + exposure + resource impact checks
+    alt Evidence is uncertain
+        Truck-&gt;&gt;N8: Hold affected action for review
+        N8-&gt;&gt;Humans: Inspect uncertainty
+    else Affected service is unavailable
+        Truck-&gt;&gt;Net: Validated disruption with evidence and affected references
+        Net-&gt;&gt;Local: Notify affected drafts, holds, commitments
+        Local-&gt;&gt;Local: Preserve completed work#59; reconcile affected resources
+        Local-&gt;&gt;Dir: Capability, region, handling, capacity requirements
+        Dir--&gt;&gt;Local: Candidate records and addresses
+        Local-&gt;&gt;Candidates: A2A request for current availability and quote
+        Candidates--&gt;&gt;Local: Owner-assessed terms or refusal
+        Local-&gt;&gt;Local: Route + handling + timing checks#59; every candidate gets a reason card
+        Local-&gt;&gt;Net: New draft version with replacement proposal
+        Net-&gt;&gt;Local: Each participant assesses the new terms
+        loop Every organization with obligations
+            Local-&gt;&gt;Local: Owner reserves resources against this version
+            Local-&gt;&gt;N8: Exact terms, hold references, approval request
+            N8-&gt;&gt;Humans: Approve or deny own obligations
+            Humans-&gt;&gt;N8: Attributed decision for current version
+            N8-&gt;&gt;Local: Authenticated decision callback
+            Local-&gt;&gt;Net: Revalidated approval or refusal
+        end
+        alt All required approvals and holds are current
+            Net-&gt;&gt;Log: Record commitment and evidence references
+            Local-&gt;&gt;N8: Authorized execution notices and receipt workflows
+        else Terms change or approval is missing
+            Local-&gt;&gt;Net: Amend again or stop under declared policy
+            Net-&gt;&gt;Log: Preserved disagreement if stopping condition reached
+        end
+    end</pre></div>
+    <figcaption><b>Diagram 7. Workflow B: disruption, discovery, and renewed approvals.</b> From Codex.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><div><h4>A reading arrives</h4><p>The carrier's Beeceptor endpoint delivers a labeled temperature reading with cargo identity and time. The telemetry specialist checks it against the food profile, the actual exposure, and which resources are affected. One warm reading in an empty truck doesn't prove the food was exposed.</p></div></li>
+    <li><div><h4>If the evidence is uncertain</h4><p>The affected action is held, and a human inspects it through n8n.</p></div></li>
+    <li><div><h4>If the service is unavailable</h4><p>The carrier sends a validated disruption with evidence. Every affected draft, hold, and commitment is notified. Completed work is preserved, and affected resources are reconciled.</p></div></li>
+    <li><div><h4>Discovery</h4><p>The affected organization queries the Directory with capability, region, handling, and capacity requirements, then asks each candidate for current availability and a quote. Each candidate answers with its own terms or refuses.</p></div></li>
+    <li><div><h4>Reason cards</h4><p>Route, handling, and timing checks run on every candidate, and every candidate gets a reason card, for example "Truck C: refrigerated, but booked until Friday."</p></div></li>
+    <li><div><h4>New version and re-approval</h4><p>A new draft version proposes the replacement. Every organization with obligations reassesses, reserves its resources against <em>this</em> version, and its human approves or denies through its own n8n workflow. The decision comes back through an authenticated callback and is revalidated.</p></div></li>
+    <li><div><h4>Commit, amend, or stop</h4><p>If all required approvals and holds are current, the commitment is recorded and execution notices go out, such as the crew's spoken shift notice. Otherwise organizations amend again or stop by policy, possibly recording a preserved disagreement.</p></div></li>
+  </ol>
+  <p>Donation receipts need actual custody and receipt evidence, not just an approved plan. The n8n callbacks and service identities still need to be verified in the build.</p>
+</section>
+
+<section id="flowC">
+  <span class="tag">13 · Workflow C</span>
+  <h2>Shared funding and preserved disagreement</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Events as Requesting organizations across events
+    participant Fund as Fund specialists + negotiator
+    participant Cash as Fund's own hold ledger
+    participant N8 as Each organization's n8n approval workflow
+    actor Humans as Authorized organization approvers
+    participant Net as AGNTCY negotiation room
+    participant UI as Coordinator view
+    Events-&gt;&gt;Fund: Current draft, conditional recipient acceptance, eligible funding gap
+    Fund-&gt;&gt;Fund: Eligibility, urgency, coverage under versioned policy
+    Fund-&gt;&gt;Cash: Check cash, earmarks, existing obligations
+    Cash--&gt;&gt;Fund: Available amount without double spending
+    Fund-&gt;&gt;Cash: Place expiring provisional grant hold
+    Fund-&gt;&gt;Net: Full or partial grant terms with policy reasons
+    Net-&gt;&gt;Events: Recalculate complete agreement
+    alt Feasible terms accepted by participants
+        Events-&gt;&gt;N8: Current obligations and holds for each organization
+        Fund-&gt;&gt;N8: Fund's current grant obligations
+        N8-&gt;&gt;Humans: Organization-specific approval requests
+        Humans-&gt;&gt;N8: Approvals or denials
+        N8-&gt;&gt;Net: Validated current-version decisions
+        alt Every required approval and hold is valid
+            Net-&gt;&gt;UI: Commitment recorded#59; grant reserved, not yet spent
+        else Missing approval at stopping point
+            Net-&gt;&gt;UI: Preserved disagreement with reasons
+        end
+    else Partial grant declined or amendment infeasible
+        Events-&gt;&gt;Net: Refusal with remaining constraint
+        Net-&gt;&gt;Fund: Reconsider request
+        Fund-&gt;&gt;Cash: Release unused provisional hold
+        Fund-&gt;&gt;Fund: Reconsider other known requests
+        Net-&gt;&gt;UI: Show options and disagreement if stopping policy reached
+    end
+    Note over Fund,UI: A grant is spent only on its authorized execution trigger#59; the coordinator never reallocates it</pre></div>
+    <figcaption><b>Diagram 8. Workflow C: shared funding and preserved disagreement.</b> From Codex. A grant is spent only on its authorized trigger; the coordinator never reallocates it.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><div><h4>Requests arrive from several events</h4><p>Each carries the current draft, the recipient's conditional acceptance, and the eligible funding gap.</p></div></li>
+    <li><div><h4>The fund checks policy and cash</h4><p>Eligibility, urgency, and coverage under its versioned policy. Then cash, earmarks, and existing obligations, so no dollar is promised twice.</p></div></li>
+    <li><div><h4>Provisional grant hold</h4><p>The fund places an expiring hold and sends full or partial grant terms with reasons.</p></div></li>
+    <li><div><h4>Participants recalculate and approve</h4><p>If feasible terms are accepted, every organization approves its own obligations. If all approvals and holds are valid, the commitment is recorded and the grant is reserved, not yet spent.</p></div></li>
+    <li><div><h4>Refusal or stop</h4><p>A declined partial grant is released, and the fund reconsiders other known requests. If the stopping policy is reached, the coordinator sees the options and the disagreement.</p></div></li>
+  </ol>
+  <h3>Candidate fund rule (Round 10, with Codex's Round 11 corrections) <span class="chip proposed">Proposed</span></h3>
+  <ul>
+    <li><strong>Mandate:</strong> urgent eligible transfers first, then least-served communities <span class="chip decided">Decided</span>.</li>
+    <li><strong>Eligibility</strong> uses the recipient's conditional acceptance of current terms. Requiring a final commitment first would be circular.</li>
+    <li><strong>Timing:</strong> decide at each request's funding-needed-by time, derived from remaining approval and preparation steps, without counting lead time twice.</li>
+    <li><strong>Ranking:</strong> urgency band, then the least-covered recipient, then lower grant per share of request covered, then a fixed tie-break.</li>
+    <li><strong>Earmarks</strong> for higher-ranked known requests are explicit expiring holds, never extra money.</li>
+    <li><strong>Partial awards</strong> need a feasible amended agreement. A refusal releases the hold and triggers reconsideration of other requests.</li>
+    <li><strong>Limitations:</strong> requests that arrive later are unknown, so arrival order can still matter. The coverage cohort must count zeros and resist request-splitting.</li>
+  </ul>
+  <h3>Why the ending can't be scripted (accounting examples, not results)</h3>
+  <div class="tablebox"><table>
+    <thead><tr><th>Synthetic case</th><th>Cash after meals and strawberries</th><th>What could happen next</th></tr></thead>
+    <tbody>
+      <tr><td class="num">$3,100 pool; $2,400 strawberry grant</td><td class="num">$600</td><td>Can cover $350 lettuce and $250 dairy if both are feasible and approved</td></tr>
+      <tr><td class="num">$3,100 pool; $2,300 strawberry grant</td><td class="num">$700</td><td>The same grants leave $100</td></tr>
+      <tr><td class="num">$2,800 pool; $2,400 strawberry grant</td><td class="num">$300</td><td>A $300 lettuce offer is $50 short. If declined and released, the $250 dairy grant fits, leaving $50</td></tr>
+      <tr><td class="num">$2,800 pool; $2,300 strawberry grant</td><td class="num">$400</td><td>An accepted $350 lettuce grant leaves $50, short of dairy's $250</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="records">
+  <span class="tag">14 · Records, privacy, and evaluation runs</span>
+  <h2>What's private, what's shared, and how runs are compared</h2>
+  <figure>
+    <div class="figbox"><pre class="mermaid">flowchart LR
+    Local["Each organization's private state&lt;br/&gt;Evidence, budget, policy, holds, approvals"]
+    Public["Authorized shared events&lt;br/&gt;Drafts, proposals, reasons, approval references"]
+    Trace["Observe / OpenTelemetry&lt;br/&gt;Redacted traces, latency, model usage"]
+    Replay["Evaluation runner&lt;br/&gt;Live shadow / recorded replay / synthetic"]
+    Methods["Same inputs and validators&lt;br/&gt;First-come-first-served / rules / LLM"]
+    Gates["Guardrail checks&lt;br/&gt;Authority, evidence, conservation, termination"]
+    Results["Coverage, pathways, costs&lt;br/&gt;Failures, refusals, variation"]
+    Local --&gt;|"permitted disclosure only"| Public
+    Local --&gt;|"redaction before export"| Trace
+    Public --&gt; Replay
+    Trace --&gt; Replay
+    Replay --&gt; Methods
+    Methods --&gt; Gates
+    Gates --&gt; Results</pre></div>
+    <figcaption><b>Diagram 9. Shared records, private records, and evaluations.</b> From Codex.</figcaption>
+  </figure>
+  <ul>
+    <li>Each organization's private state (evidence, budget, policy, holds, approvals) leaves only as <strong>permitted disclosure</strong>, and is <strong>redacted</strong> before going into traces.</li>
+    <li>The evaluation runner has declared test access only. It isn't a production supervisor. The full-information central reference uses a separately labeled privileged dataset.</li>
+    <li><strong>Live shadow</strong> runs propose agreements for review without making real commitments.</li>
+  </ul>
+  <div class="tablebox"><table>
+    <thead><tr><th>Mode</th><th>Inputs</th><th>What it can show</th></tr></thead>
+    <tbody>
+      <tr><td>Live shadow</td><td>Current source responses and confirmed declarations; proposals only</td><td>Whether adapters and assessments work with today's evidence</td></tr>
+      <tr><td>Replay</td><td>Recorded responses and events, released at their original times</td><td>Reproducible comparisons and failure diagnosis</td></tr>
+      <tr><td>Synthetic</td><td>Labeled invented lots, resources, policies, approvals, and faults</td><td>Whether constraints and recovery hold under controlled conditions</td></tr>
+    </tbody>
+  </table></div>
+  <h3>The records passed between pieces</h3>
+  <p>Every consequential record carries an event ID, sender identity, draft version where it applies, a message identity, source and observation time, and evidence references.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Record</th><th>Essential content</th><th>Who can write it</th></tr></thead>
+    <tbody>
+      <tr><td>Observation</td><td>Original and normalized values, units, scope, freshness, live/cached/synthetic label</td><td>The owning organization's adapters; approved public data may be shared</td></tr>
+      <tr><td>Assessment</td><td>Feasible bounds and options, calculation references, missing evidence, rejection reasons</td><td>Local specialists; only permitted summaries leave</td></tr>
+      <tr><td>Draft agreement</td><td>Lot quantities, destinations, resource intervals, costs and payers, obligations, version</td><td>Participants propose attributed amendments; nobody accepts for another</td></tr>
+      <tr><td>Hold</td><td>Resource, quantity, interval or amount, event and version, expiry, status</td><td>Only the resource owner</td></tr>
+      <tr><td>Approval</td><td>Approver, organization, exact version and terms, decision, validity</td><td>The organization's own human via n8n, or a labeled simulation</td></tr>
+      <tr><td>Disruption</td><td>Affected lot, resource, and agreements; evidence; observation time; impact</td><td>The resource owner; participants reassess their obligations</td></tr>
+      <tr><td>Outcome</td><td>Proposed, committed, received, distributed status; pathway; cost status; evidence</td><td>Attributed records; custody changes never multiply the source quantity</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every run also has a <strong>manifest</strong>: scenario, profile and policy versions, initial resources and data permissions, lot and request identities, observation window, methods compared, source records, approval behavior, stop rules, fault schedule, model and prompt versions, seeds, and metric definitions, all declared before results are viewed.</p>
+</section>
+
+<section id="profiles">
+  <span class="tag">15 · Food profiles</span>
+  <h2>How one architecture handles any food</h2>
+  <p>A <strong>food profile</strong> describes a product at the needed level of detail (crop, maturity, processing state, or recipe):</p>
+  <ul>
+    <li>temperature and exposure requirements, and chilling or freezing sensitivity</li>
+    <li>shelf-life assumptions and preparation needs</li>
+    <li>packaging and unit conversions, and which foods it's compatible with</li>
+    <li>quality categories, candidate pathways, and the specialist assessments it requires</li>
+  </ul>
+  <p>Every field records its source or marks itself as an assumption, and has a version. Specialists apply common procedures to these properties, and negotiator rules never branch on crop names.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Event and profile family</th><th>What must be assessed</th><th>Sources and status</th></tr></thead>
+    <tbody>
+      <tr><td>Farm strawberries</td><td>In field or harvested; maturity and condition; picking, packing, prompt cooling; packaging; exposure history; transport compatibility; receiving or processor specs</td><td>UC Davis strawberry guidance and USDA Agriculture Handbook 66. Lot condition, crew throughput, cooling capacity, and quotes need local records or labeled test values</td></tr>
+      <tr><td>Distributor lettuce</td><td>Variety; whole vs. processed; packaging; cooling and exposure; freezing and ethylene sensitivity; storage; receiving windows; documented rejection reason</td><td>UC Davis crisphead and romaine guidance, Handbook 66. A whole-head profile can't authorize fresh-cut product</td></tr>
+      <tr><td>Grocery dairy</td><td>Exact product and package; label and lot identity; holding requirements; exposure and date records; package integrity; recipient acceptance</td><td>Product and operator specs, FDA donation guidance. No single dairy shelf life applies to every product</td></tr>
+      <tr><td>Restaurant meals</td><td>Recipe, ingredients, allergens; preparation and holding records; hot or cold path; packaging; portions; serving deadline</td><td>Operator records and FDA donation guidance. Needs a recipe-specific profile</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>What isn't a food property:</strong> a farm's preparation ceiling, budget, warehouse space, and prices belong to the organization or to observations.</li>
+    <li><strong>Profiles aren't eligibility:</strong> a soft sublot doesn't automatically qualify for processing, and a refrigerated truck doesn't automatically fit every crop.</li>
+    <li><strong>Generality tests</strong> include a chilling-sensitive tomato lot. Changing only the crop name isn't a real test.</li>
+    <li><strong>Unsupported foods</strong> must produce an explicit "unsupported" result.</li>
+  </ul>
+</section>
+
+<section id="data">
+  <span class="tag">16 · Data and API contracts</span>
+  <h2>Where every number comes from</h2>
+  <p>Every observation carries its source, owner, observation and retrieval times, units, scope, validity, quality, and a live/cached/synthetic label. Both the original record and the normalized value are kept.</p>
+  <div class="tablebox"><table>
+    <thead><tr><th>Input</th><th>Source</th><th>How to interpret it</th></tr></thead>
+    <tbody>
+      <tr><td>Market conditions</td><td>USDA AMS Market News</td><td>Match commodity, grade, packaging, market, date, and price basis. A wholesale quote isn't automatically what a farm can earn</td></tr>
+      <tr><td>Routes</td><td>OpenStreetMap through OSRM</td><td>Record coordinates, distance, duration; add declared loading and return allowances. Doesn't prove truck access or live traffic</td></tr>
+      <tr><td>Resources and quotes</td><td>Each organization's own systems (Beeceptor mocks)</td><td>Owners confirm. A capacity reading isn't a hold; a quote isn't a commitment</td></tr>
+      <tr><td>Lot condition</td><td>Producer records, handling history, inspections, telemetry</td><td>Must apply to the actual lot and time. A warm empty truck doesn't prove food was exposed</td></tr>
+      <tr><td>Recipient demand</td><td>The recipient's declared requests</td><td>Keep units, validity window, and prior receipts. Never inferred from area statistics</td></tr>
+      <tr><td>Community context</td><td>USDA Food Access Research Atlas</td><td>Supports the advocate's explanation, not today's request quantities</td></tr>
+      <tr><td>Voice intake</td><td>ElevenLabs plus the person's confirmation</td><td>Quantities, units, dates, and location confirmed by read-back</td></tr>
+      <tr><td>Food properties</td><td>Reviewed references and operator specs</td><td>General guidance, actual lot evidence, and synthetic assumptions kept distinct</td></tr>
+    </tbody>
+  </table></div>
+  <p>Missing, stale, contradictory, or unsupported <strong>required</strong> evidence blocks the affected commitment and gives a reason. Missing optional information can lower confidence without blocking other events. External text is data, never an instruction.</p>
+</section>
+
+<section id="sponsors">
+  <span class="tag">17 · Sponsors and tech stack</span>
+  <h2>Every sponsor plays a role a real organization already has</h2>
+  <div class="tablebox"><table>
+    <thead><tr><th>Sponsor or tool</th><th>Role</th><th>Boundary and fallback</th></tr></thead>
+    <tbody>
+      <tr><td>Cisco AGNTCY</td><td><code>agntcy-app-sdk</code>: A2A messages, SLIM negotiation room, Directory discovery with reason cards, Observe tracing</td><td>Carries messages, not decisions. An in-process fallback is labeled and doesn't count as AGNTCY integration. Its SLIM group-chat path is marked experimental, so verify it early</td></tr>
+      <tr><td>Beeceptor</td><td>Each organization's mocked fleet, inventory, storage, and cached source data; fault injection</td><td>Simulated readings stay labeled. Organization records own the real commitments; offline fixtures keep evaluation working</td></tr>
+      <tr><td>ElevenLabs</td><td>Voice intake with read-back, Spanish support, crew notices after a commitment</td><td>No audio negotiation between organizations; typed text is the fallback. A real phone line needs its own integration</td></tr>
+      <tr><td>n8n</td><td>Each organization's approval workflow, exception routing, reminders, receipts, board reports</td><td>Carries a human's decision; never decides. A local approve button is the fallback</td></tr>
+      <tr><td>LangGraph</td><td>Each organization's internal workflow</td><td>Only inside organizations</td></tr>
+      <tr><td>Claude API</td><td>Negotiators, the voice intake role, explanations</td><td>Never produces operational numbers; calculator tools and number checks enforce this</td></tr>
+    </tbody>
+  </table></div>
+  <p>NVIDIA Brev is not used. Public documentation has been reviewed, but accounts, credits, and working calls are still unverified.</p>
+</section>
+
+<section id="models">
+  <span class="tag">18 · Models, budget, and cloud</span>
+  <h2>Claude models chosen per role, on a $100 budget, hosted on AWS</h2>
+  <div class="tablebox"><table>
+    <thead><tr><th>Role</th><th>Claude model</th><th>Price per million tokens (in / out)</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Farm, food banks, pantries, shelters, advocate</td><td>Opus 5.5 (<code>claude-opus-5-5</code>)</td><td class="num">$4 / $20</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Truckers, cross-dock, processor, distributor, grocery, restaurant</td><td>Sonnet 5.5 (<code>claude-sonnet-5-5</code>)</td><td class="num">$2 / $10</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Rescue fund (with calculator tools)</td><td>Haiku 5.5 (<code>claude-haiku-5-5</code>)</td><td class="num">$0.10 / $0.50</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Farmer voice intake</td><td>Sonnet 5.5</td><td class="num">$2 / $10</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Scoring results</td><td>No AI; all metrics are calculated</td><td class="num">$0</td><td><span class="chip decided">Decided</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="two">
+    <div class="card"><h3>Budget: $100 Claude API credit</h3><p>A full four-event day is estimated at <strong class="num">$2.50–3</strong> with mixed models, roughly <strong>35 full runs</strong>. These are unmeasured estimates. Proposed split: development $20, rehearsals and demo $15, evaluation $50, reserve $15.</p><p>Ways to stretch it:</p><ul><li>Rule-based negotiators and baselines cost nothing.</li><li>Cache each organization's fixed instructions.</li><li>Use low effort for routine moves.</li><li>Replay recorded runs for rehearsals.</li><li>Set a hard spending cap per run.</li></ul><p>Keep the model assignment fixed within any comparison, and report it.</p></div>
+    <div class="card"><h3>Cloud: AWS</h3><p><span class="chip proposed">Proposed</span> One EC2 machine running Docker Compose:</p><ul><li>One container per organization, plus AGNTCY's SLIM, Directory (with its registry and database), and an OpenTelemetry collector.</li><li>Postgres for shared records.</li><li>Keys in AWS Secrets Manager.</li><li>One public HTTPS address so n8n and ElevenLabs can reach the system.</li></ul><p>n8n, Beeceptor, and ElevenLabs stay on the sponsors' servers. No Kubernetes.</p><p><span class="chip open">To check</span> Whether AWS credits can pay for Claude through Amazon Bedrock.</p></div>
+  </div>
+</section>
+
+<section id="evaluation">
+  <span class="tag">19 · How we prove it works</span>
+  <h2>Same situation, different methods, honest numbers</h2>
+  <div class="tablebox"><table>
+    <thead><tr><th>Method</th><th>Role in the evaluation</th></tr></thead>
+    <tbody>
+      <tr><td>First-come-first-served</td><td><strong>Headline comparison.</strong> Whoever claims first gets served, under the same trucks, money, and rules</td></tr>
+      <tr><td>Nearest feasible recipient</td><td>An additional simple comparison</td></tr>
+      <tr><td>Central optimizer with full information</td><td>A separately labeled reference that sees private data; shows how close we get without anyone revealing their budget</td></tr>
+      <tr><td>Rule-based negotiators</td><td>Same protocol and calculators, no AI; shows what the AI actually adds</td></tr>
+      <tr><td>HarvestNet with AI negotiators</td><td>Our system</td></tr>
+    </tbody>
+  </table></div>
+  <p>All methods get the same observations at the same times, the same policies, profiles, calculators, validators, resources, and approval behavior, and the same partial-load options. Development cases are kept separate from held-out test cases.</p>
+  <h3>Scenario families to test</h3>
+  <div class="tablebox"><table>
+    <thead><tr><th>Family</th><th>What it must show</th></tr></thead>
+    <tbody>
+      <tr><td>Feasible independent agreement</td><td>A useful valid draft becomes a commitment through matching approvals; every number traceable</td></tr>
+      <tr><td>Market signal</td><td>The market specialist explains whether a USDA price is comparable, even if it contradicts the "below cost" story</td></tr>
+      <tr><td>Replacement discovery</td><td>Every candidate gets a reason card; resources released or reconciled; nothing invented</td></tr>
+      <tr><td>Handling disruption</td><td>Assessment follows evidence and profile; uncertain condition goes to a reviewer</td></tr>
+      <tr><td>Shared-resource contention</td><td>No resource promised twice; alternatives or preserved disagreement recorded</td></tr>
+      <tr><td>Cross-dock movement</td><td>Storage, both legs, receiving, and funding form one feasible agreement; food not counted twice</td></tr>
+      <tr><td>Shared rescue fund</td><td>Policy applied consistently; refusals release money; other requests reassessed</td></tr>
+      <tr><td>Binding non-agreement</td><td>No fabricated commitment; reasons distinguish infeasibility, missing evidence, and refusal</td></tr>
+      <tr><td>Evidence failure</td><td>Outages, stale or conflicting data, or wrong units block only the affected commitment</td></tr>
+      <tr><td>Changed or replayed approval</td><td>Old or duplicated approvals can't create a commitment</td></tr>
+      <tr><td>Uncertain execution</td><td>Reconcile before reuse; keep completed actions and costs</td></tr>
+      <tr><td>Untrusted or private input</td><td>Instructions hidden in text are ignored; private records stay private</td></tr>
+      <tr><td>Generality and units</td><td>Several foods and unit conversions; unsupported profiles reported</td></tr>
+      <tr><td>Timing and policy sensitivity</td><td>Effects of arrival order and policy choices are visible, not credited to negotiation</td></tr>
+    </tbody>
+  </table></div>
+  <h3>What we measure</h3>
+  <ul>
+    <li><strong>Headline: worst-served coverage</strong>, the lowest received share in the declared recipient cohort, including zeros, defined before the run.</li>
+    <li>Offered, proposed, committed, received, projected, and actually distributed quantities; pounds by final pathway; unharvested or unclaimed food.</li>
+    <li>Quoted, reserved, authorized, and incurred costs; released funds; uncovered expenses.</li>
+    <li>Valid proposal and agreement rates, refusals, missed deadlines, rejected invalid proposals, human interventions, disclosure, number-check failures.</li>
+    <li>Negotiation time and rounds, API and model failures, retries, and run-to-run variation.</li>
+  </ul>
+  <div class="callout leaf"><p><strong>Passing requires</strong> zero invalid or unauthorized commitments, no duplicated resources or food, traceable numbers, reconciled uncertain actions, and every run ending with a reason. A system that rejects everything may be safe but still fails on usefulness. <strong>We report whatever the numbers show</strong>, including losses against the baseline.</p></div>
+</section>
+
+<section id="guardrails">
+  <span class="tag">20 · Guardrails</span>
+  <h2>Rules no agent can argue away</h2>
+  <div class="tablebox"><table>
+    <thead><tr><th>Guardrail</th><th>Required behavior</th></tr></thead>
+    <tbody>
+      <tr><td>Authority</td><td>No organization accepts for another; the coordinator and sponsor services can't allocate or authorize</td></tr>
+      <tr><td>Numeric evidence</td><td>Every quantity, cost, capacity, conversion, and deadline traces to data or a labeled input plus a calculation</td></tr>
+      <tr><td>Feasibility</td><td>Quantity conservation, complete funding, resource occupancy, readiness, receiving windows, handling, pathway eligibility</td></tr>
+      <tr><td>Evidence freshness</td><td>Recheck important sources before commitment; surface conflicts instead of guessing</td></tr>
+      <tr><td>Versioned consent</td><td>Approvals apply to the exact current terms; changes need fresh approval</td></tr>
+      <tr><td>Resource conservation</td><td>No double booking, double spending, or double counting across custody changes</td></tr>
+      <tr><td>Information boundaries</td><td>Private budgets and records disclosed only by the owner's policy; tool access stays scoped</td></tr>
+      <tr><td>Untrusted content</td><td>API text and transcripts can't override authority, validation, or tool permissions</td></tr>
+      <tr><td>Bounded negotiation</td><td>Declared deadlines and stop criteria; a deadline never supplies approval</td></tr>
+      <tr><td>Honest outcomes</td><td>Refusal and preserved disagreement are valid results; a missing receipt isn't a delivery</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="status">
+  <span class="tag">21 · Status</span>
+  <h2>What's decided, what's proposed, what's open</h2>
+  <div class="tablebox"><table class="plain">
+    <thead><tr><th>Item</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Level 3 target; no supervisor between organizations; coordinator as first user</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Whole-chain scope: four live events plus a network map; Central Coast California</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Food profiles so it works for any food</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Calculators produce numbers; AI number checks with template fallback</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Sponsor roles (AGNTCY, Beeceptor, ElevenLabs, n8n); no Brev</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Fund priority: urgent transfers first, then least-served communities</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Stop rules; nothing committed automatically; one or two live approval clicks</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Headline: worst-served coverage vs. first-come-first-served; report results honestly</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Claude API with $100 credit; AWS; models chosen per role; fund on Haiku with calculators</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Design framework v1 frozen (authority, data contracts, harness, guardrails, evaluation)</td><td><span class="chip decided">Decided</span></td></tr>
+      <tr><td>Component breakdown in Codex's diagrams</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Exact model for each role; AWS layout; budget split</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Fund ranking details (urgency bands, earmarks, partial awards)</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Negotiator scoring, walk-away rules, deadline pressure</td><td><span class="chip proposed">Proposed</span></td></tr>
+      <tr><td>Sponsor accounts, plan limits, working integrations; AGNTCY component versions</td><td><span class="chip open">To verify</span></td></tr>
+      <tr><td>Whether AWS credits can pay for Claude via Bedrock</td><td><span class="chip open">To verify</span></td></tr>
+      <tr><td>Starting to write code</td><td><span class="chip open">Waiting for go-ahead</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="glossary">
+  <span class="tag">22 · Glossary</span>
+  <h2>Words we use, and what they mean</h2>
+  <dl class="glossary">
+    <div><dt>Organization</dt><dd>An independent participant that controls its own resources and approves its own commitments.</dd></div>
+    <div><dt>Negotiator</dt><dd>An organization's AI representative that talks to other organizations and explains its decisions.</dd></div>
+    <div><dt>Specialist</dt><dd>A calculator inside one organization that checks one thing, such as cost, storage, or route.</dd></div>
+    <div><dt>Coordinator</dt><dd>The person who watches the network. Decides nothing for anyone. Our first user.</dd></div>
+    <div><dt>Surplus lot</dt><dd>A specific batch of at-risk food, such as 10,000 lb of strawberries in one field.</dd></div>
+    <div><dt>Event</dt><dd>One surplus lot's journey from first offer to final outcome.</dd></div>
+    <div><dt>Food profile</dt><dd>The sourced, versioned facts about one kind of food: handling, chilling sensitivity, usable life, packaging, compatibility, grades, pathways, and required assessments.</dd></div>
+    <div><dt>Draft agreement</dt><dd>The one shared, numbered plan for an event, edited until everyone accepts the same version.</dd></div>
+    <div><dt>Hold</dt><dd>A temporary, expiring reservation of truck time, cold space, crew, or money, placed by the resource's owner.</dd></div>
+    <div><dt>Commitment</dt><dd>Final: every named organization approved the exact same version, with valid holds.</dd></div>
+    <div><dt>Preserved disagreement</dt><dd>No version won everyone's approval. The coordinator sees the options and reasons; nobody picks.</dd></div>
+    <div><dt>Pathway</dt><dd>Where the food ends up: donated, upcycled, animal feed, compost, or left unharvested. Each pound counted once.</dd></div>
+    <div><dt>Coverage</dt><dd>The share of a recipient's declared request it received. Worst-served coverage is our headline measure.</dd></div>
+    <div><dt>Walk-away option</dt><dd>What an organization gets with no deal. A deal must beat it.</dd></div>
+    <div><dt>Harness</dt><dd>The controlled environment around the negotiators: tools, inputs, drafts, holds, records, and replay.</dd></div>
+    <div><dt>Reason card</dt><dd>A short explanation of why a discovered candidate was chosen or rejected.</dd></div>
+  </dl>
+</section>
+
+<footer>
+  <p>Diagrams 1–9 are reproduced from Codex's <code>docs/ARCHITECTURE_DIAGRAMS.md</code> with their content unchanged. In diagrams 6–8, each semicolon inside a message is written as Mermaid's <code>#59;</code> code so the diagram can be drawn; it still displays as a semicolon. Other sources in the HarvestNet folder: <code>CONTEXT.md</code>, <code>docs/adr/</code> (decisions 0001–0005), <code>docs/CURRENT_DESIGN.md</code>, <code>docs/HARVESTNET_SCENARIOS.md</code>, <code>docs/PROJECT_BRIEF.md</code>, <code>docs/ARCHITECTURE_PLAN.md</code>, <code>docs/AGENT_BEHAVIOR.md</code>, and <code>COLLAB_claude_codex.md</code>. If this briefing and those documents disagree, the documents win.</p>
+  <p>Prices are from Anthropic's price list as of October 6, 2026. Cost figures are estimates, not measurements. All example quantities and dollar amounts are synthetic. No integration or result shown here has been built or tested yet.</p>
+</footer>
+
+</div>

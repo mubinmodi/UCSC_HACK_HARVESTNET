@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 6: How a deal becomes final</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 6 of 13 · <a href="../index.html">Course index</a></div>
+<h1>How a deal becomes final</h1>
+<p class="lede">Draft agreements, versions, holds, approvals, and the stop rules.</p>
+<div class="win"><b>After this lesson</b>You can explain exactly when a deal becomes a commitment, and what happens when it doesn't.</div>
+
+<h2>One draft agreement per batch</h2>
+<p>Each surplus batch gets one shared, numbered draft agreement. It records how much of each item goes to which food bank, who moves it and when, and what storage it needs. Agents edit it in turns, and every edit carries a reason.</p>
+
+<h2>Versions</h2>
+<p>Every change creates a new version, and <strong>approvals for an old version don't carry over</strong>. This stops a classic failure: a manager approves "200 lb by 4 pm," the plan quietly changes to "200 lb by 8 pm," and the old approval still counts.</p>
+
+<h2>Holds</h2>
+<p>Each organization places a hold on its own resource, such as cold storage space, a truck slot, a drop-off slot, or the batch itself. A hold is tied to one version and expires. Only the resource's owner can place it, so two deals can't book the same cooler space.</p>
+
+<h2>Approvals</h2>
+<p>Each organization's own person approves the exact version through n8n. n8n just carries the decision; it never decides.</p>
+
+<h2>Commitment</h2>
+<div class="test">A deal is final when <b>every named organization has approved the same version</b> and <b>every hold is still valid</b>.</div>
+
+<h2>The stop rules</h2>
+<ul>
+<li><strong>Agreement:</strong> the deal becomes a commitment, as above.</li>
+<li><strong>Ask a human:</strong> any doubt about the produce's condition, or any change to a deal that's already committed.</li>
+<li><strong>Keep the disagreement:</strong> after three rounds with no new terms, the dashboards of the organizations involved show each option and each side's reason.</li>
+<li><strong>Deadline:</strong> if the donor's deadline passes with no commitment, the produce is recorded as unclaimed, with a reason. <strong>Nothing is ever committed automatically.</strong></li>
+</ul>
+<p>After a commitment, the batch moves through four stages: <em>Moving</em> (the donor drops it off or the food bank collects it), <em>At food bank</em>, <em>Collected</em> (households confirm pickup), or back to <em>Negotiating</em> if a food bank's storage fails.</p>
+<figure class="diagram"><div class="figbox"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Offered
+    Offered --&gt; Negotiating: food banks respond
+    Negotiating --&gt; Negotiating: amendment, new version
+    Negotiating --&gt; Held: all owners place holds
+    Held --&gt; Committed: every named party approves this version
+    Held --&gt; Negotiating: a hold expires or someone changes terms
+    Negotiating --&gt; Disagreement: 3 rounds with no new terms
+    Negotiating --&gt; Unclaimed: deadline passes with no commitment
+    Committed --&gt; Moving: donor drops off or food bank collects
+    Moving --&gt; AtFoodBank: food bank receives
+    AtFoodBank --&gt; Collected: households confirm pickup
+    Committed --&gt; Negotiating: a food bank's storage fails
+    AtFoodBank --&gt; Negotiating: storage fails before pickup
+    Disagreement --&gt; [*]
+    Unclaimed --&gt; [*]
+    Collected --&gt; [*]</pre></div><figcaption>The life of a draft agreement, from offer to collected, disagreement, or unclaimed. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 8, the lifecycle diagram, and <a href="../../docs/adr/0001-no-supervisor-between-organizations.md">ADR 0001</a>.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 8, including the lifecycle diagram.</p>
+  <p><strong>Previous:</strong> <a href="0005-produce-and-matching.html">Lesson 5: Produce profiles and matching</a> · <strong>Next:</strong> <a href="0007-the-five-workflows.html">Lesson 7: The five workflows</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>

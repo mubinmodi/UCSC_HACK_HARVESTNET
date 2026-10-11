@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 10: Proving it works</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 10 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Proving it works</h1>
+<p class="lede">The comparisons, the scenarios, the metrics, and what to do if negotiation loses.</p>
+<div class="win"><b>After this lesson</b>You can explain what HarvestNet is compared against, what's measured, and why losing is an acceptable result.</div>
+
+<h2>Four methods, same inputs</h2>
+<ul>
+<li><strong>First-come-first-served:</strong> the first food bank to claim gets the whole batch. This is the headline comparison.</li>
+<li><strong>Nearest food bank.</strong></li>
+<li><strong>Rules-based negotiators:</strong> the same process and calculators, with no AI.</li>
+<li><strong>LLM negotiators:</strong> HarvestNet as designed.</li>
+</ul>
+<p>Every method gets the same inputs at the same times, with the same rules and resources.</p>
+
+<h2>Five scenarios</h2>
+<p>A normal afternoon, more produce than storage, more households than produce, a cooler failure, and a condition doubt or no agreement.</p>
+
+<h2>What's measured</h2>
+<ul>
+<li><strong>Produce wasted:</strong> pounds unclaimed or spoiled. Proposed as a headline result.</li>
+<li><strong>Worst-served fair-share coverage:</strong> how well the most-behind food bank's households did. Proposed as the second headline.</li>
+<li><strong>Households actually reached,</strong> counted by confirmed pickups.</li>
+<li>Pickup-window match, time to commitment, and number-check failures.</li>
+<li><strong>Invalid commitments, which must be zero.</strong></li>
+</ul>
+
+<h2>If negotiation loses</h2>
+<p><strong>Say so.</strong> The judges score "learning and evidence," and an honest result beats a tuned one. A useful finding might be: "Rules-based negotiation matched the LLM on waste. The LLM's value was reading messy input and explaining decisions."</p>
+
+<h2>Cost</h2>
+<p>A batch costs an estimated $0.50–1.00 in Claude calls, so the $100 credit covers roughly 100–200 batches. Rules-based runs and replays cost nothing, so use those for most testing. These are estimates, not measurements.</p>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, sections 14 and 16, and <a href="../../docs/adr/0005-freeze-framework-evaluate-variable-decisions.md">ADR 0005</a>.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 16.</p>
+  <p><strong>Previous:</strong> <a href="0009-no-invented-numbers.html">Lesson 9: No invented numbers</a> · <strong>Next:</strong> <a href="0011-architecture-and-stack.html">Lesson 11: Architecture and stack</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+</body>
+</html>

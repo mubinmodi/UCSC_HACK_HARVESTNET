@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1: No Central Decider</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+
+<div class="kicker">HarvestNet MVP · Lesson 1 of 13 · <a href="../index.html">Course index</a></div>
+<h1>Why HarvestNet has no central decider</h1>
+<p class="lede">The claim judges will push on hardest, and how to defend it in plain words.</p>
+
+<div class="win"><b>After this lesson</b>You can say in one sentence why HarvestNet counts as Level 3, and answer the four questions judges are most likely to ask about it.</div>
+
+<h2>What the judges asked for</h2>
+<p>Level 3 asks for at least three agents with <strong>competing goals</strong> that negotiate and try to agree <strong>without a central decision-maker</strong>. Judges also want to see a comparison against a simpler method, and to know when the system should stop, keep a disagreement, or ask a human.</p>
+<p class="cite">Source: the Cisco challenge statement, <a href="../../docs/CHALLENGE.md">docs/CHALLENGE.md</a>.</p>
+<p>In HarvestNet, the agents with competing goals are the <strong>donors</strong> and the <strong>food banks</strong>. Donors want produce gone fast with little effort. Food banks compete for limited produce and cold space, and each would rather the donor deliver. The <strong>advocate</strong> pushes for the households furthest below their fair share.</p>
+
+<h2>One test settles almost every question</h2>
+<div class="test">Ask about any part of the system: <b>can it make an organization commit to something that organization didn't approve?</b> If the answer is no, it isn't a central decider.</div>
+<p>A deal becomes final only when every organization named in it approves the exact same version, and each one holds its own resources. So nothing outside an organization can commit it. That's the whole rule, recorded in <a href="../../docs/adr/0001-no-supervisor-between-organizations.md">ADR 0001</a>.</p>
+
+<h2>The parts that look central, and why they aren't</h2>
+<ul>
+  <li><strong>The negotiation room and shared records.</strong> They carry and store messages in the same order for everyone. They can't pick a winner.</li>
+  <li><strong>The fair-share table.</strong> It's a rule the food banks publish together, like SNAP's benefit table. It measures who's furthest behind. It assigns no produce, and every donor and food bank still accepts or rejects each deal itself (<a href="../../docs/adr/0009-food-banks-only-snap-fair-share.md">ADR 0009</a>).</li>
+  <li><strong>The advocate.</strong> It has no vote, no veto, and no resources. It can only propose a change on its turn. If nobody accepts, nothing happens.</li>
+  <li><strong>The front-desk assistant.</strong> It takes household requests and reports committed produce. It never allocates anything.</li>
+  <li><strong>n8n.</strong> It carries a human's approval. It never approves on its own (<a href="../../docs/adr/0004-sponsors-are-organization-systems-not-deciders.md">ADR 0004</a>).</li>
+  <li><strong>A supervisor inside one organization.</strong> That's allowed. A food bank's own LangGraph workflow can direct its own specialists, because it only acts for that food bank.</li>
+</ul>
+<p>Compare this with the organizers' own demo. In coffeeAGNTCY's Lungo app, a supervisor agent directs the farms, shipper, and accountant. HarvestNet uses the same AGNTCY building blocks and removes the supervisor between organizations.</p>
+<p class="cite">Source: <a href="https://github.com/agntcy/coffeeAgntcy/blob/main/coffeeAGNTCY/coffee_agents/lungo/README.md">coffeeAGNTCY Lungo README</a>.</p>
+
+<h2>The four hard questions</h2>
+
+<div class="qa">
+  <p class="q">"Why not just use one central optimizer? It would find a better split."</p>
+  <p class="a">It might, for a single goal, if it could see everything. That means every food bank's storage, truck schedule, and household data, plus someone everyone trusts to decide for them. We do run a central optimizer, as a reference point. The question we answer is how close independent organizations get without giving up control or private data. If the optimizer wins by a lot, we'll say so.</p>
+</div>
+
+<div class="qa">
+  <p class="q">"Isn't your fair-share table a central decider?"</p>
+  <p class="a">No. It's a published rule the food banks agreed to, like SNAP's benefit table. A calculator uses it to show who's furthest behind. It never assigns produce or approves a deal. Every donor and food bank still decides for itself.</p>
+</div>
+
+<div class="qa">
+  <p class="q">"Isn't the advocate just a central allocator with a nicer name?"</p>
+  <p class="a">It has no vote, no veto, and no resources. It can only propose a change and back it with pooled counts. A food bank or donor has to accept that change, or it goes nowhere.</p>
+</div>
+
+<div class="qa">
+  <p class="q">"What happens when they can't agree?"</p>
+  <p class="a">After three rounds with no new terms, the system records a preserved disagreement: the managers involved see each option and the reasons for it. If the donor's deadline passes, unclaimed produce is recorded with a reason. Nothing is ever committed automatically.</p>
+</div>
+
+<h2>Remember it in one line</h2>
+<p><strong>"Every organization keeps its own keys: nothing in HarvestNet can commit a donor or a food bank to a deal it didn't approve."</strong></p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/adr/0001-no-supervisor-between-organizations.md">ADR 0001</a> (one paragraph), then skim the <a href="https://github.com/agntcy/coffeeAgntcy/blob/main/coffeeAGNTCY/coffee_agents/lungo/README.md">Lungo README</a> to see the supervisor pattern we're contrasting with.</p>
+  <p><strong>Next:</strong> <a href="0002-the-30-second-pitch.html">Lesson 2: The 30-second pitch</a> · <a href="../index.html">Course index</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+
+</main>
+</body>
+</html>

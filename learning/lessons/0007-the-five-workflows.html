@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 7: The five workflows</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+<div class="kicker">HarvestNet MVP · Lesson 7 of 13 · <a href="../index.html">Course index</a></div>
+<h1>The five workflows</h1>
+<p class="lede">Each workflow in plain steps, and who decides at each one.</p>
+<div class="win"><b>After this lesson</b>You can walk through all five workflows and name who makes the decision in each.</div>
+
+<h2>1. A household asks for produce</h2>
+<p>The household calls or uses the web page. The assistant drafts its request, reads it back, asks for consent, and saves it under a short code, with no name. The household hears its fair share, chooses food banks, and then either gets a pickup now or is told it'll get a text.</p>
+<p><strong>Who decides:</strong> the household, about its own request. The assistant only reports produce that's already committed.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    actor Household as Household
+    participant Channel as Web page or voice line
+    participant Desk as Front-desk assistant · L
+    participant Check as Request and fair-share checks · D
+    participant Rec as Request records
+    participant Notify as n8n alerts
+    Household-&gt;&gt;Channel: Family of 4, near Watsonville, after 6 pm, small fridge, we get CalFresh
+    Channel-&gt;&gt;Desk: Transcript or form entries
+    Desk-&gt;&gt;Check: Draft request with size, pickup window, fridge, area, SNAP yes
+    Check--&gt;&gt;Desk: Valid request, fair share 12 lb this week
+    Desk-&gt;&gt;Household: Read-back and consent question
+    Household-&gt;&gt;Desk: Confirms
+    Desk-&gt;&gt;Rec: Save request with a short code, no name
+    Desk-&gt;&gt;Household: Food banks nearby with evening pickup
+    Household-&gt;&gt;Desk: Chooses rural food bank and city food bank
+    alt Produce is already committed at a chosen food bank
+        Desk-&gt;&gt;Household: Pickup time, food bank, items, and code
+    else Nothing yet
+        Desk-&gt;&gt;Household: You are on the list, we will text you
+        Rec-&gt;&gt;Notify: Alert when produce is committed at a chosen food bank
+        Notify-&gt;&gt;Household: Text with food bank, time, items, and code
+    end</pre></div><figcaption>Workflow 1: a household asks for produce. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>2. A donor reports surplus, and the agents split it</h2>
+<p>A donor, such as a farmers market at closing time, reports its items and whether it can drop them off. Food banks bid item by item. The advocate proposes changes to close the biggest fair-share gap. The donor and the food banks agree who moves what. Then each organization's person approves.</p>
+<p><strong>Who decides:</strong> the donor and each food bank, for themselves. The advocate only proposes.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    actor Staff as Farmers market manager
+    participant Donor as Donor agent
+    participant Room as AGNTCY room
+    participant Banks as Food bank agents
+    participant Adv as Advocate agent
+    participant N8 as n8n approvals
+    Staff-&gt;&gt;Donor: Market closing, 300 lb apples, 200 lb romaine, 400 lb potatoes, gone by 3 pm
+    Donor-&gt;&gt;Donor: Specialists check profiles, condition, deadline, drop-off ability
+    Donor-&gt;&gt;Room: Surplus offer version 1, can drop off one load to the south side only
+    Room-&gt;&gt;Banks: Offer arrives
+    Banks-&gt;&gt;Banks: Check demand counts, fair-share gaps, storage, hours, truck
+    Banks-&gt;&gt;Room: Bids, city wants romaine and will collect, rural wants all potatoes and apples
+    Room-&gt;&gt;Adv: Offer and bids
+    Adv-&gt;&gt;Room: Proposed change, rural gets 250 lb apples because its gap is largest
+    Banks-&gt;&gt;Room: Eastside counter, wants 50 lb apples, has no truck today
+    Donor-&gt;&gt;Room: Version 3, drop-off to rural and eastside on one route, city collects romaine
+    Banks-&gt;&gt;Room: Accept or counter
+    Note over Room: Repeat in turns until agreement or a stop rule
+    Donor-&gt;&gt;N8: Market manager approves version 3 and the drop-off
+    Banks-&gt;&gt;N8: Food bank managers approve deliveries and the city truck run
+    N8-&gt;&gt;Room: All approvals for version 3
+    Room-&gt;&gt;Room: Record the commitment</pre></div><figcaption>Workflow 2: a donor reports surplus, and the agents split it. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>3. Pickup and confirmation</h2>
+<p>The produce arrives. A calculator splits it into household portions, each up to that household's fair share. Households get a text with a code. When they show the code, their weekly balance updates. If a household says it can't make it, its portion goes to the next household furthest below fair share. SNAP households may get a Market Match tip.</p>
+<p><strong>Who decides:</strong> the calculator applies the published rule, and each household decides whether it's coming.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Rec as Shared records
+    participant N8 as n8n alerts
+    participant Mover as Donor drop-off or food bank truck
+    participant Bank as Food bank agent and manager
+    actor Household as Household
+    Rec-&gt;&gt;N8: Commitment recorded
+    N8-&gt;&gt;Mover: Run details, time, and storage needs
+    Mover-&gt;&gt;Bank: Delivers produce
+    Bank-&gt;&gt;Rec: Received 250 lb apples and 400 lb potatoes at 4:10 pm
+    Rec-&gt;&gt;Rec: Calculate each household portion up to its fair share
+    Rec-&gt;&gt;N8: Produce is at the rural food bank
+    N8-&gt;&gt;Household: 8 lb apples and potatoes ready, 6 to 8 pm, your code
+    Household-&gt;&gt;Bank: Shows code at pickup
+    Bank-&gt;&gt;Rec: Pickup confirmed, fair-share balance updated
+    alt Household replies it cannot come
+        Household-&gt;&gt;N8: Cannot make it
+        N8-&gt;&gt;Rec: Release the portion
+        Rec-&gt;&gt;N8: Offer it to the next household furthest below fair share
+    end
+    opt Household said it receives SNAP
+        N8-&gt;&gt;Household: Tip, your CalFresh dollars are matched at a nearby farmers market
+    end</pre></div><figcaption>Workflow 3: pickup and confirmation. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>4. A food bank's cooler fails</h2>
+<p>A temperature reading (from Beeceptor in the demo) shows the cooler is too warm. The food bank's specialists check which items need cold. Romaine does, apples don't. The agent searches the Directory for food banks with cold space, writes a reason card for every candidate, and proposes a new version. Everyone involved approves again, and affected households get a text.</p>
+<p><strong>Who decides:</strong> the affected food bank proposes, and the receiving food bank decides whether to accept.</p>
+
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Mock as Beeceptor cooler status
+    participant City as City food bank agent
+    participant Room as AGNTCY room
+    participant Dir as AGNTCY Directory
+    participant Others as Other food bank agents
+    participant Donor as Donor agent
+    participant N8 as n8n approvals
+    participant Notify as n8n alerts
+    Mock-&gt;&gt;City: Walk-in cooler above safe temperature
+    City-&gt;&gt;City: Specialists check which items need cold, romaine yes, apples no
+    City-&gt;&gt;Room: Disruption, cannot hold 200 lb romaine tonight
+    City-&gt;&gt;Dir: Find food banks with cold space for 200 lb, pickup tonight, reachable
+    Dir--&gt;&gt;City: Candidate food banks
+    City-&gt;&gt;Others: Ask for cold space and pickup windows
+    Others--&gt;&gt;City: Answers or refusals
+    City-&gt;&gt;City: Reason card for every candidate
+    City-&gt;&gt;Room: Version 4, romaine moves to eastside using the city truck
+    Others-&gt;&gt;Room: Eastside accepts 150 lb, counter for the rest
+    Donor-&gt;&gt;Room: No change needed, already delivered
+    Others-&gt;&gt;N8: Eastside manager approves version 5
+    City-&gt;&gt;N8: City manager approves the truck run
+    N8-&gt;&gt;Room: All approvals for version 5
+    Room-&gt;&gt;Notify: Affected households get a new food bank, time, and code
+    alt No food bank can take it in time
+        Room-&gt;&gt;Notify: Same-day offer to city households who can come tonight
+        Notify-&gt;&gt;Room: Anything left is unclaimed with reasons
+    end</pre></div><figcaption>Workflow 4: a food bank's cooler fails. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<h2>5. Condition doubt, or no agreement</h2>
+<p>When the produce's condition is uncertain or a record is missing, a person checks it. They either approve it as "use today" or decline it, with a reason. Recalled produce is never offered. If three rounds pass with no new terms, the result is a preserved disagreement.</p>
+<p><strong>Who decides:</strong> the donor's or food bank's person.</p>
+<figure class="diagram"><div class="figbox"><pre class="mermaid">sequenceDiagram
+    participant Donor as Donor agent
+    participant Bank as Food bank agent
+    actor Human as Food bank manager or donor staff
+    participant Dash as Dashboards
+    Donor-&gt;&gt;Bank: Offer, romaine with 1 day left, cold chain unknown
+    Bank-&gt;&gt;Bank: Profile check fails or record is missing
+    Bank-&gt;&gt;Human: Condition check needed
+    alt Human confirms it is good with a record
+        Human-&gt;&gt;Bank: Approved as use today
+    else Not good or no record
+        Human-&gt;&gt;Bank: Declined
+        Bank-&gt;&gt;Dash: Item declined, reason recorded
+    end
+    Note over Bank,Dash: After 3 rounds without new terms, the involved dashboards show a preserved disagreement</pre></div><figcaption>Workflow 5: condition doubt, or no agreement. <span class="note">From docs/MVP_DESIGN.md.</span></figcaption></figure>
+<p class="cite">Source: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 9, which has a diagram for each workflow.</p>
+
+<footer>
+  <p><strong>Read next:</strong> <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, section 9. Read each diagram against the steps above.</p>
+  <p><strong>Previous:</strong> <a href="0006-how-a-deal-becomes-final.html">Lesson 6: How a deal becomes final</a> · <strong>Next:</strong> <a href="0008-level-1-and-level-2.html">Lesson 8: Where Levels 1 and 2 show up</a></p>
+  <p>Quick lookup: <a href="../reference/harvestnet-at-a-glance.html">HarvestNet at a glance</a>.</p>
+  <p>Anything unclear? Ask me. I'm your teacher for this, and I can re-explain any part in different words.</p>
+  <p class="note">Source of truth: <a href="../../docs/MVP_DESIGN.md">docs/MVP_DESIGN.md</a>, <a href="../../CONTEXT.md">CONTEXT.md</a>, and <a href="../../docs/adr/">docs/adr/</a>. If this lesson and those disagree, they win.</p>
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body>
+</html>
