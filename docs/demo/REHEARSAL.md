@@ -1,6 +1,6 @@
 # Demo rehearsal checklist (ticket #25)
 
-The rehearsal is a human task. This page says who does what, how long each part takes, and what
+The one-page run sheet for the team is `docs/demo/run-sheet.html`. The rehearsal is a human task. This page says who does what, how long each part takes, and what
 to switch to when something fails. The words to say are in `docs/demo/SCRIPT.md`. The slides are
 `docs/demo/slides.html`. The backup is the recorded replay, `docs/demo/replay.html`.
 

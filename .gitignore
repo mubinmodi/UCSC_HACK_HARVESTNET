@@ -15,3 +15,6 @@ output/
 
 # deploy/aws/setup.sh writes this after a real run (no secrets).
 deploy/aws/outputs.json
+
+# Root uv.lock is created by ad-hoc `uv run --with pytest` test runs
+/uv.lock
