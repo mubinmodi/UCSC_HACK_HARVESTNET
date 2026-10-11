@@ -39,7 +39,7 @@ The priority controls who gets a first opportunity; it does not approve for them
             outstanding=[b for b in self.priority if b not in self.passed]
             if outstanding and outstanding[0]!=org and not typed.draft.allocations_to(org):
                 return Move(org,role,typed.draft.version,MoveKind.PASS,'Waiting for baseline priority turn').to_dict()
-        move=rules_negotiator(role,org,self.engine.calc).move(typed)
+        move=self.engine.rules_for(role,org).move(typed)
         if role.value=='food_bank' and move.kind in (MoveKind.ACCEPT,MoveKind.PASS,MoveKind.REJECT):
             self.passed.add(org)
         return move.to_dict()
