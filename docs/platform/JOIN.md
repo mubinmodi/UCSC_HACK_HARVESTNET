@@ -1,10 +1,18 @@
 # Join real agents over A2A (#21)
 
-The transport/core seam is ready; **the actual join remains blocked on #20 and
-the shared contracts**. Lane B's rules are available at commit
-`f06b14822d4379bc790a2f1d8a4525ac94cb7649`; Lane A's real harness and calculators
-are still absent. A synthetic seam test is explicitly
-not claimed as completion of issue #21.
+The real core/policy adapters are now available on the original yi36 review stack
+(PRs #42-#47). The core stack includes the merged #20 runner at `bf099b0` and
+real calculators. Its HTTP integration test compares a real mixed-batch fixture
+over five actual A2A hosts against the same in-process policies, requiring
+nonempty identical commitments, pathways and recomputed core checks. Core CI run
+38127403436 passed all 32 tests, including actual Postgres persistence, and 601
+agent/API skeleton regressions. This is local A2A evidence; native Directory,
+container/public HTTPS deployment and unexpected live cooler reapproval remain
+unverified acceptance gates for #21.
+
+Use `harvestnet_core.join_adapter:policy` and
+`harvestnet_core.join_adapter:harness` from the reviewed core stack. Both the
+core and real `harvestnet_agents` package must be available to each organization.
 
 ## Plug in teammates' code
 

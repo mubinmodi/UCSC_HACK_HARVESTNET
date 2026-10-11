@@ -110,5 +110,29 @@ are ready for review, with dependencies and incomplete acceptance gates retained
 none were merged or issues closed. All 39 tests were rerun successfully. The
 user-provided n8n API key authenticated successfully and listed all five inactive
 workflows. The key is stored only in ignored local configuration. Live SMS,
-Directory daemon registration, AWS deployment and real core comparison remain
-unverified. Review readiness is not full issue acceptance.
+Directory daemon registration and AWS deployment remain unverified. The real
+core comparison has since passed in the takeover stack described below. Review
+readiness is not full issue acceptance.
+
+## Six original takeover branches (October 11)
+
+The user authorized taking over yi36's six issues and explicitly requested
+commits and pushes on each original branch. Those branches now form a review
+stack #7 -> #8 -> #9 -> #10 -> #22 -> #24, with PRs #42 through #47. No teammate
+commits were overwritten or force-pushed. The aggregate PR #40 is superseded.
+Read `docs/core/README.md` on the final branch for requirements and open gates.
+The original five Caleb branches/PRs #26-#30 remain separate and unmerged.
+
+The core stack incorporates newly merged #20 (`bf099b0`). Its actual HTTP tests
+exercise the existing Lane C human capability relay and compare real-agent
+commitments/pathways/core audits over five A2A hosts against in-process execution.
+Run 38127403436 passed all 32 core tests with actual Postgres, no skips, and 601
+existing agent/API skeleton tests. This does not certify native Directory or
+public deployment. Paid repeated LLM runs, live voice/SMS, unexpected cooler
+rediscovery/reapproval and the actual teammate frontend screens remain open.
+The new household frontend currently uses synthetic credits/locations and a
+placeholder adapter; do not silently treat those as the agreed pounds contract.
+
+The existing overnight heartbeat now checks all eleven issues every ten minutes
+and responds to actionable teammate changes. AWS remains deferred; spending is
+zero and no real SMS/messages are authorized. Usage limits cannot be bypassed.
