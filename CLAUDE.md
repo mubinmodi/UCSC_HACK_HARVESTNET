@@ -18,7 +18,7 @@ Read `docs/MVP_DESIGN.md` for the current design, with `CONTEXT.md` (vocabulary)
 
 - **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0009`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP. If any other file disagrees with these, these win.
 - **Derived copies:** `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` are styled renderings of `docs/MVP_DESIGN.md`. When the Markdown changes materially, the copies go stale; say so, or regenerate them if asked.
-- **Work plan:** `.scratch/harvestnet-mvp/spec.md`, `lanes.md` (four lanes, with integration only in join tickets 20–24), and 25 tickets in `issues/`. The tickets are mirrored as GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`, and GitHub is the live copy (see `HANDOFF_parallel_lane_b.md`).
+- **Work plan:** `.scratch/harvestnet-mvp/spec.md`, `lanes.md` (four lanes, with integration only in join tickets 20–24), and 25 tickets in `issues/`. The live tickets are GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`; the local `issues/` files are the original snapshot.
 - **`learning/`:** a short course teaching the user the design (HTML lessons, PDFs, glossary). Follow `learning/NOTES.md`: plain, short English, and no quizzes or exercises.
 
 ## Writing conventions
@@ -33,11 +33,11 @@ Read `docs/MVP_DESIGN.md` for the current design, with `CONTEXT.md` (vocabulary)
 
 ### Issue tracker
 
-Issues and specs live as local markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+Issues are GitHub issues on `mubinmodi/UCSC_HACK_HARVESTNET`, managed with `gh`. The spec and lane plan stay in `.scratch/<feature-slug>/`; its `issues/` files are the original snapshot, not the live copy. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, recorded as a `Status:` line in each issue file. See `docs/agents/triage-labels.md`.
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, applied as GitHub labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
