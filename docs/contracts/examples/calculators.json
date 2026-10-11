@@ -1,0 +1,147 @@
+{
+  "kind": "calculator_examples",
+  "contract_version": "contract-v0.1",
+  "synthetic": true,
+  "note": "Synthetic. Outputs for fair_share, fair_share_gap, storage_at, capacity_fit, pickup_feasibility, to_pounds, gap_after_plan, and arrival_time were produced by Lane B's stand-in calculators (#11, commit f06b148). household_portions has no implementation yet; its outputs follow the rule in calculators.md and are worked by hand. Fair-share pounds come from the placeholder table 0.1.0-placeholder.",
+  "examples": [
+    {
+      "calculator": "fair_share",
+      "name": "family_of_four",
+      "input": {"household_size": 4},
+      "output": {"household_size": 4, "pounds": 12, "unit": "lb", "period": "week", "table_version": "0.1.0-placeholder", "is_placeholder": true}
+    },
+    {
+      "calculator": "fair_share",
+      "name": "family_of_six_uses_each_additional_person",
+      "input": {"household_size": 6},
+      "output": {"household_size": 6, "pounds": 16, "unit": "lb", "period": "week", "table_version": "0.1.0-placeholder", "is_placeholder": true}
+    },
+    {
+      "calculator": "household_portions",
+      "name": "scarce_produce_goes_to_the_furthest_below_first",
+      "input": {
+        "pounds_available": 10,
+        "households": [
+          {"request_code": "K7P4", "household_size": 4, "received_lb": 0},
+          {"request_code": "M2Q9", "household_size": 2, "received_lb": 3},
+          {"request_code": "R3T1", "household_size": 1, "received_lb": 4}
+        ]
+      },
+      "output": {
+        "portions": [
+          {"request_code": "K7P4", "pounds": 9, "fair_share_lb": 12, "still_below_lb": 3},
+          {"request_code": "M2Q9", "pounds": 1, "fair_share_lb": 7, "still_below_lb": 3},
+          {"request_code": "R3T1", "pounds": 0, "fair_share_lb": 4, "still_below_lb": 0}
+        ],
+        "left_over_lb": 0,
+        "table_version": "0.1.0-placeholder"
+      }
+    },
+    {
+      "calculator": "household_portions",
+      "name": "enough_produce_fills_everyone_to_fair_share",
+      "input": {
+        "pounds_available": 20,
+        "households": [
+          {"request_code": "K7P4", "household_size": 4, "received_lb": 0},
+          {"request_code": "M2Q9", "household_size": 2, "received_lb": 3},
+          {"request_code": "R3T1", "household_size": 1, "received_lb": 4}
+        ]
+      },
+      "output": {
+        "portions": [
+          {"request_code": "K7P4", "pounds": 12, "fair_share_lb": 12, "still_below_lb": 0},
+          {"request_code": "M2Q9", "pounds": 4, "fair_share_lb": 7, "still_below_lb": 0},
+          {"request_code": "R3T1", "pounds": 0, "fair_share_lb": 4, "still_below_lb": 0}
+        ],
+        "left_over_lb": 4,
+        "table_version": "0.1.0-placeholder"
+      }
+    },
+    {
+      "calculator": "storage_at",
+      "name": "cold_space_at_arrival",
+      "input": {
+        "storage": [{"window": {"start": "2026-10-13T12:00:00-07:00", "end": "2026-10-13T23:59:00-07:00"}, "cold_free_lb": 150, "dry_free_lb": 300}],
+        "at": "2026-10-13T14:20:00-07:00"
+      },
+      "output": {"cold_free_lb": 150, "dry_free_lb": 300, "recorded": true}
+    },
+    {
+      "calculator": "storage_at",
+      "name": "no_record_means_no_space",
+      "input": {
+        "storage": [{"window": {"start": "2026-10-13T12:00:00-07:00", "end": "2026-10-13T23:59:00-07:00"}, "cold_free_lb": 150, "dry_free_lb": 300}],
+        "at": "2026-10-14T09:00:00-07:00"
+      },
+      "output": {"cold_free_lb": 0, "dry_free_lb": 0, "recorded": false}
+    },
+    {
+      "calculator": "capacity_fit",
+      "name": "fifty_pounds_too_much",
+      "input": {"free_lb": 150, "needed_lb": 200},
+      "output": {"fits": false, "room_left_lb": 0, "over_by_lb": 50}
+    },
+    {
+      "calculator": "pickup_feasibility",
+      "name": "households_can_collect_tonight",
+      "input": {
+        "arrives_at": "2026-10-13T14:20:00-07:00",
+        "pickup_windows": [{"start": "2026-10-13T18:00:00-07:00", "end": "2026-10-13T20:00:00-07:00"}],
+        "usable_until": "2026-10-15T12:00:00-07:00"
+      },
+      "output": {
+        "feasible": true,
+        "collect": {"start": "2026-10-13T18:00:00-07:00", "end": "2026-10-13T20:00:00-07:00"},
+        "problem": null,
+        "last_pickup_end": "2026-10-13T20:00:00-07:00"
+      }
+    },
+    {
+      "calculator": "pickup_feasibility",
+      "name": "spoils_before_households_can_collect",
+      "input": {
+        "arrives_at": "2026-10-13T16:10:00-07:00",
+        "pickup_windows": [{"start": "2026-10-13T14:00:00-07:00", "end": "2026-10-13T18:00:00-07:00"}],
+        "usable_until": "2026-10-13T16:00:00-07:00"
+      },
+      "output": {"feasible": false, "collect": null, "problem": "spoils_before_pickup", "last_pickup_end": "2026-10-13T18:00:00-07:00"}
+    },
+    {
+      "calculator": "to_pounds",
+      "name": "sacks_with_stated_weight",
+      "input": {"produce_id": "potatoes", "quantity": 8, "unit": "sack", "lb_per_unit": 50},
+      "output": {"pounds": 400}
+    },
+    {
+      "calculator": "to_pounds",
+      "name": "case_with_no_stated_weight_is_refused",
+      "input": {"produce_id": "apples", "quantity": 10, "unit": "case", "lb_per_unit": null},
+      "error": {"code": "calculator_error", "message": "no stated pounds per case for Apples; the donor must give it"}
+    },
+    {
+      "calculator": "fair_share_gap",
+      "name": "three_households_at_one_food_bank",
+      "input": {
+        "households": [
+          {"household_size": 4, "received_lb": 0},
+          {"household_size": 2, "received_lb": 3},
+          {"household_size": 1, "received_lb": 4}
+        ]
+      },
+      "output": {"gap_lb": 16, "households": 3, "households_below": 2, "table_version": "0.1.0-placeholder"}
+    },
+    {
+      "calculator": "gap_after_plan",
+      "name": "planned_above_the_gap",
+      "input": {"gap_lb": 160, "planned_lb": 400},
+      "output": {"remaining_gap_lb": 0, "above_gap_lb": 240}
+    },
+    {
+      "calculator": "arrival_time",
+      "name": "departure_plus_travel",
+      "input": {"departs_at": "2026-10-13T14:00:00-07:00", "travel_minutes": 20},
+      "output": {"arrives_at": "2026-10-13T14:20:00-07:00"}
+    }
+  ]
+}

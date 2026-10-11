@@ -1,0 +1,120 @@
+{
+  "operation": "list_approvals",
+  "group": "approvals",
+  "method": "GET",
+  "path": "/approvals",
+  "summary": "Approval requests waiting for one organization's human, with the exact terms of each version.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/approvals",
+      "query": {
+        "organization_id": "city"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "organization_id": "city",
+        "approvals": [
+          {
+            "lot_id": "lot-market-1013",
+            "version": 3,
+            "terms_hash": "sha256:3f6c1e0d9a7b5c2e8f4a6d1b0c9e7f5a3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a",
+            "requested_at": "2026-10-13T12:40:00-07:00",
+            "expires_at": "2026-10-13T14:00:00-07:00",
+            "why_you": [
+              "truck_run"
+            ],
+            "summary": "City food bank collects 200 lb romaine lettuce in its refrigerated truck, leaving 2:00 pm, arriving 2:20 pm.",
+            "terms": {
+              "lot_id": "lot-market-1013",
+              "version": 3,
+              "based_on_version": 2,
+              "proposer_id": "market",
+              "reason": "Drop-off to rural and eastside on one route; city collects the romaine in its refrigerated truck.",
+              "donor_id": "market",
+              "deadline": "2026-10-13T15:00:00-07:00",
+              "items": [
+                {
+                  "produce_id": "apples",
+                  "pounds": 300,
+                  "condition_grade": "good",
+                  "usable_until": "2026-11-01T00:00:00-07:00"
+                },
+                {
+                  "produce_id": "romaine",
+                  "pounds": 200,
+                  "condition_grade": "good",
+                  "usable_until": "2026-10-15T12:00:00-07:00"
+                },
+                {
+                  "produce_id": "potatoes",
+                  "pounds": 400,
+                  "condition_grade": "good",
+                  "usable_until": "2026-11-10T00:00:00-07:00"
+                }
+              ],
+              "allocations": [
+                {
+                  "produce_id": "romaine",
+                  "food_bank_id": "city",
+                  "pounds": 200
+                },
+                {
+                  "produce_id": "apples",
+                  "food_bank_id": "rural",
+                  "pounds": 250
+                },
+                {
+                  "produce_id": "potatoes",
+                  "food_bank_id": "rural",
+                  "pounds": 400
+                },
+                {
+                  "produce_id": "apples",
+                  "food_bank_id": "eastside",
+                  "pounds": 50
+                }
+              ],
+              "transports": [
+                {
+                  "food_bank_id": "city",
+                  "mover": "food_bank",
+                  "departs_at": "2026-10-13T14:00:00-07:00",
+                  "arrives_at": "2026-10-13T14:20:00-07:00"
+                },
+                {
+                  "food_bank_id": "rural",
+                  "mover": "donor",
+                  "departs_at": "2026-10-13T13:00:00-07:00",
+                  "arrives_at": "2026-10-13T13:40:00-07:00"
+                },
+                {
+                  "food_bank_id": "eastside",
+                  "mover": "donor",
+                  "departs_at": "2026-10-13T13:00:00-07:00",
+                  "arrives_at": "2026-10-13T13:25:00-07:00"
+                }
+              ],
+              "drop_off_to": [
+                "rural",
+                "eastside"
+              ],
+              "drop_off_refrigerated": false,
+              "names": {
+                "market": "Farmers market",
+                "city": "City food bank",
+                "rural": "Rural food bank",
+                "eastside": "Eastside food bank"
+              }
+            },
+            "status": "awaiting_decision"
+          }
+        ]
+      }
+    }
+  }
+}

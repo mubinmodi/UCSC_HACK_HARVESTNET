@@ -1,0 +1,100 @@
+{
+  "operation": "list_food_banks",
+  "group": "household",
+  "method": "GET",
+  "path": "/food-banks",
+  "summary": "Food banks near a neighborhood, with pickup hours and what's committed there now.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/food-banks",
+      "query": {
+        "neighborhood": "Watsonville",
+        "request_code": "K7P4"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "food_banks": [
+          {
+            "food_bank_id": "rural",
+            "name": "Rural food bank",
+            "area": "Watsonville",
+            "pickup_windows": [
+              {
+                "start": "2026-10-13T16:00:00-07:00",
+                "end": "2026-10-13T18:00:00-07:00"
+              },
+              {
+                "start": "2026-10-14T18:00:00-07:00",
+                "end": "2026-10-14T20:00:00-07:00"
+              }
+            ],
+            "fits_your_pickup_times": true,
+            "committed_now": [
+              {
+                "produce_id": "apples",
+                "name": "Apples",
+                "pounds": 250,
+                "badges": []
+              },
+              {
+                "produce_id": "potatoes",
+                "name": "Potatoes",
+                "pounds": 400,
+                "badges": []
+              }
+            ]
+          },
+          {
+            "food_bank_id": "city",
+            "name": "City food bank",
+            "area": "Downtown Santa Cruz",
+            "pickup_windows": [
+              {
+                "start": "2026-10-13T18:00:00-07:00",
+                "end": "2026-10-13T20:00:00-07:00"
+              },
+              {
+                "start": "2026-10-14T18:00:00-07:00",
+                "end": "2026-10-14T20:00:00-07:00"
+              }
+            ],
+            "fits_your_pickup_times": true,
+            "committed_now": [
+              {
+                "produce_id": "romaine",
+                "name": "Romaine lettuce",
+                "pounds": 200,
+                "badges": [
+                  "keep_cold",
+                  "use_within_2_days"
+                ]
+              }
+            ]
+          },
+          {
+            "food_bank_id": "eastside",
+            "name": "Eastside food bank",
+            "area": "Live Oak",
+            "pickup_windows": [
+              {
+                "start": "2026-10-13T18:00:00-07:00",
+                "end": "2026-10-13T21:00:00-07:00"
+              },
+              {
+                "start": "2026-10-14T18:00:00-07:00",
+                "end": "2026-10-14T21:00:00-07:00"
+              }
+            ],
+            "fits_your_pickup_times": true,
+            "committed_now": []
+          }
+        ]
+      }
+    }
+  }
+}

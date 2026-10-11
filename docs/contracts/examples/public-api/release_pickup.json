@@ -1,0 +1,28 @@
+{
+  "operation": "release_pickup",
+  "group": "household",
+  "method": "POST",
+  "path": "/pickups/{pickup_id}/release",
+  "summary": "\"Can't make it\": give this pickup's portion back so it goes to the next household furthest below fair share.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/pickups/pk-1013-0001/release",
+      "body": {
+        "request_code": "K7P4"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "pickup_id": "pk-1013-0001",
+        "status": "released",
+        "released": true,
+        "released_lb": 8,
+        "message": "Thanks for telling us. Your portion will go to another family."
+      }
+    }
+  }
+}

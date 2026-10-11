@@ -1,0 +1,47 @@
+{
+  "operation": "submit_counter",
+  "group": "food_bank",
+  "method": "POST",
+  "path": "/lots/{lot_id}/counters",
+  "summary": "A food bank's or donor's own staff counter the current version with one amendment and a reason, as their organization's next move.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/lots/lot-market-1013/counters",
+      "body": {
+        "organization_id": "city",
+        "version": 3,
+        "amendment": {
+          "kind": "set_pounds",
+          "produce_id": "romaine",
+          "food_bank_id": "city",
+          "pounds": 150
+        },
+        "reason": "We need 50 lb of cold space for tomorrow's delivery."
+      }
+    },
+    "response": {
+      "status": 202,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "lot_id": "lot-market-1013",
+        "status": "queued_for_turn",
+        "based_on_version": 3,
+        "move": {
+          "organization_id": "city",
+          "version": 3,
+          "action": "counter",
+          "reason": "We need 50 lb of cold space for tomorrow's delivery.",
+          "amendment": {
+            "kind": "set_pounds",
+            "produce_id": "romaine",
+            "food_bank_id": "city",
+            "pounds": 150
+          }
+        },
+        "message": "Your counter goes in on your organization's next turn. It creates a new version; earlier approvals stop counting."
+      }
+    }
+  }
+}
