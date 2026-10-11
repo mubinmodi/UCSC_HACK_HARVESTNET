@@ -1,10 +1,13 @@
 """Stand-in calculators behind a small calculator interface (tickets #11 and #13).
 
-**These are stand-ins.** Lane A (ticket #8) owns the real calculators, and ticket #1
-(contract day) was meant to agree their interface. Neither exists yet, so this module
-proposes a minimal interface (``Calculators``) and a deterministic stand-in
-(``StandInCalculators``) that both the rules-based negotiators (#11) and the LLM
-negotiators' calculator tools (#13) call. Ticket #20 swaps in Lane A's real ones.
+**These are stand-ins, for unit tests only.** Lane A (ticket #8) owns the real
+calculators, ``harvestnet_core.calculators.Calculators``, which implement this module's
+interface (``Calculators``) plus ``fair_share`` and ``household_portions``. The harness
+join (ticket #20, ``harvestnet_core.join``) runs every fixture with Lane A's real ones
+and compares each call with these stand-ins. The deterministic stand-in
+(``StandInCalculators``) stays so Lane B's unit tests run without Lane A's code; a
+negotiator built without calculators still falls back to it, and ``run_scenario`` needs
+calculators passed explicitly.
 
 Calculators are the only source of derived numbers (ADR 0002). Every call is logged in
 ``calls`` with its inputs and result, so the LLM layer can check that each number in a
@@ -131,7 +134,7 @@ class StandInCalculators:
     table: FairShareTable = field(default_factory=load_fair_share_table)
     calls: list[CalculatorCall] = field(default_factory=list)
 
-    label = "stand-in calculators (Lane B, pending Lane A ticket #8)"
+    label = "stand-in calculators (Lane B, unit tests only; the harness uses Lane A's #8)"
 
     def fair_share_gap(self, households: Sequence[HouseholdBalance]) -> GapResult:
         gap = 0.0

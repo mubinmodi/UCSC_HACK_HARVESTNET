@@ -228,6 +228,11 @@ class RulesDonor(_Negotiator):
             return f"our vehicle isn't refrigerated and {_join(cold)} needs a cold chain"
         if not drop.window.contains(departs_at):
             return f"we can only leave between {_clock(drop.window.start)} and {_clock(drop.window.end)}"
+        # The drop-off window is when our vehicle is free, like a food bank's truck window:
+        # the whole trip fits in it, arrival included (the harness checks the same, #20).
+        arrives = self._arrival(facts, fb, departs_at)
+        if arrives is not None and not drop.window.contains(arrives):
+            return f"leaving at {_clock(departs_at)} we'd arrive at {_clock(arrives)}, but our vehicle is only free until {_clock(drop.window.end)}"
         load = sum(
             draft.planned_lb(other)
             for other in draft.named_food_banks()

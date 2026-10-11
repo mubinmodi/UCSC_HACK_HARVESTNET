@@ -41,6 +41,16 @@ def finite(value):
 class Calculators:
     label = "deterministic core calculators"
 
+    # Where these answers can differ from Lane B's stand-ins for the same input, and why.
+    # The recorder adds the sentence to each difference it logs (#20). Elsewhere the
+    # answers match; these calculators also refuse inputs the stand-ins pass through
+    # (NaN, infinity, booleans, a zero pack weight), which shows as an error, not an answer.
+    stand_in_differences = {
+        "storage_at": "where storage readings overlap at that moment, the core calculator takes the smallest free space "
+                      "among them, so it never counts space a reading doesn't promise; the stand-in reads only the first "
+                      "reading that covers the moment.",
+    }
+
     def __init__(self):
         self.profiles = load_profiles()
         self.table = load_fair_share_table()

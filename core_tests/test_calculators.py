@@ -39,13 +39,14 @@ class CalculatorTests(unittest.TestCase):
 
     def test_merged_teammate_runner_uses_real_calculators(self):
         from harvestnet_agents.scenario import load_scenario
-        from harvestnet_agents.scenario_runner import run_scenario
+        from harvestnet_agents.scenario_runner import FIXTURE_CHECKS_IN_HARNESS, run_scenario
         calc=Calculators()
         result=run_scenario(load_scenario(fixture()),calculators=calc)
         self.assertEqual(result.status,'committed')
         self.assertTrue(calc.calls)
         self.assertTrue(all(result.rule_checks().values()))
-        self.assertTrue(all('pending' in value.lower() for value in result.fixture_rule_checks.values()))
+        # Lane B's runner leaves the fixture's checks to the harness; the join (#20) runs them.
+        self.assertTrue(all(value==FIXTURE_CHECKS_IN_HARNESS for value in result.fixture_rule_checks.values()))
         self.assertTrue(all(not e.get('difference_from_stand_in') for e in result.events if e['kind']=='calculator_call'))
 
 

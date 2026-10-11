@@ -314,6 +314,20 @@ def test_the_spending_cap_stops_calls_before_they_happen():
     assert decision.move == rules_move(agent_input, Role.FOOD_BANK)
 
 
+def test_a_zero_cap_without_a_client_never_builds_the_default_client(monkeypatch):
+    import harvestnet_agents.llm_negotiators as llm
+
+    def no_sdk():
+        raise AssertionError("a zero cap must not build the Anthropic client")
+
+    monkeypatch.setattr(llm, "_default_client", no_sdk)
+    raw, role, agent_input = load_input("city_bids_only_what_cold_storage_allows")
+    negotiator = LLMNegotiator(role, agent_input.turn.organization_id, cap=SpendingCap(limit_usd=0))
+    decision = negotiator.decide(agent_input)
+    assert decision.source == "fallback" and "spending cap" in decision.fallback_reason
+    assert decision.model_calls == 0 and decision.move == rules_move(agent_input, role)
+
+
 def test_the_cap_is_shared_across_a_run_and_never_exceeded():
     cap = SpendingCap(limit_usd=0.40)
     sources = [run_llm(n, cap=cap)[3].source for n in RULES_FIXTURES]

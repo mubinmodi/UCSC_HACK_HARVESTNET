@@ -104,7 +104,21 @@ def test_the_donor_never_offers_a_drop_off_beyond_its_ability(name):
         drop = agent_input.facts.drop_off
         assert drop is not None and a.food_bank_id in drop.food_bank_ids
         assert drop.window.contains(a.departs_at) and a.departs_at <= agent_input.draft.deadline
+        assert drop.window.contains(a.arrives_at)  # the whole trip fits the vehicle's window
         assert agent_input.draft.planned_lb(a.food_bank_id) <= drop.capacity_lb
+
+
+def test_a_drop_off_leaving_in_the_window_but_arriving_after_it_is_retimed():
+    # The van is free 1 to 2 pm. Leaving at 2 pm, the 40-minute trip to rural ends at 2:40 pm,
+    # after the van's window, so the donor offers to leave at 1 pm instead (#20: the harness
+    # checks the whole trip against the window, as it does for a food bank's truck).
+    raw = load("donor_retimes_a_drop_off_into_its_window")
+    raw["draft"]["transports"][0].update(departs_at="2026-10-13T14:00", arrives_at="2026-10-13T14:40")
+    role, agent_input = parse_agent_input(raw)
+    move = rules_negotiator(role, agent_input.turn.organization_id).move(agent_input)
+    assert move.kind is MoveKind.COUNTER, move.reason
+    assert move.amendment == amendment_from_dict(raw["expected"]["amendment"])
+    assert "2:40 pm" in move.reason and "2 pm" in move.reason
 
 
 # --- Advocate ---------------------------------------------------------------------------

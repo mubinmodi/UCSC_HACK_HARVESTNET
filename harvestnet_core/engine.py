@@ -26,11 +26,13 @@ def jsonable(value):
 
 
 class Engine:
-    def __init__(self, fixture, records=None):
+    def __init__(self, fixture, records=None, calculators=None):
         self.fixture = copy.deepcopy(fixture)
         self.records = records or Records()
         self.protocol = Protocol(self.records)
-        self.calc = Calculators()
+        # The real calculators by default. The join (#20) passes them wrapped so every call
+        # is logged and compared with the stand-ins; the answers are still the real ones.
+        self.calc = calculators if calculators is not None else Calculators()
         self.policy_session=uuid.uuid4().hex
         self.negotiators={}
         self.now = fixture["clock"]["start"]
@@ -116,7 +118,10 @@ class Engine:
         items = [{"produce_id":i["produce_id"], "pounds":self.calc.to_pounds(i["produce_id"],i["quantity"],i["unit"],i.get("lb_per_unit")), "condition_grade":i["condition_grade"], "usable_until":i["usable_until"], "condition_doubt":i.get("condition_doubt")} for i in offer["items"]]
         if len({i["produce_id"] for i in items}) != len(items):
             raise ValueError("combine duplicate produce lines before reporting")
-        draft = {"lot_id":offer["lot_id"], "version":1,"donor_id":offer["donor_id"], "deadline":offer["deadline"], "items":items,"allocations":[],"transports":[],"drop_off_to":[],"drop_off_refrigerated":bool(self.donors[offer["donor_id"]].get("drop_off",{}).get("refrigerated",False)) if self.donors[offer["donor_id"]].get("drop_off") else False,"proposer_id":offer["donor_id"],"reason":"Owner reported surplus; nothing committed", "based_on_version":None,"names":self.names}
+        drop = self.donors[offer["donor_id"]].get("drop_off")
+        # Version 1 publishes where the donor offered to drop off (agent-moves.md: drop_off_to),
+        # from the donor's own recorded route, so food banks without a truck can bid (#20).
+        draft = {"lot_id":offer["lot_id"], "version":1,"donor_id":offer["donor_id"], "deadline":offer["deadline"], "items":items,"allocations":[],"transports":[],"drop_off_to":list(drop["food_bank_ids"]) if drop else [],"drop_off_refrigerated":bool(drop.get("refrigerated",False)) if drop else False,"proposer_id":offer["donor_id"],"reason":"Owner reported surplus; nothing committed", "based_on_version":None,"names":self.names}
         self.protocol.create(draft, self.now)
         return draft
 
@@ -225,14 +230,21 @@ class Engine:
         return result
 
 
-def run_fixture(fixture, move_provider=None, *, records=None):
-    engine=Engine(fixture,records)
+def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, observer=None):
+    """Run every lot in a fixture. ``calculators`` defaults to the real ones.
+
+    ``observer`` (the #20 join's ``HarnessLog``) only watches: it is told when a turn
+    starts, when the mover's facts are ready, when its move is recorded, and when a lot
+    is finished. It never changes a move, a record, or the clock."""
+    engine=Engine(fixture,records,calculators)
+    if observer: observer.attach(engine)
     result={"commitments":[],"pathways":[],"rule_checks":{},"mode":fixture["mode"],"synthetic":fixture["synthetic"],"scenario_id":fixture["scenario_id"],"calculator_label":engine.calc.label,"policy_label":getattr(move_provider,'label','real rules-based negotiators' if move_provider is None else 'configured policy adapter'),"scripted_humans":True,"events":[]}
     checks=[]
     for offer in fixture["surplus_offers"]:
         engine.now=offer["reported_at"]
         if offer.get("recall_notice"):
             engine.records.event(offer["lot_id"],engine.now,"recall_refused",{"reason":"recall notice"})
+            if observer: observer.lot_finished(engine,offer["lot_id"])
             continue
         engine.create_offer(offer)
         lot_id=offer["lot_id"]
@@ -247,7 +259,9 @@ def run_fixture(fixture, move_provider=None, *, records=None):
             org=fixture["turn_order"][(turn-1)%len(fixture["turn_order"])]
             if (turn-1)%len(fixture["turn_order"])==0:
                 round_start_version=draft["version"]
+            if observer: observer.turn_started(engine,lot_id,org)
             input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)}}
+            if observer: observer.facts_ready(engine,lot_id,org,input)
             queued_id=lot_id+':'+org
             try:
                 queued=engine.records.get('queued_move',queued_id)
@@ -264,16 +278,20 @@ def run_fixture(fixture, move_provider=None, *, records=None):
                 move=move_provider(org,wire)
             else:
                 move=engine.rules_for(role,org).move(typed).to_dict()
-            if move_provider and hasattr(move_provider,'pop_metadata'):
+            def record_provenance(**extra):
+                # Runs after every provider call, so a re-ask keeps both calls' cost and counts.
+                if not (move_provider and hasattr(move_provider,'pop_metadata')):
+                    return
                 metadata=move_provider.pop_metadata()
                 if metadata:
-                    engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**metadata})
+                    engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**metadata,**extra})
                     count=metadata.get('number_check_failures',0)
                     if count:
                         engine.records.event(lot_id,engine.now,'number_check_failure',{'count':count,'organization_id':org,'problems':['reported by validated LLM policy']})
                         current=engine.records.get('lot',lot_id)
                         current['number_check_failures']=current.get('number_check_failures',0)+count
                         with engine.records.transaction(): engine.records.put('lot',lot_id,current)
+            record_provenance()
             if queued:
                 with engine.records.transaction():
                     engine.records.delete('queued_move',queued_id)
@@ -292,6 +310,8 @@ def run_fixture(fixture, move_provider=None, *, records=None):
                 # Re-ask the same owner once. Then deterministic validated fallback.
                 if move_provider:
                     retry=move_provider(org,wire)
+                    record_provenance(retry=True)
+                    lot=engine.records.get('lot',lot_id)  # provenance may have updated the counts
                     if text_number_problems(retry.get('reason',''),pool):
                         engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':['second failed number check']})
                         lot['number_check_failures']+=1
@@ -306,6 +326,7 @@ def run_fixture(fixture, move_provider=None, *, records=None):
             if move.get("organization_id")!=org or move.get("version")!=draft["version"] or not move.get("reason"):
                 raise ValueError("move violates published turn/version")
             engine.records.event(lot_id,engine.now,"move",move)
+            if observer: observer.move_made(engine,lot_id,org,input,move)
             action=move["action"]
             if org=="advocate" and action not in ("counter","pass"):
                 raise ValueError("advocate cannot vote")
@@ -374,6 +395,7 @@ def run_fixture(fixture, move_provider=None, *, records=None):
         pathways=engine.pathways(lot_id)
         caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}
         checks.append(rule_checks(engine.records,lot_id,pathways,caps))
+        if observer: observer.lot_finished(engine,lot_id)
         result["commitments"].extend(engine.records.get("lot",lot_id)["commitments"])
         result["pathways"].extend(pathways)
         result["events"].extend(engine.records.events(lot_id))
