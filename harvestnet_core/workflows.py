@@ -3,6 +3,35 @@ from harvestnet_agents.negotiation import parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from .protocol import named
 
+TEMPLATE_REASON='Validated deterministic owner fallback; human approval is still required.'
+
+
+def count_number_failure(engine,lot_id,org,problems):
+    """Record one failed outgoing-message number check and add it to the lot's count."""
+    with engine.records.transaction():
+        engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':problems})
+        current=engine.records.get('lot',lot_id)
+        current['number_check_failures']=current.get('number_check_failures',0)+1
+        engine.records.put('lot',lot_id,current)
+
+
+def checked_move(engine,lot_id,org,move,pool,reask,fallback):
+    """The outgoing-message number check (#8): re-ask the same owner once after a failure,
+    and use the deterministic owner move with template wording only after the second
+    failure. Every failure is counted."""
+    from harvestnet_agents.llm_negotiators import text_number_problems
+    for attempt in (1,2):
+        problems=text_number_problems(move.get('reason',''),pool)
+        if not problems:
+            return move
+        count_number_failure(engine,lot_id,org,problems)
+        if attempt==1:
+            move=reask()
+    move=fallback()
+    move['reason']=TEMPLATE_REASON
+    engine.records.event(lot_id,engine.now,'template_fallback',{'organization_id':org,'after_failures':2})
+    return move
+
 
 def negotiate_pending(engine,lot_id,provider=None):
     accepts=set()
@@ -16,18 +45,14 @@ def negotiate_pending(engine,lot_id,provider=None):
         if (turn-1)%len(engine.fixture['turn_order'])==0: previous_version=d['version']
         raw={'role':engine.roles[org],'draft':d,'facts':engine.facts(org,d),'turn':{'organization_id':org,'number':turn,'now':engine.now,'accepted_by':sorted(accepts)}}
         role,typed=parse_agent_input(raw)
-        from harvestnet_agents.llm_negotiators import NumberPool,precompute,text_number_problems
+        from harvestnet_agents.llm_negotiators import NumberPool,precompute
         pool=NumberPool();pool.add(typed);call_start=len(engine.calc.calls)
         pool.add(precompute(role,typed,engine.calc))
-        move=provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session}) if provider else engine.rules_for(role,org).move(typed).to_dict()
+        def ask():
+            return provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session}) if provider else engine.rules_for(role,org).move(typed).to_dict()
+        move=ask()
         for call in engine.calc.calls[call_start:]: pool.add(call.result)
-        problems=text_number_problems(move.get('reason',''),pool)
-        if problems:
-            engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':problems})
-            current=engine.records.get('lot',lot_id);current['number_check_failures']=current.get('number_check_failures',0)+1
-            with engine.records.transaction(): engine.records.put('lot',lot_id,current)
-            move=engine.rules_for(role,org).move(typed).to_dict()
-            move['reason']='Validated deterministic owner fallback; human approval is still required.'
+        move=checked_move(engine,lot_id,org,move,pool,ask,lambda:engine.rules_for(role,org).move(typed).to_dict())
         try:
             queued=engine.records.get('queued_move',lot_id+':'+org)
         except KeyError:

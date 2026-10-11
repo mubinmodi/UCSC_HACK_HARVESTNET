@@ -25,6 +25,8 @@ from harvestnet_core.join import (
 )
 
 CONTRACT_EXAMPLE = Path('docs/contracts/examples/scenario-normal-afternoon.json')
+# Lane A's checks on a changed plan, added when a fixture's cooler failure runs Workflow 4.
+WORKFLOW_4_CHECKS = {'only_cold_dependent_items_move', 'failed_cooler_holds_nothing_cold', 'household_pickups_follow_new_version'}
 
 
 def failures(checks):
@@ -72,14 +74,15 @@ class EveryFixtureTests(unittest.TestCase):
         for path, run in self.runs.items():
             with self.subTest(path):
                 raw = load_fixture(path)
-                self.assertEqual(set(run.rule_checks), set(raw['rule_checks']) | set(LANE_B_RULE_CHECKS))
+                workflow_4 = WORKFLOW_4_CHECKS if raw['faults'] else set()
+                self.assertEqual(set(run.rule_checks), set(raw['rule_checks']) | set(LANE_B_RULE_CHECKS) | workflow_4)
                 self.assertEqual(failures(run.rule_checks), {})
                 self.assertEqual(failures(run.lane_b_runner['rule_checks']), {})
                 self.assertTrue(run.passed)
                 for name, check in {**run.rule_checks, **run.lane_b_runner['rule_checks']}.items():
                     self.assertIs(check['passed'], True, name)
                     self.assertNotIn('pending', json.dumps(check).lower(), name)
-                self.assertEqual(run.harness['rule_checks'], {n: True for n in LANE_A_RULE_CHECKS})
+                self.assertEqual(run.harness['rule_checks'], {n: True for n in [*LANE_A_RULE_CHECKS, *workflow_4]})
 
     def test_version_one_lists_the_donors_own_drop_off_route(self):
         for path, run in self.runs.items():
@@ -118,32 +121,33 @@ class EveryFixtureTests(unittest.TestCase):
                 self.assertEqual(run.calculator_differences, [])
                 self.assertEqual(run.lane_b_runner['calculator_differences'], [])
 
-    def test_without_a_fault_the_harness_and_lane_bs_runner_commit_the_same_terms(self):
+    def test_the_harness_and_lane_bs_runner_commit_the_same_terms(self):
+        # Neither side forecasts a scripted fault, so with or without one they commit the same plan.
         for path, run in self.runs.items():
-            if load_fixture(path)['faults']:
-                continue
             with self.subTest(path):
                 self.assertTrue(run.lane_b_runner['same_commitment_as_harness'], (
                     run.harness['commitments'], run.lane_b_runner['committed_allocations']))
 
-    def test_with_a_known_cooler_failure_the_harness_forecasts_it_and_lane_bs_runner_reacts_to_it(self):
-        # The one remaining difference between the two runs, by design on each side: Lane A's
-        # harness treats a scripted fault as known and gives the failing cooler no cold space
-        # from the start; Lane B's runner lets the fault happen at its time and runs #15.
-        profiles = Calculators().profiles
+    def test_with_a_cooler_failure_both_runs_react_at_its_time_with_the_same_change(self):
+        # Lane A's harness runs Workflow 4 when the fault happens (cooler_join.apply_fault);
+        # Lane B's runner runs #15 at the same time. Both propose the same new version.
         for path, run in self.runs.items():
             raw = load_fixture(path)
             if not raw['faults']:
                 continue
             with self.subTest(path):
                 failing = raw['faults'][0]['food_bank_id']
-                cold_to_failing = [c for c in run.harness['commitments']
-                                   if c['food_bank_id'] == failing and profiles.get(c['produce_id']).needs_cold]
-                self.assertEqual(cold_to_failing, [])
-                self.assertFalse(run.lane_b_runner['same_commitment_as_harness'])
+                [fault] = run.harness['faults']
+                self.assertEqual((fault['food_bank_id'], fault['handling']), (failing, 'mid_run_workflow_4'))
+                [proposed] = [e['data'] for e in run.harness['events'] if e['kind'] == 'change_proposed']
                 [assessment] = run.lane_b_runner['cooler_failure_assessments']
                 self.assertEqual(assessment['food_bank_id'], failing)
+                self.assertEqual((proposed['version'], sorted(proposed['organizations'])),
+                                 (assessment['proposal']['version'], sorted(assessment['proposal']['needs_approval_from'])))
+                # Lane B's runner leaves the proposal to the humans. In the harness, the scripted
+                # receiving human answers at the trip's arrival time, so the core refuses it.
                 self.assertFalse(assessment['proposal']['committed'])
+                self.assertNotEqual(fault['change_status'], 'committed')
 
     def test_a_fixture_that_asks_for_a_check_lane_a_lacks_reports_it_not_run_and_failed(self):
         raw = load_fixture(CONTRACT_EXAMPLE)

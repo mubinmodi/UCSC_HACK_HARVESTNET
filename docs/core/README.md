@@ -10,13 +10,16 @@ From the repository root, install the `agents` package or put `agents/src` on
 ```sh
 PYTHONPATH=agents/src python -m unittest discover -s core_tests -v
 PYTHONPATH=agents/src python -m harvestnet_core run core_fixtures/normal-afternoon.json
-PYTHONPATH=agents/src python -m harvestnet_core evaluate core_fixtures/normal-afternoon.json
+PYTHONPATH=agents/src python -m harvestnet_core evaluate core_fixtures/*.json
 PYTHONPATH=agents/src python -m harvestnet_core replay runtime/replays/normal-afternoon-rules_based-0.json
 PYTHONPATH=agents/src python -m harvestnet_core.server
 ```
 
 On PowerShell, use `$env:PYTHONPATH='agents/src'` once, then omit the prefix from
-the commands. The server binds localhost port 8050. `PORT`, `DATABASE_URL`,
+the commands. `evaluate` stores each scenario's results in the records the server
+reads (`--database`, default `DATABASE_URL` or `runtime/core.sqlite`), so
+`GET /results?scenario_id=...` serves them unchanged. The cooler-failure scenario
+reads Lane C's organization systems in process, so run from the repository root. The server binds localhost port 8050. `PORT`, `DATABASE_URL`,
 `HARVESTNET_FIXTURE`, `HARVESTNET_ALLOWED_ORIGIN` and `HARVESTNET_STAFF_TOKENS`
 configure it. Staff tokens are a JSON object with a different secret for each
 organization ID. Store them in ignored local configuration and pass them as
@@ -64,7 +67,8 @@ placeholder fair share, and leave excess unassigned. Missing pack weights and
 storage readings cannot invent capacity. NaN, infinity and boolean quantities
 are rejected. Pickup eligibility checks actual weekly household windows,
 can't-eat exclusions, spoilage deadlines and same-day collection for limited-fridge
-households receiving cold-dependent produce. Pickup windows also stay within
+households receiving produce whose profile says it needs a fridge (`needs_fridge`,
+design section 8; not the transport cold chain). Pickup windows also stay within
 the owner's reserved storage interval.
 
 Every counter creates a version and clears previous approvals and holds. Owner
@@ -73,18 +77,32 @@ disagreement, and the API records deadline unclaimed without auto-commit.
 Recalled produce is refused. Condition doubt needs an explicit authenticated
 condition check; it never disappears through ordinary approval.
 
-Outgoing policy reasons are checked against inputs and calculator results. The
-fixture harness retries once after a number failure, then uses a deterministic
-owner fallback with template wording. Each failure is counted. The public rules
-scheduler checks its deterministic output too. LLM policy provenance includes
-internal number failures and fallback causes.
+Outgoing policy reasons are checked against inputs and calculator results
+(`workflows.checked_move`, shared by the fixture harness and the public API's
+scheduler). After a failed number check the same owner is asked once more; only
+after the second failure does the deterministic owner move with template wording
+replace it (`template_fallback` event). Each failure is counted on the lot and in
+the event log. LLM policy provenance includes internal number failures and
+fallback causes.
 
-The cooler-failure evaluation fixture gives **every method the same known
-scripted fault forecast** and conservatively excludes unsafe cold reservations.
-It logs the timed fault. It does not certify unexpected post-commit disruption,
-live Directory rediscovery or n8n re-approval; those remain #23/#21 deployment
-acceptance work. The normal fixture removes the cooler fault; the dedicated
-cooler fixture keeps it. The agreed contract example is left unchanged.
+Scripted faults are **not forecast**. No method's agents see a cooler failure
+before its time: the plan is negotiated and committed on the working cooler. At
+the fault time the harness runs Workflow 4 in process
+(`cooler_join.apply_fault`): Lane C's demo switch fails the cooler, the failing
+food bank's agent reads its own systems, rediscovers food banks through Lane C's
+local Directory, runs Lane B's cooler-failure flow, records the failed cooler in
+its status and proposes the new version. Each named organization's scripted human
+decides on that exact version, minutes counted from the fault. No reply is no
+approval. Without an approved change, cold-dependent pickups at the failed cooler
+become `held_for_human` and are never counted as collected. This is the same path
+as the #23 join, without HTTP. It does not certify the live AGNTCY Directory or
+n8n re-approval.
+
+With the shipped cooler fixture, the scripted eastside human answers 15 minutes
+after being asked. That is exactly the planned trip's arrival time, because Lane
+B's plan departs at the moment of detection, so the core refuses the answer as
+stale and nothing commits. This is reported as is (see #10 below). A variant
+where humans answer within the trip time commits the change; the tests cover both.
 
 ## #9: real API logic
 
@@ -92,7 +110,24 @@ cooler fixture keeps it. The agreed contract example is left unchanged.
 response fields. Unknown records return 404; stale terms return 409. Fair share
 comes from the real calculator. Preview saves nothing; saving requires complete
 answers and explicit consent. Requests expire after seven days, including their
-write-only phone and pickup records. Names, addresses and income are refused.
+write-only phone and pickup records. Their pickup notices in the event log keep
+only the pounds, items and food bank; the request code and the household's pickup
+window are removed (design section 12). Names, addresses and income are refused.
+
+`GET /` lists every operation (the agreed contract plus the three additive,
+proposed routes), with `contract_version`. A missing body field, an unknown
+`produce_id` or another bad input returns the contract's 400; only unknown
+records return 404.
+
+A surplus offer's `drop_off` applies to that offer only. It is checked and stored
+with the lot, survives restarts, and never changes the donor's recorded drop-off
+or other lots. An item without `usable_until` gets the **produce profile's**
+minimum usable days (cold life for cold-dependent produce, room life otherwise),
+counted from the report time and labeled `usable_until_basis: profile_assumption`
+with the profile field, days, profile set version and that field's sources. The
+label is returned by `create_surplus_offer` and `get_lot`. A `use_soon` item must
+state the donor's own `usable_until`: the profiles give no use-soon life, and
+none is invented (ADR 0002). A condition check relabels the item `condition_check`.
 
 Offers schedule each organization's real rules, acquire its own holds and stop
 awaiting actual human approvals. Accept/decline, counter queueing, version history,
@@ -123,7 +158,20 @@ approvals. The advocate makes no baseline amendments.
 
 Metrics come from run records: produce not collected by the scripted end,
 worst-served weekly coverage, households reached, pickup-window match, time to
-first commitment, invalid commitments and counted number failures. The
+first commitment, invalid commitments and counted number failures.
+**Worst-served coverage** follows design section 16: for each food bank, the
+average over the households that chose it of each household's share of fair share
+received (capped at 1, zeros included), then the lowest of those averages.
+`coverage_by_food_bank` shows each average. A household that chose several food
+banks counts in each. The old value took the single lowest household and was 0.0
+in every run; it now differs across scenarios and methods.
+
+For a scenario with a fault, each method's result has `cooler_failure`: how many
+faults, `mid_run_workflow_4`, the change statuses and any refusals, pounds and
+pickups moved or released, and pounds `held_for_human`. On the shipped cooler
+fixture every method reports the refused late answer and held cold pickups,
+because the fixture's scripted timing is what it is. Change commitments count
+toward `invalid_commitments` like first commitments. The
 `produce_wasted_lb` field currently means **not collected by scenario end**, not
 observed spoilage. This definition is stated beside each result. Replays carry
 the original moves and must reproduce commitments/pathways/checks without any
@@ -140,7 +188,15 @@ front desk. An injected extractor must pass its evidence checks; raw transcript
 text is not stored. Voice intake returns read-back/consent without saving; a
 separate consented voice request gets the same calculated fair share as the web.
 Without a configured voice extractor the API returns 503 and directs to text.
-No uncapped Claude extractor is instantiated automatically.
+`POST /voice-intake` has a per-process sliding-window rate limit (20 calls a
+minute by default, `voice_rate_limit` on `API`); over it, 503 `rate_limited`. The
+API refuses a bare Lane B `ClaudeExtractor`: it must be wrapped in
+`harvestnet_core.voice.CappedExtractor`, which takes a spending cap (zero to $100,
+nonzero needs `allow_paid`). The extractor doesn't report token usage, so each
+call is reserved and charged at its worst case (every prompt and transcript
+character as an input token, full `max_tokens` output, highest listed price).
+When the next call's worst case doesn't fit, no call is made: 503
+`spending_cap_reached`. The local server attaches no extractor.
 
 Local HTTP tests exercise browser-style request creation and the existing
 capability-verified human approval relay. Tests also cover pickup views, wrong
@@ -162,7 +218,10 @@ cap requires explicit authorization. This session spent no provider credits.
 
 Repeated runs report individual values plus mean and standard deviation.
 `publish_evaluation` stores the results response; `/results` returns those method
-values unchanged. Missing LLM configuration gives `not_run`, with null values.
+values unchanged. `python -m harvestnet_core evaluate` calls it for each fixture.
+`--llm-cap-usd 0` runs the LLM method with no model calls (`fallback_only`); a
+nonzero cap needs `--allow-paid` and is shared by every scenario and repetition
+in the command (`--repeats`). Missing LLM configuration gives `not_run`, with null values.
 Each LLM run is labeled from its own `policy_provenance` events, not from the
 shared cap: it reports `model_calls`, `llm_decisions`, `fallback_decisions` and
 `template_fallbacks`. Runs with no LLM decisions (zero cap, or a shared cap

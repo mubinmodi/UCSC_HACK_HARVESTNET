@@ -61,8 +61,8 @@ def _json(url, body=None, *, token=None, method=None):
 def run_until_fault(fixture, records=None):
     """Run the core fixture to its commitment, before its scripted faults and household replies.
 
-    The fixture's own run applies the cooler failure before negotiating (a forecast); here
-    the failure arrives mid-run, after commitment and delivery, through Lane C's switch.
+    The fixture's own run handles the failure in process at its time (``apply_fault``); here
+    it is left for the caller to deliver over HTTP, through Lane C's switch.
     """
     pre = copy.deepcopy(fixture)
     faults = pre.get('faults', [])
@@ -103,7 +103,7 @@ def organization_systems(engine, at, faults=(), recorded=None):
            'donor': {'inventory': {'lot_id': offer['lot_id'], 'recall': bool(offer['recall_notice']), 'deadline': offer['deadline'],
                                    'items': [{'profile_id': i['produce_id'], 'quantity': i['quantity'], 'unit': i['unit'],
                                               'condition': i['condition_grade']} for i in offer['items']]},
-                     'truck': _truck(engine.donors[offer['donor_id']].get('drop_off'))}}
+                     'truck': _truck(engine.drop_off(offer['lot_id']))}}
     held = {}
     for other in records.all('lot'):
         for owner, hs in other['holds'].items():
@@ -193,6 +193,113 @@ def handle_cooler_reading(*, food_bank_id, lot_id, systems_url, core_url, token,
         change = _json(f'{core}/lots/{quote(lot_id)}/changes', {'terms': flow.new_version.terms,
                        'organizations': list(flow.new_version.organizations), 'dashboard': flow.dashboard()}, token=token)
     return {'status': 'assessed', 'flow': flow, 'change': change}
+
+
+def apply_fault(engine, lot_id, fault):
+    """A fixture's cooler failure at its own time, in process, for the harness and evaluation.
+
+    The same steps as ``handle_cooler_reading`` and the #23 join, without HTTP. No agent saw
+    the fault before ``fault['at']``: the plan was negotiated and committed on the working
+    cooler. At the fault time Lane C's demo switch fails the cooler, the failing food bank's
+    agent reads its own systems, rediscovers food banks through Lane C's local Directory and
+    runs Lane B's cooler-failure flow, records the failed cooler in its status, and proposes
+    the new version. Each named organization's scripted human then decides on that exact
+    version (``fixture['humans']``, minutes counted from the fault). No reply is no approval.
+    Returns a summary for the run's metrics. Synthetic, like the fixture.
+    """
+    from harvestnet_platform.directory import LocalDirectory, record_info
+    from harvestnet_platform.transport import ORGANIZATIONS
+    from datetime import timedelta
+    from .protocol import Conflict
+    records, bid = engine.records, fault['food_bank_id']
+    at = dt(fault['at'])
+    engine.now = max(dt(engine.now), at).isoformat()
+    summary = {'food_bank_id': bid, 'at': fault['at'], 'lot_id': lot_id, 'handling': 'mid_run_workflow_4',
+               'change_status': None, 'refusals': [], 'pounds_moved': 0.0, 'pickups_moved': 0, 'pickups_released': 0,
+               'held_for_human_lb': 0.0, 'synthetic': True}
+    systems = scenario_systems(organization_systems(engine, fault['at'], [fault]))
+    systems.switch(bid, True)
+    cooler = systems.read(bid, 'cooler')
+    signal = read_cooler_signal(cooler, organization_id=bid)
+    reading = signal.reading.summary()
+    # The failing food bank's own status, as PUT /food-banks/{id}/status records it.
+    with records.transaction():
+        bank = records.get('bank', bid)
+        bank['cooler'] = {'status': 'failed', 'temperature_c': signal.temperature_c, 'cold_available': False,
+                          **{k: reading[k] for k in ('source', 'mode', 'synthetic', 'observed_at')}}
+        bank['status_version'] = bank.get('status_version', 0) + 1
+        records.put('bank', bid, bank)
+        records.event(lot_id, engine.now, 'cooler_failure', {'food_bank_id': bid, 'reading': fault['reading'], 'synthetic': True,
+                      'handling': 'Not known to any agent before this time; Workflow 4 runs now'})
+    lot = records.get('lot', lot_id)
+    if lot['status'] != 'committed' or not changes._held(lot, bid):
+        summary['change_status'] = 'nothing_held_at_failed_cooler'
+        return summary
+    try:
+        holding = changes.holding(engine, lot_id, bid)
+    except Conflict as exc:
+        summary['change_status'] = f'not_assessed: {exc}'
+        return summary
+    directory = LocalDirectory(systems, {org: f'local://harvestnet/agents/{org}' for org in ORGANIZATIONS})
+    found = directory.search(min_cold_lb=0)  # every food bank, so every one gets a reason card
+    answers = {}
+    for record in found['records']:
+        info = record_info(record)
+        org = info.get('organization_id')
+        if info.get('capabilities', {}).get('role') == 'food_bank' and org != bid:
+            answers[org] = {'response': 'answered', 'name': engine.names[org],
+                            'storage': systems.read(org, 'storage'), 'pickup_hours': systems.read(org, 'pickup-hours')}
+    flow = run_cooler_failure_flow(cooler_reading=cooler, truck_reading=systems.read(bid, 'truck'),
+                                   pickup_hours_reading=systems.read(bid, 'pickup-hours'), holding=holding,
+                                   directory_result=found, answers=answers, travel_minutes=holding['travel_minutes'],
+                                   profiles=engine.calc.profiles)
+    if flow.new_version is None:
+        summary['change_status'] = 'no_change_proposed'
+        return summary
+    proposed = changes.propose(engine, lot_id, {'terms': flow.new_version.terms, 'organizations': list(flow.new_version.organizations),
+                                                'dashboard': flow.dashboard()}, bid)
+    humans = {h['organization_id']: h for h in engine.fixture.get('humans', [])}
+    result = None
+    for org in sorted(proposed['needs_approval_from'], key=lambda o: humans.get(o, {}).get('after_minutes', 0)):
+        human = humans.get(org)
+        if human is None:
+            continue  # no reply is no approval
+        engine.now = max(dt(engine.now), at + timedelta(minutes=human['after_minutes'])).isoformat()
+        receipt = {'lot_id': lot_id, 'version': proposed['version'], 'organization_id': org, 'terms_hash': proposed['terms_hash'],
+                   'decision': human['on_approval_request'], 'receipt_id': f"script-{lot_id}-{proposed['version']}-{org}"}
+        try:
+            result = changes.approve(engine, receipt, org)
+        except Conflict as exc:
+            records.event(lot_id, engine.now, 'change_refused', {'version': proposed['version'], 'organization_id': org, 'reason': str(exc)})
+            summary['refusals'].append({'organization_id': org, 'at': engine.now, 'reason': str(exc)})
+            break
+    change = changes.find(records, lot_id, proposed['version'])
+    summary.update(change_status=change['status'], version=change['version'])
+    if change['status'] == 'committed':
+        summary.update(pounds_moved=sum(m['pounds'] for m in change['terms']['moves']),
+                       pickups_moved=len(change.get('moved_pickups', [])), pickups_released=len(change.get('released_pickups', [])))
+    else:
+        summary['held_for_human_lb'] = hold_for_human(engine, lot_id, bid)
+    return summary
+
+
+def hold_for_human(engine, lot_id, food_bank_id):
+    """Without an approved change, cold-dependent pickups at the failed cooler wait for a human.
+
+    The harness never counts them as collected: whether that produce is still safe is a
+    human's decision (design section 12, anything uncertain goes to a human). Returns pounds.
+    """
+    records, profiles, held = engine.records, engine.calc.profiles, 0.0
+    with records.transaction():
+        for p in records.all('pickup'):
+            if p['lot_id'] != lot_id or p['food_bank_id'] != food_bank_id or p['status'] != 'committed':
+                continue
+            if any(profiles.get(i['produce_id']).needs_cold for i in p['items']):
+                p.update(status='held_for_human', hold_reason='cooler failed and no change was approved; a human decides')
+                records.put('pickup', p['pickup_id'], p)
+                records.event(lot_id, engine.now, 'pickup_held_for_human', {'pickup_id': p['pickup_id'], 'pounds': p['pounds'], 'reason': p['hold_reason']})
+                held += p['pounds']
+    return held
 
 
 def request_approvals(approvals_url, events_token, approval_request):

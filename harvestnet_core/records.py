@@ -8,6 +8,10 @@ import sqlite3
 import threading
 
 
+class NotFound(KeyError):
+    """No stored record of this kind and ID. Still a ``KeyError`` for existing callers."""
+
+
 class Records:
     def __init__(self, database=":memory:"):
         self.lock = threading.RLock()
@@ -48,7 +52,7 @@ class Records:
     def get(self, kind, id):
         row = self.execute("SELECT data FROM records WHERE kind=? AND id=?", (kind, id)).fetchone()
         if row is None:
-            raise KeyError(id)
+            raise NotFound(id)
         return json.loads(row[0])
 
     def all(self, kind):
@@ -62,6 +66,13 @@ class Records:
 
     def events(self, run_id):
         return [{"sequence": r[0], "at": r[1], "kind": r[2], "data": json.loads(r[3])} for r in self.execute("SELECT sequence,at,kind,data FROM events WHERE run_id=? ORDER BY sequence", (run_id,)).fetchall()]
+
+    def events_of_kind(self, kind):
+        return [{"sequence": r[0], "run_id": r[1], "at": r[2], "data": json.loads(r[3])} for r in self.execute("SELECT sequence,run_id,at,data FROM events WHERE kind=? ORDER BY sequence", (kind,)).fetchall()]
+
+    def replace_event_data(self, sequence, data):
+        """Only for privacy purges: an expired household's details are removed, the counts kept."""
+        self.execute("UPDATE events SET data=? WHERE sequence=?", (json.dumps(data, allow_nan=False), sequence))
 
     def close(self):
         self.db.close()
