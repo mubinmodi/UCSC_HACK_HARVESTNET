@@ -27,7 +27,7 @@ export function ReviewScreen(props: {
     [t.labels.cantEat, cantEat.length ? cantEat.join(', ') : t.none],
     [t.labels.snap, form.snap === 'yes' ? t.yes : form.snap === 'no' ? t.no : t.preferNot],
     [t.labels.language, form.language === 'es' ? 'Español' : 'English'],
-    [t.labels.phone, form.phone.trim() || t.notSet],
+    [t.labels.email, form.email.trim() || t.notSet],
   ];
   const example = isExampleData(preview);
 

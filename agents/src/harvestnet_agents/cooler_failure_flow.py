@@ -608,20 +608,19 @@ def _new_version(event_id: str, failure: CoolerFailure, d: CoolerFailureDecision
 
 # --- Household texts (front_desk wording) --------------------------------------------------
 
-DECLINE_REPLIES = {Language.EN: ("can't make it", "cant make it", "cannot make it"), Language.ES: ("no puedo ir",)}
-"""Matches the phrases Lane C's reply workflow releases a portion on (PR #28)."""
-ACCEPT_REPLIES = {Language.EN: ("yes",), Language.ES: ("sí", "si")}
 
+# Pickup messages go by email (user decision, October 11, 2026). The email carries a
+# "Can't make it" link to the household page; there is nothing to reply to.
 _NOTICE = {
     Language.EN: {
         "changed": "Your pickup changed.",
-        "reply": "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another family.",
-        "decline": "Can't make it? Reply CAN'T MAKE IT and your portion goes to another family.",
+        "reply": "This isn't a food bank you chose. If you can't go there, use the Can't make it link and your portion goes to another family.",
+        "decline": "Can't make it? Use the Can't make it link and your portion goes to another family.",
     },
     Language.ES: {
         "changed": "Su recogida cambió.",
-        "reply": "Responda SÍ para conservarla, o NO PUEDO IR para rechazarla. Si la rechaza, su porción pasa a otra familia.",
-        "decline": "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otra familia.",
+        "reply": "Este no es un banco de alimentos que eligió. Si no puede ir, use el enlace No puedo ir y su porción pasa a otra familia.",
+        "decline": "¿No puede ir? Use el enlace No puedo ir y su porción pasa a otra familia.",
     },
 }
 
@@ -638,9 +637,7 @@ class HouseholdNotice:
     food_bank: str
     items: tuple[tuple[str, str, float], ...]  # (produce_id, display name, pounds)
     window: PickupWindow
-    reply_expected: bool  # the household didn't choose this food bank, so it is asked
-    decline_replies: tuple[str, ...]
-    accept_replies: tuple[str, ...]
+    reply_expected: bool  # the household didn't choose this food bank, so it is asked whether it can go
     message: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -657,8 +654,6 @@ class HouseholdNotice:
             "items": [{"name": name, "pounds": _plain(lb), "produce_id": pid} for pid, name, lb in self.items],
             "window": _window_view(self.window),
             "reply_expected": self.reply_expected,
-            "decline_replies": list(self.decline_replies),
-            "accept_replies": list(self.accept_replies),
             "message": self.message,
         }
 
@@ -670,7 +665,7 @@ def household_change_notices(
     item_names: Mapping[str, Mapping[str, str]] | None = None,
     profiles: ProfileSet | None = None,
 ) -> tuple[HouseholdNotice, ...]:
-    """Texts for households whose portions the new version moves to the receiving food bank.
+    """Pickup notices for households whose portions the new version moves to the receiving food bank.
 
     ``households`` are request records: ``request_code``, ``language``,
     ``chosen_food_banks``, and ``portions`` (``produce_id``, ``pounds``,
@@ -741,8 +736,6 @@ def _notice(nv: NewVersion, code: str, language: Language, items, *, reply_expec
         items=items,
         window=window,
         reply_expected=reply_expected,
-        decline_replies=DECLINE_REPLIES[language],
-        accept_replies=ACCEPT_REPLIES[language] if reply_expected else (),
         message=message,
     )
 

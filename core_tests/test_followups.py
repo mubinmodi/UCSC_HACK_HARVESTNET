@@ -136,7 +136,7 @@ class PublicAPITests(unittest.TestCase):
     def test_root_lists_every_contract_operation(self):
         status, body = self.api.call('GET', '/')
         self.assertEqual(status, 200, body)
-        self.assertEqual(body['contract_version'], 'contract-v0.1')
+        self.assertEqual(body['contract_version'], 'contract-v0.2')
         agreed = {p.stem for p in Path('docs/contracts/examples/public-api').glob('*.json')}
         listed = {o['operation'] for o in body['operations']}
         self.assertTrue(agreed <= listed, agreed - listed)
@@ -235,7 +235,7 @@ class EveryOperationShapeTests(unittest.TestCase):
         run('get_health', '/health')
         run('get_fair_share', '/fair-share?household_size=4&language=en')
         run('preview_request', '/requests/preview', form)
-        code = run('create_request', '/requests', {**form, 'household_size': 3, 'consent': True, 'channel': 'web', 'phone': '+15555550142'})['request_code']
+        code = run('create_request', '/requests', {**form, 'household_size': 3, 'consent': True, 'channel': 'web', 'email': 'household@example.invalid'})['request_code']
         run('list_food_banks', '/food-banks?request_code=' + code)
         run('choose_food_banks', f'/requests/{code}/food-banks', {'food_bank_ids': ['city']})
         run('list_produce_profiles', '/produce-profiles')

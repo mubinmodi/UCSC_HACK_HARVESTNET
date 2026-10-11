@@ -27,7 +27,7 @@ from urllib.parse import urlsplit
 
 __all__ = ["CORS_HEADERS", "Response", "Route", "examples_source", "handle", "load_routes"]
 
-CONTRACT_VERSION = "contract-v0.1"
+CONTRACT_VERSION = "contract-v0.2"  # public API only; the other three contracts stay contract-v0.1
 _REPO_EXAMPLES = Path(__file__).resolve().parents[3] / "docs" / "contracts" / "examples" / "public-api"
 _LABEL = {"mode": "example", "synthetic": True}
 

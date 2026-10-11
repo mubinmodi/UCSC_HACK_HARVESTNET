@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .api import API
+from .email_delivery import EmailDispatcher
 from .engine import Engine
 from .records import Records
 
@@ -54,6 +55,24 @@ if __name__=='__main__':
     fixture=json.loads(Path(os.environ.get('HARVESTNET_FIXTURE','docs/contracts/examples/scenario-normal-afternoon.json')).read_text())
     records=Records(os.environ.get('DATABASE_URL','runtime/core.sqlite'))
     engine=Engine(fixture,records)
-    api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')))
+    pickup_webhook=os.environ.get('N8N_PICKUP_WEBHOOK_URL')
+    release_webhook=os.environ.get('N8N_RELEASE_WEBHOOK_URL')
+    token=os.environ.get('N8N_WEBHOOK_TOKEN')
+    email_enabled=bool(pickup_webhook or release_webhook)
+    if email_enabled and not (pickup_webhook and release_webhook and token):
+        raise ValueError('both pickup webhooks and N8N_WEBHOOK_TOKEN are required for email notices')
+    page_url=os.environ.get('HARVESTNET_HOUSEHOLD_URL') if email_enabled else None
+    if email_enabled and not page_url:
+        raise ValueError('HARVESTNET_HOUSEHOLD_URL is required for email notices')
+    api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')),
+            household_page_url=page_url)
+    if email_enabled:
+        allowed=os.environ.get('SES_TEST_RECIPIENTS','')
+        dispatcher=EmailDispatcher(api,pickup_webhook=pickup_webhook,release_webhook=release_webhook,
+                                   token=token,allowed_recipients=allowed.split(','))
+        import threading
+        worker=threading.Thread(target=dispatcher.run_forever,daemon=True,name='household-email-outbox')
+        worker.start()
+        api.email_dispatcher_thread=worker
     host,port=bind_address()
     make_server(api,host=host,port=port).serve_forever()

@@ -1,5 +1,5 @@
 {
-  "name": "HarvestNet - carry human review requests",
+  "name": "HarvestNet - email human review requests",
   "nodes": [
     {
       "id": "authenticated-event",
@@ -25,8 +25,8 @@
       }
     },
     {
-      "id": "prepare-review-text",
-      "name": "Prepare review text",
+      "id": "prepare-review-email",
+      "name": "Prepare review email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -34,30 +34,33 @@
         0
       ],
       "parameters": {
-        "jsCode": "const b = $json.body; if (!b.to || !b.message || !b.decision_url || !Number.isInteger(b.version)) throw new Error('Issued human review request required'); return [{json: {to:b.to, message:b.message}}];"
+        "jsCode": "const b = $json.body; if (!b.to || !b.message || !b.decision_url || !Number.isInteger(b.version)) throw new Error('Issued human review request required'); return [{json: {to:b.to, subject: b.subject || ('HarvestNet: review draft version ' + b.version), message:b.message}}];"
       }
     },
     {
-      "id": "send-text",
-      "name": "Send text",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
+      "id": "send-email",
+      "name": "Send email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
       "position": [
         520,
         0
       ],
       "parameters": {
-        "resource": "sms",
         "operation": "send",
-        "from": "={{ $vars.HARVESTNET_SMS_FROM }}",
-        "to": "={{ $json.to }}",
-        "message": "={{ $json.message }}",
-        "options": {}
+        "fromEmail": "={{ $vars.HARVESTNET_EMAIL_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.message }}",
+        "options": {
+          "appendAttribution": false
+        }
       },
       "credentials": {
-        "twilioApi": {
+        "smtp": {
           "id": "CONFIGURE_IN_N8N",
-          "name": "HarvestNet SMS provider"
+          "name": "HarvestNet Amazon SES SMTP"
         }
       }
     },
@@ -72,7 +75,7 @@
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
+        "responseBody": "={{ JSON.stringify({sent: true}) }}",
         "options": {}
       }
     }
@@ -82,25 +85,25 @@
       "main": [
         [
           {
-            "node": "Prepare review text",
+            "node": "Prepare review email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare review text": {
+    "Prepare review email": {
       "main": [
         [
           {
-            "node": "Send text",
+            "node": "Send email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send text": {
+    "Send email": {
       "main": [
         [
           {

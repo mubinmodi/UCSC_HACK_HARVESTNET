@@ -55,17 +55,18 @@ class DemoReplay(unittest.TestCase):
         self.assertTrue(all(m['reason'] for m in r['negotiation']['moves']))
         self.assertEqual(r['cooler_failure']['status'], 'committed')
         self.assertEqual({c['outcome'] for c in r['cooler_failure']['dashboard']['reason_cards']}, {'chosen', 'rejected'})
-        self.assertTrue(r['household_texts'])
-        spanish = [t for t in r['household_texts'] if t['language'] == 'es']
+        self.assertTrue(r['household_emails'])
+        spanish = [t for t in r['household_emails'] if t['language'] == 'es']
         self.assertTrue(spanish and all('lechuga romana' in t['message'] for t in spanish))
         # The shipped fixture's own outcome is kept: the late answer is refused.
         cooler = next(s for s in r['results']['shipped'] if s['scenario_id'] == 'cooler-failure')
         rules = next(m for m in cooler['methods'] if m['method'] == 'rules_based')
         self.assertEqual(rules['cooler_failure']['changes_committed'], 0)
 
-    def test_recording_holds_no_phone_numbers(self):
-        self.assertTrue(all(t['to'] is None for t in self.recording['household_texts']))
+    def test_recording_holds_no_contact_details(self):
+        self.assertTrue(all(t['to'] is None for t in self.recording['household_emails']))
         self.assertIsNone(re.search(r'\+1\d{10}', json.dumps(self.recording)))
+        self.assertIsNone(re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', json.dumps(self.recording)))
 
 
 if __name__ == '__main__':

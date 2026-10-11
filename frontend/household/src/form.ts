@@ -15,7 +15,7 @@ export interface FormState {
   cantEat: string;
   snap: SnapAnswer | null;
   language: Language;
-  phone: string;
+  email: string;
 }
 
 export const emptyForm = (language: Language): FormState => ({
@@ -27,21 +27,22 @@ export const emptyForm = (language: Language): FormState => ({
   cantEat: '',
   snap: null,
   language,
-  phone: '',
+  email: '',
 });
 
-export type FieldName = 'size' | 'days' | 'time' | 'fridge' | 'neighborhood' | 'phone';
+export type FieldName = 'size' | 'days' | 'time' | 'fridge' | 'neighborhood' | 'email';
 export type FieldErrors = Partial<Record<FieldName, string>>;
 
-/** Phone as +1XXXXXXXXXX for a 10-digit US number, otherwise digits with any leading +. Null if invalid. */
-export function normalizePhone(raw: string): string | null {
-  const trimmed = raw.trim();
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length < 10 || digits.length > 15) return null;
-  if (trimmed.startsWith('+')) return `+${digits}`;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-  return `+${digits}`;
+/** Match the core's optional email rules before consent, without echoing a bad address. */
+export function normalizeEmail(raw: string): string | null {
+  const value = raw.trim();
+  if (!value || value.length > 254 || value.split('@').length !== 2) return null;
+  const [local, domain] = value.split('@');
+  const labels = domain.split('.');
+  if (!/^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]{1,64}$/.test(local) || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return null;
+  if (labels.length < 2 || labels.some(label => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return null;
+  if (!/^[A-Za-z]{2,63}$/.test(labels.at(-1) ?? '')) return null;
+  return `${local}@${domain.toLowerCase()}`;
 }
 
 export function validate(form: FormState, t: Strings): FieldErrors {
@@ -51,7 +52,7 @@ export function validate(form: FormState, t: Strings): FieldErrors {
   if (form.time === null) errors.time = t.required;
   if (form.fridge === null) errors.fridge = t.required;
   if (!form.neighborhood.trim()) errors.neighborhood = t.required;
-  if (form.phone.trim() && normalizePhone(form.phone) === null) errors.phone = t.phoneInvalid;
+  if (form.email.trim() && normalizeEmail(form.email) === null) errors.email = t.emailInvalid;
   return errors;
 }
 
@@ -78,10 +79,13 @@ export function toAnswers(form: FormState): HouseholdAnswers {
   };
 }
 
-/** create_request: the same answers, plus consent, channel, and the optional phone. */
+/** create_request: the same answers, plus consent, channel, and the optional write-only email. */
 export function toCreateBody(form: FormState): CreateRequestBody {
   const body: CreateRequestBody = { ...toAnswers(form), channel: 'web', consent: true };
-  const phone = form.phone.trim() ? normalizePhone(form.phone) : null;
-  if (phone) body.phone = phone;
+  if (form.email.trim()) {
+    const email = normalizeEmail(form.email);
+    if (!email) throw new Error('toCreateBody called with an invalid email');
+    body.email = email;
+  }
   return body;
 }

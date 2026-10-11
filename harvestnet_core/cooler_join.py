@@ -13,9 +13,10 @@ This wires the three lanes together without changing any of their decisions:
 - Lane C's approval bridge issues each named organization's review link. Each human's
   decision goes to the core's ``/approvals`` with that organization's own credential
   (``OrganizationCoreAPI``). Only every named approval commits the new version.
-- ``household_texts`` builds the affected households' texts with Lane B's wording, from
-  the core's pickups, after commitment. The core adds ``to``, ``pickup_id`` and
-  ``release_url``. Lane C's ``/notifications/prepare`` turns them into n8n text bodies.
+- ``household_texts`` builds the affected households' pickup notices with Lane B's wording,
+  from the core's pickups, after commitment. The core adds ``to`` (the household's email, if it
+  gave one), ``pickup_id`` and ``release_url``. Lane C's ``/notifications/prepare`` turns them
+  into emails for n8n and Amazon SES (user decision, October 11, 2026: email, not SMS).
 
 Nothing here decides for an organization (ADR 0001, 0004). Every number comes from a
 reading, a record, a calculator or a profile (ADR 0002). All data is synthetic.
@@ -36,6 +37,8 @@ from harvestnet_agents.cooler_failure_flow import terms_hash as lane_b_terms_has
 from harvestnet_agents.negotiation import parse_facts
 
 from . import changes
+from .contact import release_url
+from .notices import household_email
 from .engine import Engine, run_fixture
 from .protocol import dt
 from .records import Records
@@ -328,7 +331,7 @@ def organization_core_api(base_url, tokens):
     return _core_api_class()(base_url, tokens)
 
 
-# --- Household texts after commitment ---------------------------------------------------------
+# --- Household pickup notices after commitment ---------------------------------------------------------
 
 
 def new_version_from_change(engine, change):
@@ -348,11 +351,11 @@ def new_version_from_change(engine, change):
 
 
 def household_texts(engine, lot_id, version, *, household_page_url, item_names=None, profiles=None):
-    """Texts for the households whose pickups this committed version moved.
+    """Pickup notices for the households whose pickups this committed version moved.
 
-    Lane B writes the words; the core supplies the pounds, ``pickup_id``, ``release_url``
-    and ``to`` (only if the household gave a phone). Raises ``NotCommittedError`` until
-    every named organization approved this exact version.
+    Lane B writes the words; the core supplies the pounds, ``pickup_id``, the "Can't make it"
+    ``release_url`` and ``to`` (only if the household gave an email). Raises
+    ``NotCommittedError`` until every named organization approved this exact version.
     """
     change = changes.find(engine.records, lot_id, version)
     if change is None:
@@ -366,17 +369,13 @@ def household_texts(engine, lot_id, version, *, household_page_url, item_names=N
         ids = by_code[n.request_code]['pickup_ids']
         if len(ids) != 1:
             raise ValueError('one pickup notice per moved pickup; this household has several')
-        try:
-            phone = engine.records.get('phone', n.request_code)['phone']
-        except KeyError:
-            phone = None
-        out.append({**n.to_dict(), 'pickup_id': ids[0], 'to': phone,
-                    'release_url': f"{household_page_url.rstrip('/')}/pickups/{quote(ids[0], safe='')}"})
+        out.append({**n.to_dict(), 'kind': 'pickup_changed', 'pickup_id': ids[0], 'to': household_email(engine.records, n.request_code),
+                    'release_url': release_url(household_page_url, ids[0], n.request_code, n.language.value)})
     return out
 
 
 def prepare_texts(approvals_url, events_token, notices):
-    """Lane C's prepared text bodies for n8n. Only households with a phone get one; nothing is sent."""
+    """Lane C's prepared emails for n8n. Only households with an email get one; nothing is sent."""
     return [_json(approvals_url.rstrip('/') + '/notifications/prepare', n, token=events_token) for n in notices if n.get('to')]
 
 

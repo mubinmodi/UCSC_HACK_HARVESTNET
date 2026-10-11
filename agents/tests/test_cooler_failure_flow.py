@@ -401,16 +401,16 @@ def test_affected_households_get_a_new_text_in_their_language():
     assert en.message == (
         "Your pickup changed. Ready for pickup at Eastside food bank, 6 to 8 pm: 4 lb romaine lettuce. "
         "Your code is K7Q2. Please wash produce before eating. "
-        "Reply YES to keep it, or CAN'T MAKE IT to decline. If you decline, your portion goes to another family."
+        "This isn't a food bank you chose. If you can't go there, use the Can't make it link and your portion goes to another family."
     )
     assert es.message == (
         "Su recogida cambió. Puede recoger en Eastside food bank, de 6 a 8 p. m.: 6 lb de lechuga romana. "
         "Su código es M3R8. Por favor lave los productos antes de comerlos. "
-        "¿No puede ir? Responda NO PUEDO IR y su porción pasa a otra familia."
+        "¿No puede ir? Use el enlace No puedo ir y su porción pasa a otra familia."
     )
 
 
-def test_every_notice_offers_a_decline_and_asks_non_choosers_to_reply():
+def test_every_notice_offers_a_decline_and_asks_non_choosers_whether_they_can_go():
     scen = scenario()
     nv = run().new_version
     en, es = household_change_notices(nv, all_approved(nv), scen["households"], item_names=scen["item_names"])
@@ -418,9 +418,10 @@ def test_every_notice_offers_a_decline_and_asks_non_choosers_to_reply():
     assert en.reply_expected is True
     # M3R8 chose eastside; it can still decline.
     assert es.reply_expected is False
-    # Lane C's reply workflow (PR #28) recognizes these decline phrases.
-    assert "can't make it" in en.decline_replies
-    assert "no puedo ir" in es.decline_replies
+    # Email has a "Can't make it" link, not a reply: no notice asks the household to reply.
+    assert "Can't make it link" in en.message and "enlace No puedo ir" in es.message
+    assert not {"decline_replies", "accept_replies"} & set(en.to_dict())
+    assert "Reply" not in en.message and "Responda" not in es.message
 
 
 def test_notice_record_matches_lane_c_pickup_notice_fields():

@@ -12,14 +12,14 @@ export interface FairShareState {
   retry: () => void;
 }
 
-const FIELD_ORDER: FieldName[] = ['size', 'days', 'time', 'fridge', 'neighborhood', 'phone'];
+const FIELD_ORDER: FieldName[] = ['size', 'days', 'time', 'fridge', 'neighborhood', 'email'];
 const FIELD_TARGET: Record<FieldName, string> = {
   size: 'size-more',
   days: 'days-group',
   time: 'time-group',
   fridge: 'fridge-group',
   neighborhood: 'neighborhood',
-  phone: 'phone',
+  email: 'email',
 };
 
 export function AboutScreen(props: {
@@ -209,25 +209,25 @@ export function AboutScreen(props: {
         />
 
         <div>
-          <label htmlFor="phone">{t.phoneLabel}</label>
-          <p className="hint" id="phone-hint">
-            {t.phoneHint}
+          <label htmlFor="email">{t.emailLabel}</label>
+          <p className="hint" id="email-hint">
+            {t.emailHint}
           </p>
-          {errors.phone && (
-            <p className="field-error" id="phone-error">
-              {errors.phone}
+          {errors.email && (
+            <p className="field-error" id="email-error">
+              {errors.email}
             </p>
           )}
           <input
-            id="phone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={form.phone}
-            onChange={e => set('phone', e.target.value)}
-            maxLength={20}
-            aria-invalid={errors.phone ? true : undefined}
-            aria-describedby={describe('phone', 'phone-hint')}
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            maxLength={254}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={describe('email', 'email-hint')}
           />
         </div>
 

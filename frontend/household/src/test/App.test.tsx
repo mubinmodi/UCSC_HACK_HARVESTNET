@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import App from '../App';
@@ -8,7 +8,7 @@ import { examples, HOUSEHOLD_OPERATIONS, mockApi, operationFor, type Override, t
 const body = (op: string) => JSON.parse(JSON.stringify(examples[op].example.response.body));
 
 /** Fill screen 1 with the same answers as the contract examples (preview_request.json). */
-async function fillHousehold(user: UserEvent, opts: { phone?: string } = {}) {
+async function fillHousehold(user: UserEvent, opts: { email?: string } = {}) {
   const more = screen.getByRole('button', { name: 'One more person' });
   for (let i = 0; i < 4; i++) await user.click(more);
   await user.click(within(screen.getByRole('group', { name: /Which days/ })).getByRole('radio', { name: 'Weekdays' }));
@@ -17,11 +17,11 @@ async function fillHousehold(user: UserEvent, opts: { phone?: string } = {}) {
   await user.type(screen.getByLabelText(/neighborhood/i), 'Watsonville');
   await user.type(screen.getByLabelText(/can't eat/i), 'eggplant');
   await user.click(within(screen.getByRole('group', { name: /SNAP/ })).getByRole('radio', { name: 'Yes' }));
-  if (opts.phone) await user.type(screen.getByLabelText(/Phone number/), opts.phone);
+  if (opts.email) await user.type(screen.getByLabelText(/Email for pickup updates/), opts.email);
 }
 
 async function toFoodBanks(user: UserEvent) {
-  await fillHousehold(user, { phone: '(555) 555-0142' });
+  await fillHousehold(user, { email: 'household@example.invalid' });
   await user.click(screen.getByRole('button', { name: 'Review my answers' }));
   await user.click(await screen.findByRole('button', { name: 'Yes, save my answers' }));
   await screen.findByRole('heading', { level: 1, name: 'Choose your food banks' });
@@ -65,16 +65,16 @@ describe('household page against the contract examples', () => {
     const user = userEvent.setup();
     const { calls } = mockApi();
     render(<App />);
-    await fillHousehold(user, { phone: '5555550142' });
+    await fillHousehold(user, { email: 'household@example.invalid' });
     await user.click(screen.getByRole('button', { name: 'Review my answers' }));
 
     expect(await screen.findByText(body('preview_request').read_back)).toBeInTheDocument();
     expect(screen.getByText(body('preview_request').consent_question)).toBeInTheDocument();
     // The skeleton's example reply is labelled as such.
     expect(screen.getByText(/Example reply: it may not match your answers/)).toBeInTheDocument();
-    // The phone number is only sent with consent, never in the preview.
+    // The email is only sent with consent, never in the preview.
     const preview = calls.find(c => c.url.pathname === '/requests/preview')!;
-    expect(preview.body).not.toHaveProperty('phone');
+    expect(preview.body).not.toHaveProperty('email');
 
     await user.click(screen.getByRole('button', { name: "No, don't save" }));
     expect(screen.getByRole('heading', { level: 1, name: 'Nothing was saved' })).toBeInTheDocument();
@@ -89,6 +89,24 @@ describe('household page against the contract examples', () => {
     expect(screen.getByText('Please answer the questions marked below.')).toBeInTheDocument();
     expect(screen.getAllByText('Please answer this question.')).toHaveLength(5);
     expect(calls).toHaveLength(0);
+  });
+
+  it('accepts a request without email and refuses an invalid address before preview', async () => {
+    const user = userEvent.setup();
+    const { calls } = mockApi();
+    render(<App />);
+    await fillHousehold(user);
+    await user.type(screen.getByLabelText(/Email for pickup updates/), 'not-an-email');
+    await user.click(screen.getByRole('button', { name: 'Review my answers' }));
+    expect(screen.getByText('Enter an email address, or leave it blank.')).toBeInTheDocument();
+    expect(calls.some(c => c.url.pathname === '/requests/preview')).toBe(false);
+    await user.clear(screen.getByLabelText(/Email for pickup updates/));
+    await user.click(screen.getByRole('button', { name: 'Review my answers' }));
+    await user.click(await screen.findByRole('button', { name: 'Yes, save my answers' }));
+    await screen.findByRole('heading', { level: 1, name: 'Choose your food banks' });
+    const saved = calls.find(c => c.method === 'POST' && c.url.pathname === '/requests')!;
+    expect(saved.body).not.toHaveProperty('email');
+    expect(saved.body).not.toHaveProperty('phone');
   });
 
   it('shows the fair share sentence exactly as the API sends it (never calculates it)', async () => {
@@ -144,6 +162,76 @@ describe('household page against the contract examples', () => {
     // The request code is the pickup code (contract decision 11), and the balance comes from the API.
     expect(screen.getAllByText('K7P4').length).toBeGreaterThan(0);
     expect(screen.getByText('This week: 0 of 12 lb received')).toBeInTheDocument();
+  });
+
+  it('opens an emailed pickup link in Spanish without releasing anything until the household confirms', async () => {
+    const user = userEvent.setup();
+    const { calls } = mockApi();
+    window.history.replaceState(null, '', '/household/#pickup=pk-1013-0001&code=K7P4&lang=es');
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Su recogida' })).toBeInTheDocument();
+    const pickup = await screen.findByRole('heading', { level: 2, name: 'Rural food bank' });
+    expect(pickup).toHaveFocus();
+    expect(document.documentElement.lang).toBe('es');
+    expect(calls.find(c => c.method === 'GET' && c.url.pathname === '/requests/K7P4')?.url.searchParams.get('language')).toBe('es');
+    expect(calls.some(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'No puedo ir' }));
+    expect(calls.some(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Sí, no puedo ir' }));
+    expect(await screen.findByText(body('release_pickup').message)).toBeInTheDocument();
+    expect(calls.find(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))?.body).toEqual({ request_code: 'K7P4' });
+  });
+
+  it('opens a second pickup link for the same request while the page is already open', async () => {
+    const status = body('get_request');
+    status.pickups.push({ ...status.pickups[0], pickup_id: 'pk-1013-0002', food_bank_name: 'Second food bank' });
+    const { calls } = mockApi(op => (op === 'get_request' ? { status: 200, body: status } : undefined));
+    window.history.replaceState(null, '', '/household/#pickup=pk-1013-0001&code=K7P4&lang=en');
+    render(<App />);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Rural food bank' })).toHaveFocus();
+
+    window.history.replaceState(null, '', '/household/#pickup=pk-1013-0002&code=K7P4&lang=en');
+    fireEvent(window, new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Second food bank' })).toHaveFocus());
+    expect(calls.filter(c => c.method === 'GET' && c.url.pathname === '/requests/K7P4')).toHaveLength(2);
+    expect(calls.some(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))).toBe(false);
+  });
+
+  it('shows a clear message when an emailed pickup is no longer available', async () => {
+    const user = userEvent.setup();
+    const status = body('get_request');
+    status.pickups = [];
+    const { calls } = mockApi(op => (op === 'get_request' ? { status: 200, body: status } : undefined));
+    window.history.replaceState(null, '', '/household/#pickup=pk-1013-0001&code=K7P4&lang=en');
+    render(<App />);
+    expect(await screen.findByText(/This pickup is no longer available here/)).toBeInTheDocument();
+    expect(calls.some(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Use another code' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'About your household' })).toBeInTheDocument();
+    expect(window.location.hash).toBe('');
+  });
+
+  it('lets a household recover from an expired emailed code without releasing anything', async () => {
+    const user = userEvent.setup();
+    const { calls } = mockApi(op => (op === 'get_request' ? { status: 404, body: { error: { code: 'not_found', message: 'Expired' } } } : undefined));
+    window.history.replaceState(null, '', '/household/#pickup=pk-1013-0001&code=K7P4&lang=en');
+    render(<App />);
+    expect(await screen.findByText("We couldn't find that. Check your code and try again.")).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use another code' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'About your household' })).toBeInTheDocument();
+    expect(window.location.hash).toBe('');
+    expect(calls.some(c => c.method === 'POST' && c.url.pathname.endsWith('/release'))).toBe(false);
+  });
+
+  it('promises email updates only when the request opted in', async () => {
+    const user = userEvent.setup();
+    const status = body('get_request');
+    status.pickups = [];
+    mockApi(op => (op === 'get_request' ? { status: 200, body: status } : undefined));
+    render(<App />);
+    await toPickup(user);
+    expect(await screen.findByText(/We'll email you when produce is ready/)).toBeInTheDocument();
+    expect(screen.queryByText(/We'll text you/)).not.toBeInTheDocument();
   });
 
   it('shows committed produce and badges on the food bank screen', async () => {

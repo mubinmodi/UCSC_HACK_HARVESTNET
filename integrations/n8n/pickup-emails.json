@@ -1,5 +1,5 @@
 {
-  "name": "HarvestNet - committed pickup and verified Market Match text",
+  "name": "HarvestNet - email committed pickup and verified Market Match tip",
   "nodes": [
     {
       "id": "authenticated-event",
@@ -53,26 +53,29 @@
       }
     },
     {
-      "id": "send-text",
-      "name": "Send text",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
+      "id": "send-email",
+      "name": "Send email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
       "position": [
         520,
         0
       ],
       "parameters": {
-        "resource": "sms",
         "operation": "send",
-        "from": "={{ $vars.HARVESTNET_SMS_FROM }}",
-        "to": "={{ $json.to }}",
-        "message": "={{ $json.message }}",
-        "options": {}
+        "fromEmail": "={{ $vars.HARVESTNET_EMAIL_FROM }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
       },
       "credentials": {
-        "twilioApi": {
+        "smtp": {
           "id": "CONFIGURE_IN_N8N",
-          "name": "HarvestNet SMS provider"
+          "name": "HarvestNet Amazon SES SMTP"
         }
       }
     },
@@ -87,7 +90,7 @@
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
+        "responseBody": "={{ JSON.stringify({sent: true}) }}",
         "options": {}
       }
     }
@@ -108,14 +111,14 @@
       "main": [
         [
           {
-            "node": "Send text",
+            "node": "Send email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send text": {
+    "Send email": {
       "main": [
         [
           {

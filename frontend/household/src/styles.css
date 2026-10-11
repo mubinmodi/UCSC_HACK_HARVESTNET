@@ -160,6 +160,7 @@ input[type=radio], input[type=checkbox] { width: 24px; height: 24px; accent-colo
 .bank-card .tag { background: #e6f1f8; border-color: #3d6f8f; color: #173a52; }
 
 .pickup { border: 1.5px solid #cfe0d4; border-radius: 16px; padding: 16px; background: #fff; display: flex; flex-direction: column; gap: 8px; }
+.pickup.link-target { border-color: #2d7658; box-shadow: 0 0 0 2px #cfe0d4; }
 .pickup h2 { display: flex; gap: 10px; align-items: center; font-size: 21px; }
 .pickup.released { opacity: 0.85; background: #f3f3ef; }
 .when { font-weight: 700; }
