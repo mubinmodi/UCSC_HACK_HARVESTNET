@@ -240,10 +240,13 @@ def run_fixture(fixture, move_provider=None, *, records=None):
         unchanged=0
         declined=[]
         rounds=fixture["policies"]["rounds_without_new_terms_before_disagreement"]
+        stop_reason=None
         for turn in range(1,201):
             lot=engine.records.get("lot",lot_id)
             draft=lot["draft"]
             org=fixture["turn_order"][(turn-1)%len(fixture["turn_order"])]
+            if (turn-1)%len(fixture["turn_order"])==0:
+                round_start_version=draft["version"]
             input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)}}
             queued_id=lot_id+':'+org
             try:
@@ -312,7 +315,6 @@ def run_fixture(fixture, move_provider=None, *, records=None):
                 if move["amendment"]["kind"]=="set_pounds" and engine.roles[org]=="food_bank":
                     declined.append({"food_bank_id":org,"produce_id":move["amendment"]["produce_id"]})
                 accepts.clear()
-                unchanged=0
             elif action=="accept":
                 accepts.add(org)
             elif action=="request_hold":
@@ -339,14 +341,16 @@ def run_fixture(fixture, move_provider=None, *, records=None):
                 if engine.records.get("lot",lot_id)["status"]=="committed":
                     break
             if turn%len(fixture["turn_order"])==0:
-                unchanged+=1
+                # A round counts toward the stop rule only if nobody changed the terms in it.
+                unchanged=unchanged+1 if engine.records.get("lot",lot_id)["draft"]["version"]==round_start_version else 0
                 if unchanged>=rounds:
+                    stop_reason=f"{rounds} rounds without new terms; no automatic commitment"
                     break
         lot=engine.records.get("lot",lot_id)
         if lot["status"]!="committed":
             with engine.records.transaction():
                 lot["status"]="preserved_disagreement"
-                lot["stop_reason"]="Three rounds without new terms; no automatic commitment"
+                lot["stop_reason"]=stop_reason or "Turn limit reached without an approved feasible pathway; no automatic commitment"
                 engine.records.put("lot",lot_id,lot)
                 engine.records.event(lot_id,engine.now,"preserved_disagreement",{"reason":lot["stop_reason"]})
         engine.distribute(lot_id)

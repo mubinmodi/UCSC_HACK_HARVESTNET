@@ -1,5 +1,7 @@
 name: Core acceptance checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   core:
     runs-on: ubuntu-latest
@@ -18,11 +20,6 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: mubinmodi/UCSC_HACK_HARVESTNET
-          ref: 2424d7535bd0f58348f93a72756270e50894c9a1
-          path: runtime/platform
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -31,7 +28,8 @@ jobs:
         env:
           PYTHONPATH: agents/src
           HARVESTNET_TEST_DATABASE_URL: postgresql://harvestnet_test:isolated_ci_only@127.0.0.1:5432/harvestnet_test
-          HARVESTNET_PLATFORM_SOURCE: runtime/platform
+          # Lane C's harvestnet_platform/ is merged into this repo, so no pinned checkout.
+          HARVESTNET_PLATFORM_SOURCE: .
         run: python -m unittest discover -s core_tests -v
       - name: Existing agent and skeleton regression tests
         env:

@@ -126,7 +126,9 @@ class Protocol:
             if owner!=old['donor_id'] and not any(a['food_bank_id']==owner and a['produce_id']==produce_id for a in old['allocations']):
                 raise ValueError('condition check belongs to the donor or receiving food bank')
             draft=copy.deepcopy(old)
-            item=next(i for i in draft['items'] if i['produce_id']==produce_id)
+            item=next((i for i in draft['items'] if i['produce_id']==produce_id),None)
+            if item is None:
+                raise ValueError(f'produce {produce_id!r} is not in lot {lot_id!r}')
             item.update(condition_grade=grade,usable_until=usable_until,condition_doubt=None)
             draft.update(version=version+1,based_on_version=version,proposer_id=owner,reason=reason)
             lot.update(draft=draft,approvals={},holds={},status='negotiating')

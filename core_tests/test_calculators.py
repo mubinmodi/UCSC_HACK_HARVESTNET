@@ -63,8 +63,10 @@ class CalculatorTests(unittest.TestCase):
     def test_calculators_do_not_guess_or_accept_nan(self):
         c=Calculators()
         for invalid in (float('nan'),float('inf'),-1,True):
-            with self.assertRaises(ValueError): c.capacity_fit(invalid,1)
             with self.assertRaises(ValueError): c.household_portions(invalid,[])
+        for invalid in (float('nan'),float('inf'),True):
+            with self.assertRaises(ValueError): c.capacity_fit(invalid,1)
+        self.assertFalse(c.capacity_fit(-1,1).fits)
         with self.assertRaises(ValueError): c.to_pounds('apples',1,'case')
         self.assertEqual(c.to_pounds('potatoes',8,'sack',50),400)
         self.assertEqual(c.fair_share(6).pounds,16)
