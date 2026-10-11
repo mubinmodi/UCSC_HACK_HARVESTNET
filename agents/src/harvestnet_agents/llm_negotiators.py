@@ -769,7 +769,7 @@ class LLMNegotiator:
         state = _MoveState()
         messages: list[dict[str, Any]] = [{"role": "user", "content": render_input(self.role, agent_input, labeled)}]
         system, tools = system_prompt(self.role), tools_for(self.role)
-        client = self.client if self.client is not None else _default_client()
+        client = self.client  # the default client is built only once a call fits under the cap
 
         while state.calls < self.config.max_model_calls_per_move:
             request = {
@@ -788,6 +788,12 @@ class LLMNegotiator:
                 self.cap.reserve(worst)
             except SpendingCapReached as exc:
                 return self._fallback(rules_move, state, f"spending cap: {exc}")
+            if client is None:
+                try:
+                    client = _default_client()
+                except Exception:
+                    self.cap.reserved_usd = max(0.0, self.cap.reserved_usd - worst)
+                    raise
             response = client.beta.messages.create(**request)
             state.calls += 1
             served = getattr(response, "model", None) or self.model
