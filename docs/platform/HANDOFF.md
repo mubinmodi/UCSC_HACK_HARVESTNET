@@ -68,7 +68,11 @@ texts `Ez4Sir1ssOKZfjuo`, replies `ESzgVkSoQOjzQeU3`, human receipt relay
 
 The user has an AWS account, but no AWS host, authenticated session, secret ARN,
 domain or core API image is configured. **User hosting budget is $0: prepare only
-until credits are confirmed. Do not provision chargeable resources.** Secrets
+until credits are confirmed. Do not provision chargeable resources.** The user
+subsequently deferred AWS work entirely on October 11: skip AWS sign-in, credit
+checks and provisioning until the user resumes that scope. Continue non-AWS
+integration work; n8n application workflows still require a reachable API before
+they can be fully activated. Secrets
 Manager storage and actual HTTPS deployment are not verified. Docker Compose is
 validated, but Docker Engine/container runtime is absent. Native App SDK startup
 and authenticated A2A exchange pass locally; a real Directory daemon push/search
