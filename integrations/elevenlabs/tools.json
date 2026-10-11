@@ -1,84 +1,138 @@
 {
-  "note": "ElevenLabs server tools (webhooks) for the HarvestNet voice line, ticket #4. PLACEHOLDER endpoints: replace API_BASE_URL with the real API address, and the paths with the voice-intake paths agreed in ticket #1 (contract day). Field names are proposed and match Lane B's front-desk assistant (#14), which expects a transcript of language plus speaker turns.",
+  "synthetic": true,
+  "note": "ElevenLabs server tools (webhooks) for the HarvestNet voice line, ticket #4. Each tool is one operation of the agreed public API (docs/contracts/public-api.md). Method, path, request fields, and response fields match the operation's example in docs/contracts/examples/public-api/, and tests/test_elevenlabs_tools.py checks that they still do. Every example value here (codes such as K7P4, ids, pounds) is synthetic.",
+  "contract": "docs/contracts/public-api.md",
+  "base_url": "https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws",
+  "base_url_note": "The deployed API skeleton, which returns the contract examples. Swap in the real API's address when Lane A's server is deployed; the paths stay the same.",
   "tools": [
     {
-      "name": "prepare_request",
-      "description": "Send the household's answers so HarvestNet can read them back. Nothing is saved yet. Call this after asking all the questions, and again after any correction.",
+      "name": "voice_intake",
+      "operation": "voice_intake",
+      "contract_example": "docs/contracts/examples/public-api/voice_intake.json",
+      "description": "Send the call so far. HarvestNet reads the household's answers from it and returns the read-back to speak, the questions still to ask, and the consent question once every answer is in. Nothing is saved. Call this after asking all the questions, and again after any new answer or correction.",
       "method": "POST",
-      "url": "https://API_BASE_URL/voice-intake",
+      "path": "/voice-intake",
       "body_parameters": {
-        "conversation_id": {
+        "call_id": {
           "type": "string",
-          "source": "dynamic variable system__conversation_id",
-          "description": "The ElevenLabs conversation id, so the API can match later calls in the same call."
+          "source": "dynamic_variable",
+          "dynamic_variable": "system__conversation_id",
+          "description": "The ElevenLabs conversation id. Filled by ElevenLabs, never by the model."
         },
-        "language": {
-          "type": "string",
-          "enum": ["en", "es"],
-          "description": "The language the call is in: en for English, es for Spanish."
-        },
-        "turns": {
-          "type": "array",
-          "description": "Each question you asked and the household's answer, in order, using the household's exact words.",
-          "items": {
-            "speaker": {"type": "string", "enum": ["assistant", "household"]},
-            "text": {"type": "string"}
+        "transcript": {
+          "type": "object",
+          "source": "llm",
+          "description": "The call so far.",
+          "properties": {
+            "language": {
+              "type": "string",
+              "enum": ["en", "es"],
+              "description": "The language of the call: en for English, es for Spanish."
+            },
+            "turns": {
+              "type": "array",
+              "description": "Every question you asked and every answer the household gave, in order. Copy the household's words exactly; never summarize, fix, or translate them.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "speaker": {"type": "string", "enum": ["assistant", "household"]},
+                  "text": {"type": "string"}
+                }
+              }
+            }
           }
         }
       },
-      "example_response": {
-        "status": "readback_awaiting_consent",
-        "saved": false,
-        "missing_questions": [],
-        "speak": "You told me: 4 people, weekdays after 6 pm, limited fridge space, near Watsonville, nothing you can't eat, and you receive CalFresh.",
-        "consent_question": "May HarvestNet keep these answers for 7 days to find produce for your household? We don't keep your name or address."
-      }
+      "response_fields": ["read_back", "missing_questions", "consent_question", "complete", "draft_request", "fair_share_lb", "next"]
     },
     {
-      "name": "submit_request",
-      "description": "Save the request after the household clearly said yes to the consent question. Never call this without a clear yes.",
+      "name": "create_request",
+      "operation": "create_request",
+      "contract_example": "docs/contracts/examples/public-api/create_request.json",
+      "description": "Save the request. Call this only after the household clearly said yes to the consent question. Copy each answer field exactly from draft_request in the last voice_intake response. Never call this without a clear yes.",
       "method": "POST",
-      "url": "https://API_BASE_URL/voice-intake/{conversation_id}/consent",
-      "path_parameters": {
-        "conversation_id": {"type": "string", "source": "dynamic variable system__conversation_id"}
-      },
+      "path": "/requests",
       "body_parameters": {
-        "consent": {
-          "type": "string",
-          "enum": ["yes"],
-          "description": "Only yes. If the household says no, don't call this tool."
-        }
+        "language": {"type": "string", "enum": ["en", "es"], "source": "llm", "description": "draft_request.language from the last voice_intake response."},
+        "household_size": {"type": "integer", "source": "llm", "description": "draft_request.household_size from the last voice_intake response."},
+        "pickup_windows": {
+          "type": "array",
+          "source": "llm",
+          "description": "draft_request.pickup_windows from the last voice_intake response, unchanged.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": {"type": "array", "items": {"type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]}},
+              "start": {"type": "string", "description": "Local clock time such as 18:00, or null."},
+              "end": {"type": "string", "description": "Local clock time such as 20:00, or null."}
+            }
+          }
+        },
+        "limited_fridge": {"type": "boolean", "source": "llm", "description": "draft_request.limited_fridge from the last voice_intake response."},
+        "neighborhood": {"type": "string", "source": "llm", "description": "draft_request.neighborhood from the last voice_intake response."},
+        "cant_eat": {"type": "array", "items": {"type": "string"}, "source": "llm", "description": "draft_request.cant_eat from the last voice_intake response (an empty list means nothing)."},
+        "snap": {"type": "string", "enum": ["yes", "no", "not_said"], "source": "llm", "description": "draft_request.snap from the last voice_intake response."},
+        "channel": {"type": "string", "source": "constant", "value": "voice", "description": "Always voice."},
+        "consent": {"type": "boolean", "source": "constant", "value": true, "description": "Always true. The tool is only called after a clear yes."}
       },
-      "example_response": {
-        "status": "saved",
-        "saved": true,
-        "fair_share_lb_per_week": 12,
-        "food_banks": [
-          {"id": "fb-rural", "name": "Rural food bank", "pickup_hours": "Mon to Fri, 4 to 8 pm"},
-          {"id": "fb-city", "name": "City food bank", "pickup_hours": "Mon to Sat, 3 to 8 pm"}
-        ],
-        "speak": "Your household's fresh produce share is 12 pounds a week. Food banks near you with evening pickup: the rural food bank, Monday to Friday, 4 to 8 pm, and the city food bank, Monday to Saturday, 3 to 8 pm. Which can you get to?"
+      "omitted_contract_fields": {
+        "phone": "The voice line never collects or sends a phone number. Texts are opt-in on the web page only (docs/MVP_DESIGN.md section 12)."
+      },
+      "response_fields": ["request_code", "fair_share_lb", "expires_at", "next"],
+      "assign_dynamic_variables": {"request_code": "request_code"}
+    },
+    {
+      "name": "list_food_banks",
+      "operation": "list_food_banks",
+      "contract_example": "docs/contracts/examples/public-api/list_food_banks.json",
+      "description": "Find food banks near the household's neighborhood, with pickup hours, whether those fit the household's times, and produce committed there now.",
+      "method": "GET",
+      "path": "/food-banks",
+      "query_parameters": {
+        "neighborhood": {"type": "string", "source": "llm", "description": "draft_request.neighborhood from the last voice_intake response."},
+        "request_code": {"type": "string", "source": "dynamic_variable", "dynamic_variable": "request_code", "description": "The request_code from the create_request response."}
+      },
+      "response_fields": ["food_banks"],
+      "response_item_fields": {
+        "food_banks": ["food_bank_id", "name", "area", "pickup_windows", "fits_your_pickup_times", "committed_now"]
       }
     },
     {
       "name": "choose_food_banks",
-      "description": "Record which food banks the household can get to. They may choose more than one.",
-      "method": "POST",
-      "url": "https://API_BASE_URL/voice-intake/{conversation_id}/food-banks",
+      "operation": "choose_food_banks",
+      "contract_example": "docs/contracts/examples/public-api/choose_food_banks.json",
+      "description": "Save which food banks the household can get to. They may choose more than one.",
+      "method": "PUT",
+      "path": "/requests/{request_code}/food-banks",
       "path_parameters": {
-        "conversation_id": {"type": "string", "source": "dynamic variable system__conversation_id"}
+        "request_code": {"type": "string", "source": "dynamic_variable", "dynamic_variable": "request_code", "description": "The request_code from the create_request response."}
       },
       "body_parameters": {
         "food_bank_ids": {
           "type": "array",
           "items": {"type": "string"},
-          "description": "The ids of the food banks the household chose, from the submit_request response."
+          "source": "llm",
+          "description": "The food_bank_id of each food bank the household chose, from the list_food_banks response."
         }
       },
-      "example_response": {
-        "status": "on_list",
-        "pickup_code": "A7K2",
-        "speak": "You're on the list for the rural food bank and the city food bank. When produce is ready, the food bank will have it for you with your code."
+      "response_fields": ["request_code", "chosen_food_bank_ids"]
+    },
+    {
+      "name": "get_request",
+      "operation": "get_request",
+      "contract_example": "docs/contracts/examples/public-api/get_request.json",
+      "description": "Look up a household that already has a request code: this week's balance and any committed pickups. Use it only when the caller gives you their code.",
+      "method": "GET",
+      "path": "/requests/{request_code}",
+      "path_parameters": {
+        "request_code": {"type": "string", "source": "llm", "description": "The code the caller gave you, letters and numbers only, no spaces."}
+      },
+      "query_parameters": {
+        "language": {"type": "string", "enum": ["en", "es"], "source": "llm", "description": "The language of the call."}
+      },
+      "response_fields": ["request_code", "fair_share_lb", "received_this_week_lb", "pickups"],
+      "response_item_fields": {
+        "pickups": ["food_bank_name", "window", "items", "pounds", "wording"]
       }
     }
   ]
