@@ -29,7 +29,8 @@ TOOL_PREFIX = "harvestnet_"  # keeps the tools apart from anything else in the a
 # Settings that are not in the repo's other files. Change here, then re-run.
 LLM = "claude-sonnet-5-5"  # the front desk model named in docs/MVP_DESIGN.md
 VOICE_ID = "cjVigY5qzO86Huf0OWal"  # the ElevenLabs API docs' default voice; change to taste
-TTS_MODEL = "eleven_flash_v2_5"  # multilingual and fast, so Spanish works
+TTS_MODEL = "eleven_flash_v2"  # the API requires flash/turbo v2 for the English default
+SPANISH_TTS_MODEL = "eleven_flash_v2_5"  # multilingual model for the Spanish override
 MAX_CALL_SECONDS = 900
 REQUEST_CODE_PLACEHOLDER = "not_saved_yet"  # until create_request returns the real code
 
@@ -170,6 +171,7 @@ def build_agent_body(parsed: dict, tool_ids: list[str]) -> dict:
                 "es": {
                     "overrides": {
                         "agent": {"language": "es", "first_message": parsed["first_message_es"]},
+                        "tts": {"model_id": SPANISH_TTS_MODEL},
                     }
                 }
             },
