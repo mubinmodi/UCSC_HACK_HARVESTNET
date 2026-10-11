@@ -1,0 +1,37 @@
+name: Core acceptance checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: harvestnet_test
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: harvestnet_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'psycopg[binary]==3.2.10' pytest
+      - name: Core acceptance and actual Postgres persistence
+        env:
+          PYTHONPATH: agents/src
+          HARVESTNET_TEST_DATABASE_URL: postgresql://harvestnet_test:isolated_ci_only@127.0.0.1:5432/harvestnet_test
+          # Lane C's harvestnet_platform/ is merged into this repo, so no pinned checkout.
+          HARVESTNET_PLATFORM_SOURCE: .
+        run: python -m unittest discover -s core_tests -v
+      - name: Existing agent and skeleton regression tests
+        env:
+          PYTHONPATH: agents/src:api_skeleton/src
+        run: pytest agents/tests api_skeleton/tests -q

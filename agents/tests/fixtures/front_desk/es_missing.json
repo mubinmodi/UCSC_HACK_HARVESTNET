@@ -1,0 +1,36 @@
+{
+  "transcript": {
+    "language": "es",
+    "turns": [
+      {"speaker": "assistant", "text": "Hola, habla HarvestNet. ¿Cuántas personas hay en su hogar?"},
+      {"speaker": "household", "text": "Somos tres."},
+      {"speaker": "assistant", "text": "¿Cuándo puede recoger?"},
+      {"speaker": "household", "text": "Depende de mi trabajo, no sé todavía."},
+      {"speaker": "assistant", "text": "¿Tiene poco espacio en el refrigerador?"},
+      {"speaker": "household", "text": "No, tenemos un refri grande."},
+      {"speaker": "assistant", "text": "¿Cerca de qué vecindario está?"},
+      {"speaker": "household", "text": "Cerca de Salinas, en el este."},
+      {"speaker": "assistant", "text": "Si quiere, puede decirme si recibe CalFresh, o saltar esa pregunta."},
+      {"speaker": "household", "text": "Prefiero no decir."}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 3, "evidence": "Somos tres"},
+    "pickup_windows": {"value": null, "evidence": null},
+    "limited_fridge": {"value": false, "evidence": "tenemos un refri grande"},
+    "neighborhood": {"value": "Salinas", "evidence": "Cerca de Salinas"},
+    "cant_eat": {"value": null, "evidence": null},
+    "snap": {"value": "prefer_not_to_say", "evidence": "Prefiero no decir"}
+  },
+  "expected_draft": {
+    "language": "es",
+    "household_size": 3,
+    "pickup_windows": null,
+    "limited_fridge": false,
+    "neighborhood": "Salinas",
+    "cant_eat": null,
+    "snap": "not_said",
+    "missing": ["pickup_windows", "cant_eat"],
+    "dropped": []
+  }
+}

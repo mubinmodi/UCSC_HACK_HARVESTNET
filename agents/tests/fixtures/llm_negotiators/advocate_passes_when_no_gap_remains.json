@@ -1,0 +1,80 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "advocate_passes_when_no_gap_remains",
+  "role": "advocate",
+  "responses": [
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01",
+          "name": "adjust_pounds",
+          "input": {
+            "current_lb": 60,
+            "change_lb": 300
+          }
+        }
+      ]
+    },
+    {
+      "model": "claude-opus-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 410,
+        "output_tokens": 260,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2900
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "counter",
+            "amendment": {
+              "kind": "set_pounds",
+              "produce_id": "potatoes",
+              "food_bank_id": "rural",
+              "from_food_bank_id": null,
+              "to_food_bank_id": null,
+              "pounds": 360,
+              "mover": null,
+              "departs_at": null,
+              "arrives_at": null
+            },
+            "reason": "Every food bank's households reach fair share under version 5, but 300 lb of potatoes would go unclaimed. Rural is in a low-access area, so we propose its potatoes go from 60 lb to 360 lb to reduce waste."
+          }
+        }
+      ]
+    }
+  ],
+  "differs_from_rules": "The rules-based advocate passes once no gap remains. This recorded model response instead proposes the 300 lb of unclaimed potatoes for Rural to reduce waste, which section 6 of the design allows the advocate to do. Rural still decides for itself.",
+  "expected": {
+    "kind": "counter",
+    "amendment": {
+      "kind": "set_pounds",
+      "produce_id": "potatoes",
+      "food_bank_id": "rural",
+      "pounds": 360
+    }
+  }
+}

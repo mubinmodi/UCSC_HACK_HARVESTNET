@@ -1,0 +1,50 @@
+{
+  "operation": "update_food_bank_status",
+  "group": "food_bank",
+  "method": "PUT",
+  "path": "/food-banks/{food_bank_id}/status",
+  "summary": "A food bank manager sets cold and dry storage, pickup hours, and truck availability.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/food-banks/city/status",
+      "body": {
+        "storage": [
+          {
+            "window": {
+              "start": "2026-10-13T12:00:00-07:00",
+              "end": "2026-10-14T21:00:00-07:00"
+            },
+            "cold_free_lb": 250,
+            "dry_free_lb": 200
+          }
+        ],
+        "pickup_windows": [
+          {
+            "start": "2026-10-13T18:00:00-07:00",
+            "end": "2026-10-13T20:00:00-07:00"
+          }
+        ],
+        "truck": {
+          "window": {
+            "start": "2026-10-13T13:00:00-07:00",
+            "end": "2026-10-13T17:00:00-07:00"
+          },
+          "refrigerated": true,
+          "capacity_lb": 250
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "food_bank_id": "city",
+        "status_version": 2,
+        "updated_at": "2026-10-13T11:30:00-07:00",
+        "message": "Saved. Your agent will use these limits from now on."
+      }
+    }
+  }
+}

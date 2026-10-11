@@ -1,0 +1,74 @@
+{
+  "operation": "preview_request",
+  "group": "household",
+  "method": "POST",
+  "path": "/requests/preview",
+  "summary": "Check a household's answers and get the read-back and consent question. Saves nothing.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/requests/preview",
+      "body": {
+        "language": "en",
+        "household_size": 4,
+        "pickup_windows": [
+          {
+            "days": [
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri"
+            ],
+            "start": "18:00",
+            "end": null
+          }
+        ],
+        "limited_fridge": true,
+        "neighborhood": "Watsonville",
+        "cant_eat": [
+          "eggplant"
+        ],
+        "snap": "yes"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "saved": false,
+        "draft_request": {
+          "language": "en",
+          "household_size": 4,
+          "pickup_windows": [
+            {
+              "days": [
+                "mon",
+                "tue",
+                "wed",
+                "thu",
+                "fri"
+              ],
+              "start": "18:00",
+              "end": null
+            }
+          ],
+          "limited_fridge": true,
+          "neighborhood": "Watsonville",
+          "cant_eat": [
+            "eggplant"
+          ],
+          "snap": "yes",
+          "missing": [],
+          "dropped": []
+        },
+        "complete": true,
+        "fair_share_lb": 12,
+        "read_back": "Here is what I have. Household: 4 people. Pickup: weekdays after 6 pm. Fridge space: limited. Neighborhood: Watsonville. Can't eat: eggplant. SNAP/CalFresh: yes. Is that right?",
+        "missing_questions": [],
+        "consent_question": "Can I save these answers? We keep them with a short code, never your name or address, and delete them after 7 days. Your SNAP/CalFresh answer is optional and never changes your share. Please answer yes or no."
+      }
+    }
+  }
+}

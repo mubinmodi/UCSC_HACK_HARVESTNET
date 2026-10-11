@@ -1,0 +1,78 @@
+{
+  "_note": "Recorded negotiator input for ticket #11. Synthetic: it stands in for contract day's example input/output pairs (ticket #1 is not done). All numbers and times are synthetic.",
+  "role": "donor",
+  "draft": {
+    "lot_id": "lot-market-1013",
+    "version": 1,
+    "donor_id": "market",
+    "deadline": "2026-10-13T15:00",
+    "items": [
+      {
+        "produce_id": "apples",
+        "pounds": 300,
+        "condition_grade": "good",
+        "usable_until": "2026-11-01T00:00"
+      },
+      {
+        "produce_id": "romaine",
+        "pounds": 200,
+        "condition_grade": "good",
+        "usable_until": "2026-10-15T12:00"
+      },
+      {
+        "produce_id": "potatoes",
+        "pounds": 400,
+        "condition_grade": "good",
+        "usable_until": "2026-11-10T00:00"
+      }
+    ],
+    "allocations": [],
+    "transports": [],
+    "drop_off_to": [
+      "rural",
+      "eastside"
+    ],
+    "drop_off_refrigerated": false,
+    "proposer_id": "market",
+    "reason": "Surplus offer",
+    "names": {
+      "market": "Farmers market",
+      "city": "City food bank",
+      "rural": "Rural food bank",
+      "eastside": "Eastside food bank"
+    }
+  },
+  "facts": {
+    "donor_id": "market",
+    "travel_minutes": {
+      "city": 20,
+      "rural": 40,
+      "eastside": 25
+    },
+    "drop_off": {
+      "window": {
+        "start": "2026-10-13T13:00",
+        "end": "2026-10-13T15:00"
+      },
+      "refrigerated": false,
+      "capacity_lb": 700,
+      "food_bank_ids": [
+        "rural",
+        "eastside"
+      ]
+    }
+  },
+  "turn": {
+    "organization_id": "market",
+    "number": 1,
+    "now": "2026-10-13T12:30",
+    "accepted_by": []
+  },
+  "expected": {
+    "kind": "pass",
+    "reason_includes": [
+      "300 lb apples",
+      "3 pm"
+    ]
+  }
+}
