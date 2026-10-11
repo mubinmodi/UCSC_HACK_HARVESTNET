@@ -388,7 +388,7 @@ setup_security_group() {
   for port in 80 443; do
     have=""
     [[ "$SG_ID" == sg-* ]] && have="$(lookup ec2 describe-security-groups --group-ids "$SG_ID" \
-      --query "length(SecurityGroups[0].IpPermissions[?FromPort==\`$port\` && ToPort==\`$port\` && IpProtocol=='tcp'].IpRanges[?CidrIp=='0.0.0.0/0'][])" \
+      --query "length(SecurityGroups[0].IpPermissions[?FromPort==\`$port\` && ToPort==\`$port\` && IpProtocol=='tcp'][].IpRanges[?CidrIp=='0.0.0.0/0'][])" \
       --output text)"
     if [ "${have:-0}" -ge 1 ] 2>/dev/null; then
       info "port $port open"
