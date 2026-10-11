@@ -17,6 +17,26 @@ from harvestnet_agents.negotiation import StorageSlot,TimeWindow
 from test_core import fixture
 
 class CalculatorTests(unittest.TestCase):
+    def test_signed_adjustments_are_finite_and_never_negative(self):
+        calc=Calculators()
+        self.assertEqual(calc.adjust_pounds(5,3),8)
+        self.assertEqual(calc.adjust_pounds(5,-2),3)
+        self.assertEqual(calc.adjust_pounds(5,-10),0)
+        for invalid in (float('nan'),float('inf'),True):
+            with self.assertRaises(ValueError): calc.adjust_pounds(5,invalid)
+        with self.assertRaises(ValueError): calc.adjust_pounds(-1,2)
+        with self.assertRaises(ValueError): calc.adjust_pounds(1e308,1e308)
+
+    def test_new_teammate_surplus_bid_uses_real_calculator(self):
+        from harvestnet_agents.negotiation import parse_agent_input
+        raw=json.loads(Path('agents/tests/fixtures/negotiators/eastside_bids_beyond_fair_share_once_its_households_have_it.json').read_text())
+        role,typed=parse_agent_input(raw)
+        e=Engine(json.loads(Path('docs/contracts/examples/scenario-normal-afternoon.json').read_text()))
+        move=e.rules_for(role,typed.turn.organization_id).move(typed).to_dict()
+        self.assertEqual(move['amendment']['pounds'],200)
+        self.assertIn('beyond fair share',move['reason'])
+        self.assertIn('adjust_pounds',[call.name for call in e.calc.calls])
+
     def test_merged_teammate_runner_uses_real_calculators(self):
         from harvestnet_agents.scenario import load_scenario
         from harvestnet_agents.scenario_runner import run_scenario

@@ -19,14 +19,14 @@ def negotiate_pending(engine,lot_id,provider=None):
         from harvestnet_agents.llm_negotiators import NumberPool,precompute,text_number_problems
         pool=NumberPool();pool.add(typed);call_start=len(engine.calc.calls)
         pool.add(precompute(role,typed,engine.calc))
-        move=provider(org,{**raw,'turn':org,'turn_context':raw['turn']}) if provider else rules_negotiator(role,org,engine.calc).move(typed).to_dict()
+        move=provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session}) if provider else engine.rules_for(role,org).move(typed).to_dict()
         for call in engine.calc.calls[call_start:]: pool.add(call.result)
         problems=text_number_problems(move.get('reason',''),pool)
         if problems:
             engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':problems})
             current=engine.records.get('lot',lot_id);current['number_check_failures']=current.get('number_check_failures',0)+1
             with engine.records.transaction(): engine.records.put('lot',lot_id,current)
-            move=rules_negotiator(role,org,engine.calc).move(typed).to_dict()
+            move=engine.rules_for(role,org).move(typed).to_dict()
             move['reason']='Validated deterministic owner fallback; human approval is still required.'
         try:
             queued=engine.records.get('queued_move',lot_id+':'+org)

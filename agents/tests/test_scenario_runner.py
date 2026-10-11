@@ -14,7 +14,7 @@ import pytest
 
 from harvestnet_agents.calculators import CalculatorError, HouseholdBalance, StandInCalculators
 from harvestnet_agents.llm_negotiators import LLMNegotiator, SpendingCap
-from harvestnet_agents.negotiation import Role, StorageSlot, TimeWindow
+from harvestnet_agents.negotiation import Role, StorageSlot, TimeWindow, amendment_from_dict, parse_draft, parse_facts
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.scenario import load_scenario
 from harvestnet_agents.scenario_runner import (
@@ -112,6 +112,103 @@ def test_every_pound_is_allocated_or_visibly_unclaimed(normal):
         assert allocated + item["unclaimed_lb"] == item["pounds"]
         if item["unclaimed_lb"]:
             assert item["unclaimed_reason"]
+
+
+# --- Beyond fair share (user direction, October 11, 2026) ---------------------------------
+
+# The fair-share gaps the run's facts give (synthetic, placeholder table), before and after the policy change.
+GAPS = {"city": 31.0, "rural": 32.0, "eastside": 19.0}
+UNCLAIMED_BEFORE_LB = 818.0  # 249 lb apples, 169 lb romaine, 400 lb potatoes, when food banks bid only to their gaps
+
+
+def own_facts(run, organization_id):
+    """The food bank's own facts as of the commitment (before the cooler failure changes them)."""
+    commit = events(run, "commitment")[0]["seq"]
+    raw = [e["facts"] for e in events(run, "facts") if e["organization_id"] == organization_id and e["seq"] < commit][-1]
+    return parse_facts(Role.FOOD_BANK, raw)
+
+
+def test_food_banks_take_the_surplus_beyond_fair_share_so_much_less_is_unclaimed(normal):
+    unclaimed = sum(i["unclaimed_lb"] for i in normal.outcome["items"])
+    assert unclaimed < UNCLAIMED_BEFORE_LB / 4
+    assert unclaimed == 0  # this run: every pound has a food bank
+
+
+def test_no_food_bank_takes_more_than_it_can_store_or_hand_out_before_it_spoils(normal):
+    calc = StandInCalculators()
+    draft = normal.committed_draft
+    for fb in draft.named_food_banks():
+        facts, tr = own_facts(normal, fb), draft.transport(fb)
+        ends = []
+        for a in draft.allocations_to(fb):
+            check = calc.pickup_feasibility(tr.arrives_at, facts.pickup_windows, draft.item(a.produce_id).usable_until)
+            assert check.feasible, (fb, a.produce_id)
+            profile = calc.profiles.get(a.produce_id)
+            days = profile.days_usable_cold if profile.needs_cold else profile.days_usable_room
+            assert days is not None and check.collect.end - tr.arrives_at <= timedelta(days=days.min), (fb, a.produce_id)
+            ends.append(check.collect.end)
+        for at in (tr.arrives_at, max(ends)):  # storage over time: from arrival until pickup ends
+            free = calc.storage_at(facts.storage, at)
+            cold = sum(a.pounds for a in draft.allocations_to(fb) if calc.profiles.get(a.produce_id).needs_cold)
+            dry = draft.planned_lb(fb) - cold
+            assert cold <= free.cold_free_lb and dry <= free.dry_free_lb, (fb, at)
+        if tr.mover.value == "food_bank":
+            assert draft.planned_lb(fb) <= facts.truck.capacity_lb
+
+
+def test_bids_toward_fair_share_come_before_bids_beyond_it_and_are_marked(normal):
+    bids = [m for m in events(normal, "move")
+            if m["role"] == "food_bank" and m["move"]["action"] == "counter" and m["move"]["amendment"]["kind"] == "set_pounds"]
+    beyond = [m for m in bids if "beyond fair share" in m["move"]["reason"]]
+    toward = [m for m in bids if m not in beyond]
+    assert beyond and toward
+    assert max(m["seq"] for m in toward) < min(m["seq"] for m in beyond)
+    versions = {e["version"]: e for e in events(normal, "version")}
+    for m in beyond:
+        draft = parse_draft(versions[m["version"]]["terms"])
+        # A food bank bids beyond fair share only on a version that already plans its own gap ...
+        assert draft.planned_lb(m["organization_id"]) >= m["facts"]["demand"]["below_fair_share_lb"]
+    # ... and in this run, the first one comes after every food bank's gap is planned.
+    first = parse_draft(versions[beyond[0]["version"]]["terms"])
+    assert all(first.planned_lb(fb) >= gap for fb, gap in GAPS.items())
+    for m in toward:
+        after = parse_draft(versions[m["version"]]["terms"]).amend(
+            amendment_from_dict(m["move"]["amendment"]), proposer_id=m["organization_id"], reason="")
+        assert after.planned_lb(m["organization_id"]) <= m["facts"]["demand"]["below_fair_share_lb"]
+
+
+def test_pounds_beyond_fair_share_never_count_toward_it(normal):
+    # The fair-share figures every organization sees stay what the households' requests give.
+    for e in events(normal, "facts"):
+        if e["role"] == "food_bank":
+            assert e["facts"]["demand"]["below_fair_share_lb"] == GAPS[e["organization_id"]]
+        elif e["role"] == "advocate":
+            assert {g["food_bank_id"]: g["below_fair_share_lb"] for g in e["facts"]["gaps"]} == GAPS
+    accounting = {f["food_bank_id"]: f for f in normal.outcome["fair_share"]}
+    assert set(accounting) == set(GAPS)
+    for fb, gap in GAPS.items():
+        f = accounting[fb]
+        assert f["below_fair_share_lb"] == gap and f["remaining_gap_lb"] == 0
+        assert f["planned_lb"] == normal.committed_draft.planned_lb(fb)
+        assert f["beyond_fair_share_lb"] == f["planned_lb"] - gap > 0
+
+
+@pytest.mark.parametrize("capacity_lb", [500, 300])
+def test_a_donor_vehicle_too_small_for_the_extra_pounds_gets_them_back_never_fair_share(capacity_lb):
+    # Food banks can't see the donor's vehicle, so extra bids can overfill it. The donor asks the truck-less
+    # food bank to collect; it takes back pounds beyond fair share instead of asking again and again.
+    data = raw()
+    data["donors"][0]["drop_off"]["capacity_lb"] = capacity_lb
+    run = run_scenario(load_scenario(data))
+    assert run.status == "committed", events(run, "stop")
+    assert all(run.rule_checks().values()), {k: v.failures for k, v in run.lane_b_rule_checks.items()}
+    take_backs = [m for m in events(run, "move") if m["role"] == "food_bank" and "take back" in m["move"]["reason"]]
+    assert take_backs and all("beyond fair share" in m["move"]["reason"] for m in take_backs)
+    draft = run.committed_draft
+    assert all(draft.planned_lb(fb) >= gap for fb, gap in GAPS.items())  # fair-share pounds are never taken back
+    donor_moved = sum(draft.planned_lb(fb) for fb in draft.named_food_banks() if draft.transport(fb).mover.value == "donor")
+    assert donor_moved <= capacity_lb
+    assert sum(i["unclaimed_lb"] for i in run.outcome["items"]) < UNCLAIMED_BEFORE_LB
 
 
 def test_the_cooler_failure_after_commitment_proposes_a_move_awaiting_fresh_approval(normal):
