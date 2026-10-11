@@ -48,7 +48,8 @@ def negotiate_pending(engine,lot_id,provider=None):
             if move.get('resource_owner')!=org: raise ValueError('hold belongs to another owner')
             engine.protocol.hold(lot_id,d['version'],org,move['holds'],engine.now,engine.capacities(org,d))
         lot=engine.records.get('lot',lot_id)
-        if lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
+        queued=any(m['lot_id']==lot_id for m in engine.records.all('queued_move'))
+        if not queued and lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
             lot['status']='awaiting_approvals'
             with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
             return lot

@@ -223,6 +223,8 @@ class API:
                 move={"organization_id":b['organization_id'],"version":b['version'],"action":"counter","amendment":b['amendment'],"reason":b['reason']}
                 with self.records.transaction():
                     self.records.put('queued_move',path[1]+':'+b['organization_id'],{"lot_id":path[1],**move})
+                from .workflows import negotiate_pending
+                negotiate_pending(self.engine,path[1])
                 return 202,{"lot_id":path[1],"status":"queued_for_turn","based_on_version":d['version'],"move":move,"message":"Counter queued for your organization's next turn."}
             if method=='POST' and path[2:]==['condition-checks']:
                 self.authorize(b['organization_id'],token)

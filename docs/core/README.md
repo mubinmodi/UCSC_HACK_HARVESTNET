@@ -9,3 +9,7 @@ Transactional records, owner holds, exact-version human approvals, event audits 
 ## Issue #8
 
 Real calculator, matching, recall, number-validation and stale-approval acceptance tests. Also injects these calculators into the newly merged teammate scenario runner. Core audits and Lane B checks are separate; no result is synthesized.
+
+## Issue #9
+
+Real public API and HTTP server, consent/privacy/expiry, owner authentication, condition checks, counter processing, commitments and household pickup release. No actual SMS or voice provider calls. The HTTP server binds localhost unless configured.
