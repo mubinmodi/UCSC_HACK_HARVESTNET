@@ -1,0 +1,17 @@
+{
+  "kind": "fair_share_table",
+  "version": "0.1.0-placeholder",
+  "status": "placeholder",
+  "note": "PLACEHOLDER. Synthetic starting values copied from docs/MVP_DESIGN.md section 4 (Proposed). Not sourced from SNAP or any food bank. The participating food banks must agree and publish real values before any real use.",
+  "published_by": null,
+  "published_date": null,
+  "unit": "lb",
+  "period": "week",
+  "pounds_by_household_size": {
+    "1": 4,
+    "2": 7,
+    "3": 10,
+    "4": 12
+  },
+  "each_additional_person_lb": 2
+}
