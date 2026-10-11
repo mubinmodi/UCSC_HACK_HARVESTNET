@@ -11,7 +11,7 @@ One small EC2 machine runs the whole stack with Docker Compose. `setup.sh` creat
 
 ## Run it
 
-All settings and optional provider keys are listed in `deploy/aws/env.template`. Copy it to `deploy/aws/.env` (gitignored), fill it in, then load it with `set -a; . deploy/aws/.env; set +a` before the commands below.
+All settings and optional provider keys are listed in `deploy/aws/env.template`. To paste API keys without them showing on screen, run `deploy/aws/set-keys.sh` in a terminal. Copy it to `deploy/aws/.env` (gitignored), fill it in, then load it with `set -a; . deploy/aws/.env; set +a` before the commands below.
 
 ```sh
 ALERT_EMAIL=you@example.org deploy/aws/setup.sh --dry-run   # see the plan first
@@ -50,7 +50,8 @@ It does not create a NAT gateway, load balancer, RDS database, CloudFront distri
 - **HTTPS:** Caddy gets a free certificate for `<elastic-ip-with-dashes>.sslip.io`, a public name that resolves to the IP inside it. To use your own domain, point its A record at the Elastic IP and set `HARVESTNET_DOMAIN`.
 - **URLs:** core API `https://<host>/api/` (health at `/api/health`), review pages `/human/...`, platform adapters `/platform/...`, and each frontend at `/<app>/` (list at `/apps.txt`). The frontends are built with `VITE_API_BASE_URL=https://<host>/api` and served by Caddy on the same origin, so CloudFront isn't needed.
 - **No GitHub token on the machine:** your laptop runs `git archive` and uploads the bundle to the private bucket. The machine downloads it with its instance role. SSM Run Command starts `deploy/aws/remote_deploy.sh` from the bundle. That script loads the secret into a 0600 file, builds the image and runs `docker compose up`.
-- **Claude spending:** `CLAUDE_RUN_CAP_USD` and `CLAUDE_TOTAL_CAP_USD` go into the secret and into the core and organization containers. Both default to 0, which means no paid calls. Caps above $100 are refused. Today only `harvestnet_platform/budget.py` reads these variables. The deployed core server makes no Claude calls.
+- **Live cooler failure (#23):** Caddy also proxies exactly `POST /systems/demo/<city|rural|eastside>/cooler` to the systems service, which requires the `DEMO_SWITCH_TOKEN` bearer (401 otherwise). No other systems route is public. The three food bank hosts each run their own cooler watcher (`harvestnet_core/cooler_watch.py`, started by `COOLER_WATCH=1`): it polls that food bank's own cooler reading every `COOLER_WATCH_INTERVAL_SECONDS` (10), and when it fails, proposes the new version to the core and asks the approval service for the review emails. It never approves or commits. Each of those hosts receives the core's staff-token map and `API_EVENTS_TOKEN` and uses only its own organization's token. Operator commands: `docs/demo/REHEARSAL.md`.
+- **Claude spending:** `CLAUDE_RUN_CAP_USD` and `CLAUDE_TOTAL_CAP_USD` go into the secret and into the core and organization containers. Both default to 0, which means no paid calls. Caps above $100 are refused. `harvestnet_platform/budget.py` reads these variables. The core's voice intake (`POST /api/voice-intake`) also reads them: with `ANTHROPIC_API_KEY` set and `CLAUDE_RUN_CAP_USD` above 0, it attaches Lane B's Claude extractor under that hard cap (worst case reserved per call, plus a 20-calls-per-minute rate limit). The cap is per process, so a core restart starts it from zero again. Without a key, or with a cap of 0, voice intake answers 503 and households use the text form. Set the key and cap with `ANTHROPIC_API_KEY=... CLAUDE_RUN_CAP_USD=2 CLAUDE_TOTAL_CAP_USD=5 deploy/aws/setup.sh`; the image installs the `anthropic` SDK through the agents `claude` extra.
 
 ## Monthly cost estimate
 
@@ -118,3 +119,7 @@ It deletes the instance with its disk and data, the Elastic IP, the security gro
 - `sslip.io` certificates depend on a free public DNS service and on Let's Encrypt rate limits. If Caddy can't get a certificate, use a real domain.
 - The approvals service relays human decisions to the core with one `CORE_API_TOKEN`, but the core accepts each organization's own staff token. With one token, only that organization's decisions commit through the relay. This setup doesn't change that seam.
 - A t4g.micro has 1 GB of memory. Nine small Python services use about 35 MB each when idle (measured locally); the Directory daemon adds another process with a 256 MB memory ceiling. Actual full-stack memory use has not been measured on the instance. If it runs short, use `INSTANCE_TYPE=t4g.small`.
+
+## Reset the demo data
+
+`deploy/aws/reset_data.sh` (add `--dry-run` to preview, `--yes` to skip the prompt) deletes the live core records, review links, cooler state and organization host data, restarts the services on a fresh synthetic scenario, and re-publishes the free rules-based evaluation. It keeps the Claude spending ledger, the Directory, the HTTPS certificates and every AWS resource.

@@ -302,6 +302,11 @@ def main():
         print(f'Directory: AGNTCY Directory at {address}, refreshed every {interval:g}s', flush=True)
     else:
         print('Directory: none configured; searches use the labeled local registry fallback', flush=True)
+    if os.getenv('COOLER_WATCH') == '1':
+        # A food bank's own agent watches its own cooler and proposes the change (#23).
+        # Only the AWS image carries harvestnet_core, so this stays off unless asked for.
+        from harvestnet_core.cooler_watch import start_from_env
+        start_from_env(args.organization)
     serve(handler_for(receiver, os.getenv('TRANSPORT_TOKEN'), endpoint), args.port, args.host)
 
 

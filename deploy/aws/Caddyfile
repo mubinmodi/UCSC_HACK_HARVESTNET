@@ -10,6 +10,17 @@
 	handle /human/* {
 		reverse_proxy approvals:8030
 	}
+	# The demo cooler switch only (#23): POST /systems/demo/<city|rural|eastside>/cooler with
+	# the DEMO_SWITCH_TOKEN bearer. The systems service answers 401 without it. Every other
+	# systems route (the readings) stays on the private network.
+	@coolerswitch {
+		method POST
+		path_regexp ^/systems/demo/(city|rural|eastside)/cooler$
+	}
+	handle @coolerswitch {
+		uri strip_prefix /systems
+		reverse_proxy systems:8010
+	}
 	handle_path /api/* {
 		reverse_proxy core:8000
 	}

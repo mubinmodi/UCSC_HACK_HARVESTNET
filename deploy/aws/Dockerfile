@@ -10,8 +10,9 @@ COPY agents/pyproject.toml ./agents/pyproject.toml
 COPY agents/src ./agents/src
 # The organization hosts register in the AGNTCY Directory (deploy/aws/compose.directory.yaml)
 # with the Directory SDK only, at the version pinned in requirements-agntcy.txt. The heavier
-# App SDK host (compose.agntcy.yaml) is not installed here.
-RUN pip install --no-cache-dir . ./agents "$(grep -E '^agntcy-dir==' requirements-agntcy.txt)"
+# App SDK host (compose.agntcy.yaml) is not installed here. The agents `claude` extra adds the
+# anthropic SDK for the core's voice-intake extractor (#22); it only calls out when a key and a cap are set.
+RUN pip install --no-cache-dir . "./agents[claude]" "$(grep -E '^agntcy-dir==' requirements-agntcy.txt)"
 # The core is run from /app (python -m harvestnet_core.server); it reads its fixture from docs/contracts.
 COPY harvestnet_core ./harvestnet_core
 COPY docs/contracts/examples ./docs/contracts/examples

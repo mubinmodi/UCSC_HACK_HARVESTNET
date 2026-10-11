@@ -436,6 +436,12 @@ class API:
                     # A changed version of a committed plan takes its own fresh approvals.
                     result=changes.approve(self.engine,receipt,owner)
                     return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","change_status":result['status'],"committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
+                # A committed change supersedes the version it changed. The lot's own draft stays at
+                # that earlier version, so a decision on it would otherwise still be accepted.
+                if type(receipt['version']) is int:
+                    newer=[c['version'] for c in changes.changes_for(self.records,receipt['lot_id']) if c['status']=='committed' and c['version']>receipt['version']]
+                    if newer:
+                        raise Conflict(f"version {receipt['version']} was superseded by committed version {max(newer)}; decide on the current version")
                 result=self.engine.protocol.approve(receipt,owner,self.engine.now,self.engine.validate)
                 self.engine.distribute(b['lot_id'])
                 return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
