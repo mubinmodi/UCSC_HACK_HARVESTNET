@@ -1062,3 +1062,9 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 13. **Metrics:** worst-served coverage over declared cohorts including zeros; separate receipts/distribution, food-specific measures, pathways, residual requests, and costs. Count source food once across custody changes. Report losses as well as gains.
 14. **Current documents:** the three canonical design docs are **v1 framework baselines, frozen October 10, 2026**. Inputs, policies, profiles, adapters, and outcomes remain versioned and variable; old numerical examples are archived.
 15. **Process:** Markdown design work only. The questionnaire is unsent. No code, `/to-spec`, `/to-tickets`, external messaging, or operational commitments are authorized by this freeze.
+
+## User direction (October 11, 2026): household frontend, recorded by Codex
+
+The user explicitly authorized implementing the frontend on `gianellerella/02-household-web-page` with React, TypeScript, and Tailwind CSS, using the supplied visual reference and placeholders for all backend APIs. Implemented household details, review and consent, food bank choice, and pickup preview with English/Spanish text. All numerical values, food bank details, codes, and API outcomes are synthetic. The reference uses credits while `docs/MVP_DESIGN.md` proposes pounds; credits remain an explicitly labeled visual placeholder, pending the real policy/API. No ADR or source-of-truth design decision was changed.
+
+Validation limitation: the local shell has no Node.js/npm installation, so dependency installation, TypeScript build, and browser verification could not be run here.
