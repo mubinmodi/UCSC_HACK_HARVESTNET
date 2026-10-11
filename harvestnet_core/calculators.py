@@ -1,0 +1,86 @@
+"""Real deterministic calculators; no stand-in inheritance or model arithmetic."""
+from dataclasses import asdict
+from datetime import timedelta
+from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt
+from harvestnet_agents.fair_share import fair_share, load_fair_share_table
+from harvestnet_agents.profiles import load_profiles, to_pounds
+from harvestnet_agents.negotiation import TimeWindow
+from .protocol import number
+
+
+class Calculators:
+    label = "deterministic core calculators"
+
+    def __init__(self):
+        self.profiles = load_profiles()
+        self.table = load_fair_share_table()
+        self.calls = []
+
+    def log(self, name, inputs, result):
+        self.calls.append(CalculatorCall(name, inputs, result))
+        return result
+
+    def fair_share(self, household_size):
+        if isinstance(household_size, bool) or not isinstance(household_size, int) or household_size < 1:
+            raise ValueError("household size must be a positive integer")
+        return self.log("fair_share", {"household_size": household_size}, fair_share(household_size, self.table))
+
+    def fair_share_gap(self, households):
+        gaps = [max(0, self.fair_share(h.household_size).pounds - number(h.received_lb)) for h in households]
+        return self.log("fair_share_gap", {"households": [asdict(h) for h in households]}, GapResult(sum(gaps), len(gaps), sum(x > 0 for x in gaps), self.table.version))
+
+    def household_portions(self, pounds_available, households):
+        available = number(pounds_available)
+        codes = [h["request_code"] for h in households]
+        if len(codes) != len(set(codes)):
+            raise ValueError("duplicate household")
+        shares = [self.fair_share(h["household_size"]).pounds for h in households]
+        gaps = [max(0, s - number(h["received_lb"])) for s, h in zip(shares, households)]
+        # Water-fill the largest deficits until they meet the next deficit.
+        remaining = min(available, sum(gaps))
+        residual = gaps.copy()
+        while remaining > 1e-9 and max(residual, default=0) > 1e-9:
+            largest = max(residual)
+            group = [i for i, g in enumerate(residual) if abs(g - largest) < 1e-9]
+            next_level = max((g for g in residual if g < largest - 1e-9), default=0)
+            each = min(largest - next_level, remaining / len(group))
+            for i in group:
+                residual[i] -= each
+            remaining -= each * len(group)
+        portions = [{"request_code": c, "pounds": g-r, "fair_share_lb": s, "still_below_lb": r} for c,g,r,s in zip(codes,gaps,residual,shares)]
+        return self.log("household_portions", {"pounds_available": available, "households": households}, {"portions": portions, "left_over_lb": max(0, available - sum(p["pounds"] for p in portions)), "table_version": self.table.version})
+
+    def storage_at(self, storage, at):
+        candidates = [s for s in storage if s.window.start <= at < s.window.end]
+        # Overlapping readings are conservative, never summed as extra capacity.
+        result = StorageAt(min((number(s.cold_free_lb) for s in candidates), default=0), min((number(s.dry_free_lb) for s in candidates), default=0), bool(candidates))
+        return self.log("storage_at", {"at": at.isoformat(), "storage": [asdict(s) for s in storage]}, result)
+
+    def capacity_fit(self, free_lb, needed_lb):
+        free, needed = number(free_lb), number(needed_lb)
+        return self.log("capacity_fit", {"free_lb": free, "needed_lb": needed}, CapacityFit(needed <= free, max(0, free-needed), max(0, needed-free)))
+
+    def gap_after_plan(self, gap_lb, planned_lb):
+        gap, planned = number(gap_lb), number(planned_lb)
+        return self.log("gap_after_plan", {"gap_lb": gap, "planned_lb": planned}, GapAfterPlan(max(0, gap-planned), max(0, planned-gap)))
+
+    def arrival_time(self, departs_at, travel_minutes):
+        return self.log("arrival_time", {"departs_at": departs_at.isoformat(), "travel_minutes": number(travel_minutes)}, departs_at + timedelta(minutes=travel_minutes))
+
+    def pickup_feasibility(self, arrives_at, pickup_windows, usable_until):
+        last = max((w.end for w in pickup_windows), default=None)
+        result = PickupCheck(False, None, "no_pickup_hours" if last is None else "arrives_after_pickup_ends" if last <= arrives_at else "spoils_before_pickup", last)
+        for w in sorted(pickup_windows, key=lambda w: w.start):
+            start, end = max(arrives_at, w.start), min(usable_until, w.end)
+            if start < end:
+                result = PickupCheck(True, TimeWindow(start, end), None, last)
+                break
+        return self.log("pickup_feasibility", {"arrives_at": arrives_at.isoformat(), "usable_until": usable_until.isoformat(), "pickup_windows": [asdict(w) for w in pickup_windows]}, result)
+
+    def to_pounds(self, produce_id, quantity, unit, lb_per_unit=None):
+        number(quantity)
+        if lb_per_unit is not None:
+            if number(lb_per_unit) == 0:
+                raise ValueError("pack weight must be positive")
+        result = number(to_pounds(self.profiles.get(produce_id), quantity, unit, lb_per_unit))
+        return self.log("to_pounds", {"produce_id": produce_id, "quantity": quantity, "unit": unit, "lb_per_unit": lb_per_unit}, result)
