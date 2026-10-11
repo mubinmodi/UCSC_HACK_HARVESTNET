@@ -1,8 +1,14 @@
 """Core/transport identity boundary; the exact same real policy in both modes."""
+from functools import lru_cache
 from harvestnet_agents.negotiation import parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from .calculators import Calculators
 from .engine import run_fixture
+
+
+@lru_cache(maxsize=256)
+def owner_policy(session,role,organization):
+    return rules_negotiator(role,organization,Calculators())
 
 
 def policy(organization,data):
@@ -12,7 +18,10 @@ def policy(organization,data):
         raise ValueError('transport identity does not match core turn')
     role='donor' if organization=='donor' else 'advocate' if organization=='advocate' else 'food_bank'
     role,typed=parse_agent_input({'role':role,'draft':data['draft'],'facts':data['facts'],'turn':context})
-    move=rules_negotiator(role,domain_org,Calculators()).move(typed).to_dict()
+    session=data['policy_session']
+    if not isinstance(session,str) or not session:
+        raise ValueError('core policy session is required')
+    move=owner_policy(session,role,domain_org).move(typed).to_dict()
     move['organization_id']=organization
     if 'resource_owner' in move: move['resource_owner']=organization
     return move
