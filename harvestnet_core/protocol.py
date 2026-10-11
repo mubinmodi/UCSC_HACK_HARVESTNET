@@ -38,7 +38,7 @@ class Protocol:
     def __init__(self, records):
         self.records = records
 
-    def create(self, draft, now):
+    def create(self, draft, now, extra=None):
         from harvestnet_agents.negotiation import parse_draft
         if type(draft['version']) is not int or draft['version']<1:
             raise ValueError('positive integer version required')
@@ -52,7 +52,8 @@ class Protocol:
                 pass
             else:
                 raise Conflict("lot already exists")
-            self.records.put("lot", draft["lot_id"], {"draft": draft, "versions": [copy.deepcopy(draft)], "status": "negotiating", "approvals": {}, "holds": {}, "commitments": []})
+            # ``extra`` holds offer facts outside the shared draft, such as this offer's drop-off.
+            self.records.put("lot", draft["lot_id"], {**copy.deepcopy(extra or {}), "draft": draft, "versions": [copy.deepcopy(draft)], "status": "negotiating", "approvals": {}, "holds": {}, "commitments": []})
             self.records.event(draft["lot_id"], now, "draft", draft)
 
     def amend(self, lot_id, version, organization_id, amendment, reason, now):
@@ -132,6 +133,7 @@ class Protocol:
             item.update(condition_grade=grade,usable_until=usable_until,condition_doubt=None)
             draft.update(version=version+1,based_on_version=version,proposer_id=owner,reason=reason)
             lot.update(draft=draft,approvals={},holds={},status='negotiating')
+            lot.setdefault('usable_until_basis',{})[produce_id]={'kind':'condition_check','organization_id':owner}
             lot['versions'].append(copy.deepcopy(draft))
             self.records.put('lot',lot_id,lot)
             self.records.event(lot_id,now,'human_condition_check',{'organization_id':owner,'produce_id':produce_id,'version':draft['version'],'grade':grade,'reason':reason})

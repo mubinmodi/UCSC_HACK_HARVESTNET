@@ -11,6 +11,7 @@ from .calculators import Calculators
 from .protocol import Protocol, Conflict, dt, number, named, terms_hash
 from .records import Records
 from .checks import rule_checks
+from .workflows import checked_move
 
 
 def jsonable(value):
@@ -53,19 +54,11 @@ class Engine:
                     self.records.get("request", r["request_code"])
                 except KeyError:
                     self.records.put("request", r["request_code"], record)
-        # Scripted faults are public fixture facts for every comparison method.
-        # Reserve conservatively when a known cold-space loss precedes collection.
-        # This is a fixture forecast, not a claim of live Directory rediscovery.
+        # Scripted faults are not forecast: no agent sees a fault before its time. The
+        # harness applies each one when it happens (``cooler_join.apply_fault``, Workflow 4).
         for fault in fixture.get("faults", []):
             if fault["kind"] != "cooler_failure":
                 raise ValueError("unsupported fixture fault")
-            bid = fault["food_bank_id"]
-            bank = self.records.get("bank", bid)
-            if any(dt(w["end"]) > dt(fault["at"]) for w in bank["pickup_windows"]):
-                for s in bank["storage"]:
-                    s["cold_free_lb"] = 0
-                with self.records.transaction():
-                    self.records.put("bank", bid, bank)
 
     def rules_for(self, role, organization):
         key=(role,organization)
@@ -81,10 +74,12 @@ class Engine:
         profile=self.calc.profiles.get(item['produce_id'])
         if bank["organization_id"] not in request.get("chosen_food_bank_ids", []) or item["produce_id"].casefold() in exclusions or profile.name.casefold() in exclusions or dt(request["expires_at"]) <= dt(self.now):
             return None
-        needs_cold = self.calc.profiles.get(item["produce_id"]).needs_cold
+        # Design section 8: produce that needs a household fridge goes to limited-fridge
+        # households only for same-day pickup. The profile's needs-fridge field, not its cold chain.
+        needs_fridge = profile.needs_fridge
         for window in bank["pickup_windows"]:
             start, end = max(dt(window["start"]), arrival), min(dt(window["end"]), dt(item["usable_until"]))
-            if request["limited_fridge"] and needs_cold and start.date() != arrival.date():
+            if request["limited_fridge"] and needs_fridge and start.date() != arrival.date():
                 continue
             for hw in request["pickup_windows"]:
                 day = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[start.weekday()]
@@ -106,11 +101,22 @@ class Engine:
         role = self.roles[org]
         donor = self.donors[draft["donor_id"]]
         if role == "donor":
-            return {"donor_id":org, "travel_minutes":donor["travel_minutes"], "drop_off":donor.get("drop_off")}
+            return {"donor_id":org, "travel_minutes":donor["travel_minutes"], "drop_off":self.drop_off(draft["lot_id"])}
         if role == "food_bank":
             bank = self.records.get("bank", org)
             return {"food_bank_id":org, "name":self.names[org], "storage":bank["storage"], "pickup_windows":bank["pickup_windows"], "truck":bank.get("truck"), "travel_minutes_from_donor":donor["travel_minutes"].get(org), "demand":self.demand(org)}
         return {"gaps":[{"food_bank_id":bid,"name":self.names[bid],"households":self.demand(bid)["households"],"below_fair_share_lb":self.demand(bid)["below_fair_share_lb"],"low_access":b["low_access"]} for bid,b in self.banks.items()], "declined":list(declined)}
+
+    def drop_off(self, lot_id):
+        """The drop-off ability recorded with this lot's offer, else the donor's recorded one."""
+        try:
+            lot = self.records.get("lot", lot_id)
+        except KeyError:
+            lot = None
+        if lot is not None and "drop_off" in lot:
+            return lot["drop_off"]
+        donor = lot["draft"]["donor_id"] if lot is not None else None
+        return self.donors[donor].get("drop_off") if donor else None
 
     def create_offer(self, offer):
         if offer.get("recall_notice"):
@@ -118,16 +124,19 @@ class Engine:
         items = [{"produce_id":i["produce_id"], "pounds":self.calc.to_pounds(i["produce_id"],i["quantity"],i["unit"],i.get("lb_per_unit")), "condition_grade":i["condition_grade"], "usable_until":i["usable_until"], "condition_doubt":i.get("condition_doubt")} for i in offer["items"]]
         if len({i["produce_id"] for i in items}) != len(items):
             raise ValueError("combine duplicate produce lines before reporting")
-        drop = self.donors[offer["donor_id"]].get("drop_off")
+        # An offer may state its own drop-off ability (the public API); else the donor's record.
+        drop = offer["drop_off"] if "drop_off" in offer else self.donors[offer["donor_id"]].get("drop_off")
         # Version 1 publishes where the donor offered to drop off (agent-moves.md: drop_off_to),
         # from the donor's own recorded route, so food banks without a truck can bid (#20).
         draft = {"lot_id":offer["lot_id"], "version":1,"donor_id":offer["donor_id"], "deadline":offer["deadline"], "items":items,"allocations":[],"transports":[],"drop_off_to":list(drop["food_bank_ids"]) if drop else [],"drop_off_refrigerated":bool(drop.get("refrigerated",False)) if drop else False,"proposer_id":offer["donor_id"],"reason":"Owner reported surplus; nothing committed", "based_on_version":None,"names":self.names}
-        self.protocol.create(draft, self.now)
+        basis = offer.get("usable_until_basis") or {}
+        extra = {"drop_off": drop, "usable_until_basis": {i["produce_id"]: basis.get(i["produce_id"], {"kind": "donor_condition_check", "organization_id": offer["donor_id"]}) for i in items}}
+        self.protocol.create(draft, self.now, extra)
         return draft
 
     def capacities(self, owner, draft):
         if owner == draft["donor_id"]:
-            drop = self.donors[owner].get("drop_off")
+            drop = self.drop_off(draft["lot_id"])
             return {"lot":sum(i["pounds"] for i in draft["items"]), "drop_off": drop["capacity_lb"] if drop else 0}
         bank = self.records.get("bank", owner)
         return {"storage_cold": min((s["cold_free_lb"] for s in bank["storage"]),default=0), "storage_dry":min((s["dry_free_lb"] for s in bank["storage"]),default=0), "truck":bank["truck"]["capacity_lb"] if bank.get("truck") else 0}
@@ -140,7 +149,7 @@ class Engine:
             if expected and sum(h.get("pounds") or 0 for h in holds.get(org,[]) if h["resource"]==expected) + 1e-8 < sum(a["pounds"] for a in draft["allocations"]):
                 raise Conflict("lot hold does not cover allocation")
         drop_total = sum(a["pounds"] for a in draft["allocations"] if transports.get(a["food_bank_id"],{}).get("mover")=="donor")
-        drop = self.donors[draft["donor_id"]].get("drop_off")
+        drop = self.drop_off(draft["lot_id"])
         if drop_total and (not drop or drop_total > drop["capacity_lb"] + 1e-8):
             raise Conflict("donor drop-off capacity exceeded")
         if drop_total and sum(h.get('pounds') or 0 for h in holds.get(draft['donor_id'],[]) if h['resource']=='drop_off')+1e-8 < drop_total:
@@ -238,10 +247,21 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
     is finished. It never changes a move, a record, or the clock."""
     engine=Engine(fixture,records,calculators)
     if observer: observer.attach(engine)
-    result={"commitments":[],"pathways":[],"rule_checks":{},"mode":fixture["mode"],"synthetic":fixture["synthetic"],"scenario_id":fixture["scenario_id"],"calculator_label":engine.calc.label,"policy_label":getattr(move_provider,'label','real rules-based negotiators' if move_provider is None else 'configured policy adapter'),"scripted_humans":True,"events":[]}
+    result={"commitments":[],"pathways":[],"rule_checks":{},"mode":fixture["mode"],"synthetic":fixture["synthetic"],"scenario_id":fixture["scenario_id"],"calculator_label":engine.calc.label,"policy_label":getattr(move_provider,'label','real rules-based negotiators' if move_provider is None else 'configured policy adapter'),"scripted_humans":True,"events":[],"faults":[]}
     checks=[]
+    pending_faults=list(fixture.get("faults",[]))
     for offer in fixture["surplus_offers"]:
         engine.now=offer["reported_at"]
+        for fault in [f for f in pending_faults if dt(f["at"])<=dt(offer["reported_at"])]:
+            # Already happened when this lot is offered: a current fact every agent reads.
+            pending_faults.remove(fault)
+            with engine.records.transaction():
+                bank=engine.records.get("bank",fault["food_bank_id"])
+                for slot in bank["storage"]:
+                    slot["cold_free_lb"]=0
+                bank["cooler"]={"status":"failed","temperature_c":fault["reading"].get("temperature_c"),"cold_available":False,"synthetic":True,"observed_at":fault["at"]}
+                engine.records.put("bank",fault["food_bank_id"],bank)
+            result["faults"].append({"food_bank_id":fault["food_bank_id"],"at":fault["at"],"handling":"before_offer_status","synthetic":True})
         if offer.get("recall_notice"):
             engine.records.event(offer["lot_id"],engine.now,"recall_refused",{"reason":"recall notice"})
             if observer: observer.lot_finished(engine,offer["lot_id"])
@@ -267,7 +287,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 queued=engine.records.get('queued_move',queued_id)
             except KeyError:
                 queued=None
-            from harvestnet_agents.llm_negotiators import NumberPool, precompute, text_number_problems
+            from harvestnet_agents.llm_negotiators import NumberPool, precompute
             call_start=len(engine.calc.calls)
             role, typed=parse_agent_input(input)
             pool=NumberPool()
@@ -301,28 +321,14 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                     engine.records.event(lot_id,engine.now,'stale_counter_refused',{'organization_id':org,'version':queued['version']})
             for call in engine.calc.calls[call_start:]:
                 pool.add(call.result)
-            problems=text_number_problems(move.get('reason',''),pool)
-            if problems:
-                engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':problems})
-                lot=engine.records.get('lot',lot_id)
-                lot['number_check_failures']=lot.get('number_check_failures',0)+1
-                with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
-                # Re-ask the same owner once. Then deterministic validated fallback.
-                if move_provider:
-                    retry=move_provider(org,wire)
-                    record_provenance(retry=True)
-                    lot=engine.records.get('lot',lot_id)  # provenance may have updated the counts
-                    if text_number_problems(retry.get('reason',''),pool):
-                        engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':['second failed number check']})
-                        lot['number_check_failures']+=1
-                        with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
-                        move=engine.rules_for(role,org).move(typed).to_dict()
-                        move['reason']='Validated deterministic owner fallback; human approval is still required.'
-                        engine.records.event(lot_id,engine.now,'template_fallback',{'organization_id':org})
-                    else:
-                        move=retry
-                else:
-                    move['reason']='Validated deterministic owner move; human approval is still required.'
+            def reask():
+                # The same owner, asked once more. A re-ask keeps both calls' cost and counts.
+                if not move_provider:
+                    return engine.rules_for(role,org).move(typed).to_dict()
+                retry=move_provider(org,wire)
+                record_provenance(retry=True)
+                return retry
+            move=checked_move(engine,lot_id,org,move,pool,reask,lambda:engine.rules_for(role,org).move(typed).to_dict())
             if move.get("organization_id")!=org or move.get("version")!=draft["version"] or not move.get("reason"):
                 raise ValueError("move violates published turn/version")
             engine.records.event(lot_id,engine.now,"move",move)
@@ -375,8 +381,12 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 engine.records.put("lot",lot_id,lot)
                 engine.records.event(lot_id,engine.now,"preserved_disagreement",{"reason":lot["stop_reason"]})
         engine.distribute(lot_id)
-        for fault in fixture.get('faults',[]):
-            engine.records.event(lot_id,fault['at'],'scripted_cooler_failure',{'food_bank_id':fault['food_bank_id'],'reading':fault['reading'],'synthetic':True,'handling':'Known fixture fault excluded unsafe cold reservations before commitment; live rediscovery belongs to the cooler-failure adapter'})
+        from . import changes
+        for fault in list(pending_faults):
+            # The fault happens after this lot was negotiated: Workflow 4, at its own time.
+            from .cooler_join import apply_fault
+            pending_faults.remove(fault)
+            result["faults"].append(apply_fault(engine,lot_id,fault))
         from .api import API
         api=API(engine,clock=lambda:engine.now)
         for reply in fixture.get("household_replies",[]):
@@ -384,7 +394,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 if p['lot_id']==lot_id and p['request_code']==reply['request_code'] and reply['on_pickup_notice']=='cant_make_it' and p['status']=='committed':
                     engine.now=p['window']['start']
                     api.release(p['pickup_id'],p['request_code'])
-                if p["lot_id"]==lot_id and p["request_code"]==reply["request_code"] and reply["on_pickup_notice"]=="collect":
+                if p["lot_id"]==lot_id and p["request_code"]==reply["request_code"] and reply["on_pickup_notice"]=="collect" and p["status"]=="committed":
                     with engine.records.transaction():
                         p["status"]="collected"
                         engine.records.put("pickup",p["pickup_id"],p)
@@ -392,12 +402,15 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                         r["received_this_week_lb"]=r.get("received_this_week_lb",0)+p["pounds"]
                         engine.records.put("request",r["request_code"],r)
                         engine.records.event(lot_id,p["window"]["start"],"pickup_confirmation",{"pickup_id":p["pickup_id"],"pounds":p["pounds"]})
-        pathways=engine.pathways(lot_id)
-        caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}
-        checks.append(rule_checks(engine.records,lot_id,pathways,caps))
+        pathways=changes.pathways(engine,lot_id)
+        if changes.changes_for(engine.records,lot_id):
+            checks.append(changes.rule_checks(engine,lot_id))
+        else:
+            caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}
+            checks.append(rule_checks(engine.records,lot_id,pathways,caps))
         if observer: observer.lot_finished(engine,lot_id)
         result["commitments"].extend(engine.records.get("lot",lot_id)["commitments"])
         result["pathways"].extend(pathways)
         result["events"].extend(engine.records.events(lot_id))
-    result["rule_checks"]={k:all(c[k] for c in checks) for k in checks[0]} if checks else {"zero_invalid_commitments":False}
+    result["rule_checks"]={k:all(c.get(k,True) for c in checks) for k in dict.fromkeys(k for c in checks for k in c)} if checks else {"zero_invalid_commitments":False}
     return result
