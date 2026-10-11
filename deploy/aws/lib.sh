@@ -1,5 +1,7 @@
 # Shared helpers for deploy/aws/setup.sh and deploy/aws/teardown.sh.
 # Sourced, never run directly. Nothing here prints a secret value.
+# The names below are used by the scripts that source this file.
+# shellcheck shell=bash disable=SC2034
 
 PROFILE="${PROFILE:-incubator}"
 REGION="${REGION:-us-east-2}"
