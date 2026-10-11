@@ -141,6 +141,23 @@ if [ -n "$ROLE_FOUND" ]; then
 fi
 [ -n "$PROFILE_FOUND$ROLE_FOUND" ] || info "none"
 
+step "SES SMTP user and sender identity (created by hand for n8n email)"
+SES_USER="harvestnet-ses-smtp"
+if lookup iam get-user --user-name "$SES_USER" >/dev/null 2>&1; then
+  for key in $(lookup iam list-access-keys --user-name "$SES_USER" --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+    aws_rw iam delete-access-key --user-name "$SES_USER" --access-key-id "$key"
+  done
+  aws_rw iam delete-user-policy --user-name "$SES_USER" --policy-name harvestnet-ses-send 2>/dev/null || true
+  aws_rw iam delete-user --user-name "$SES_USER"
+else
+  info "no SES SMTP user"
+fi
+if [ -n "${SES_SENDER_EMAIL:-}" ] && lookup sesv2 get-email-identity --email-identity "$SES_SENDER_EMAIL" >/dev/null 2>&1; then
+  aws_rw sesv2 delete-email-identity --email-identity "$SES_SENDER_EMAIL"
+else
+  info "no SES identity to remove (set SES_SENDER_EMAIL to remove one)"
+fi
+
 step "S3 bucket"
 if [ -n "$BUCKET_FOUND" ]; then
   aws_rw s3 rm "s3://$BUCKET" --recursive --only-show-errors
