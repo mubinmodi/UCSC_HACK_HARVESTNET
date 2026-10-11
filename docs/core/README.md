@@ -49,8 +49,11 @@ Audits recompute approval/version evidence, overlapping storage/truck/lot holds,
 per-item conservation, pathways, fair-share limits and counted number failures.
 Tests tamper with an approval and double-book storage, and assert audit failure.
 CI runs a real Postgres service and tests event persistence, rollback and reconnect.
-The local machine has no Postgres server; that gate is verified in CI, not replaced
-with a SQLite-only claim.
+The local machine has no Postgres server. GitHub Actions run 38127403436 verified
+the actual Postgres test: all 32 core tests passed with no skips, followed by
+601 existing agent and API skeleton tests. Each of the six original branch push
+workflows also passed. This verifies test database persistence, not production
+deployment or external provider delivery.
 
 ## #8: calculators, matching, versions and stop rules
 
