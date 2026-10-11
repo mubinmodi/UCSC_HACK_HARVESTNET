@@ -3,6 +3,7 @@ import copy
 from dataclasses import asdict, is_dataclass
 from datetime import timedelta, time
 import re
+import uuid
 from harvestnet_agents.negotiation import parse_agent_input, parse_draft, parse_facts, Role
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.calculators import HouseholdBalance
@@ -30,6 +31,8 @@ class Engine:
         self.records = records or Records()
         self.protocol = Protocol(self.records)
         self.calc = Calculators()
+        self.policy_session=uuid.uuid4().hex
+        self.negotiators={}
         self.now = fixture["clock"]["start"]
         self.names = {o["organization_id"]: o["name"] for o in fixture["organizations"]}
         self.roles = {o["organization_id"]: o["role"] for o in fixture["organizations"]}
@@ -61,6 +64,12 @@ class Engine:
                     s["cold_free_lb"] = 0
                 with self.records.transaction():
                     self.records.put("bank", bid, bank)
+
+    def rules_for(self, role, organization):
+        key=(role,organization)
+        if key not in self.negotiators:
+            self.negotiators[key]=rules_negotiator(role,organization,self.calc)
+        return self.negotiators[key]
 
     def reserved(self, code):
         return sum(p["pounds"] for p in self.records.all("pickup") if p["request_code"] == code and p["status"] == "committed")
@@ -248,10 +257,10 @@ def run_fixture(fixture, move_provider=None, *, records=None):
             pool.add(typed)
             pool.add(precompute(role,typed,engine.calc))
             if move_provider:
-                wire={**input,"turn":org,"turn_context":input["turn"]}
+                wire={**input,"turn":org,"turn_context":input["turn"],"policy_session":engine.policy_session}
                 move=move_provider(org,wire)
             else:
-                move=rules_negotiator(role,org,engine.calc).move(typed).to_dict()
+                move=engine.rules_for(role,org).move(typed).to_dict()
             if move_provider and hasattr(move_provider,'pop_metadata'):
                 metadata=move_provider.pop_metadata()
                 if metadata:
@@ -284,7 +293,7 @@ def run_fixture(fixture, move_provider=None, *, records=None):
                         engine.records.event(lot_id,engine.now,'number_check_failure',{'count':1,'organization_id':org,'problems':['second failed number check']})
                         lot['number_check_failures']+=1
                         with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
-                        move=rules_negotiator(role,org,engine.calc).move(typed).to_dict()
+                        move=engine.rules_for(role,org).move(typed).to_dict()
                         move['reason']='Validated deterministic owner fallback; human approval is still required.'
                         engine.records.event(lot_id,engine.now,'template_fallback',{'organization_id':org})
                     else:
