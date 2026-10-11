@@ -68,10 +68,24 @@ def test_the_scenario_outcome_follows_the_facts():
     # Romaine needs a cold chain: only the city food bank, with a refrigerated truck and a walk-in, can take it.
     assert draft.pounds("romaine", "rural") == 0 and draft.pounds("romaine", "eastside") == 0
     assert draft.pounds("romaine", "city") > 0
-    # The rural food bank, with the largest gap, ends up with the most produce.
-    assert max(("city", "rural", "eastside"), key=draft.planned_lb) == "rural"
     # No food bank goes above its households' gap while another is below it.
     gaps = {"city": 200, "rural": 310, "eastside": 90}
     below = [fb for fb, gap in gaps.items() if draft.planned_lb(fb) < gap]
     above = [fb for fb, gap in gaps.items() if draft.planned_lb(fb) > gap]
     assert not (below and above)
+    # Every gap is met, the rural food bank's (the largest) in full, so the rest goes out beyond fair share
+    # (user direction, October 11, 2026) instead of staying unclaimed.
+    assert not below and draft.planned_lb("rural") == gaps["rural"]
+    assert all(draft.unallocated_lb(i.produce_id) == 0 for i in draft.items)
+
+
+def test_extra_pounds_come_only_after_every_gap_is_met_and_are_marked_beyond_fair_share():
+    _, moves, _ = negotiate()
+    bids =[m for m in moves if m.role is Role.FOOD_BANK and m.kind is MoveKind.COUNTER and m.amendment.kind == "set_pounds"]
+    beyond = [m for m in bids if "beyond fair share" in m.reason]
+    assert beyond, "someone should bid beyond fair share for the surplus"
+    first_beyond = moves.index(beyond[0])
+    # Every bid toward fair share comes before the first bid beyond it.
+    assert all(moves.index(m) < first_beyond for m in bids if m not in beyond)
+    for m in beyond:
+        assert m.amendment.food_bank_id == m.organization_id
