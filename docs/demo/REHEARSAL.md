@@ -65,7 +65,7 @@ version history instead of waiting.
       https://18-217-110-223.sslip.io/donor-dashboard/ (donor, then the city and eastside
       dashboards), https://18-217-110-223.sslip.io/results-strip/, and `docs/demo/replay.html`
       (kept in a background tab).
-- [ ] Reset the cooler switch to working, and start from a fresh scenario.
+- [ ] Start from a fresh scenario: `deploy/aws/reset_data.sh` wipes the live demo data (lots, households, review links, cooler state) and re-publishes the results strip. It keeps the Claude spending ledger.
 - [ ] Check the phone for the voice line, and the phones or inboxes that receive n8n messages.
 - [ ] Spending cap: set `CLAUDE_RUN_CAP_USD` only if the team agreed to live Claude calls
       (`docs/platform/DEPLOYMENT.md`). Zero means rules and templates only. Say so if asked.
