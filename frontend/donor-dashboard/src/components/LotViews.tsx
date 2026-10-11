@@ -1,7 +1,7 @@
 import { History, MessageSquareWarning } from 'lucide-react';
 import { api } from '../api';
 import { describeChange, formatDateTime, humanize, lb, moverText, nameOf, type Names } from '../format';
-import type { Lot, LotVersion } from '../types';
+import type { Lot, LotItem, LotVersion } from '../types';
 import { useLoad } from '../useLoad';
 import { Badge, DataLabel, ErrorNote, Photo } from './ui';
 
@@ -64,6 +64,18 @@ export function disagreementText(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
+/**
+ * Where an item goes and who moves it. Uses the item's `split` (contract); if a server
+ * leaves it out, the same facts are read from the current draft's allocations and transports.
+ */
+function splitOf(lot: Lot, produceId: string, split: LotItem['split']) {
+  if (split && split.length > 0) return split;
+  const transports = lot.draft?.transports ?? [];
+  return (lot.draft?.allocations ?? [])
+    .filter((a) => a.produce_id === produceId)
+    .map((a) => ({ food_bank_id: a.food_bank_id, pounds: a.pounds, mover: transports.find((t) => t.food_bank_id === a.food_bank_id)?.mover ?? '' }));
+}
+
 /** A lot's live status, item by item, with the current draft and approvals. */
 export function LotStatus({ lot }: { lot: Lot }) {
   const names = lot.draft?.names;
@@ -91,9 +103,9 @@ export function LotStatus({ lot }: { lot: Lot }) {
                 </strong>
                 <Badge text={item.status} />
               </div>
-              {item.split && item.split.length > 0 ? (
+              {splitOf(lot, item.produce_id, item.split).length > 0 ? (
                 <ul className="split">
-                  {item.split.map((s) => (
+                  {splitOf(lot, item.produce_id, item.split).map((s) => (
                     <li key={s.food_bank_id}>
                       {lb(s.pounds)} to {nameOf(names, s.food_bank_id)} · {moverText(s.mover)}
                     </li>

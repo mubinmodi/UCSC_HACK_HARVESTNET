@@ -103,6 +103,21 @@ describe('donor page', () => {
   });
 });
 
+describe('lot status without per-item split', () => {
+  it('reads destinations and movers from the current draft', async () => {
+    const lot = exampleBody<Lot>('get_lot');
+    for (const item of lot.items) delete item.split;
+    mockApi({ get_lot: lot });
+    sessionValue.set('page', 'lots');
+    render(<App />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Lot ID'), lot.lot_id);
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    expect(await screen.findByText('250 lb to Rural food bank · Donor drops off')).toBeInTheDocument();
+    expect(screen.getByText('200 lb to City food bank · Food bank collects')).toBeInTheDocument();
+  });
+});
+
 describe('food bank dashboard', () => {
   it('shows capacity, counts-only fair-share gap, offers with the agent’s reason, and arrivals', async () => {
     mockApi();
