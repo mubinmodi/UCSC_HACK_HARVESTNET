@@ -127,6 +127,14 @@ front-desk extractor now read their cap from `CLAUDE_RUN_CAP_USD` (default 0).
 
 ### n8n Cloud draft refresh (October 11, 2026)
 
+The team created separate live workflows. Read-only n8n API inspection confirmed
+these three are active: review requests `x3dsVytciPRThmlX`, pickup emails
+`9qaAaWdqvIEzn4T4`, and release thank-you emails `g0qO8uMLOBIwpYi4`.
+These are the live notification workflows; do not activate the older drafts
+below alongside them. Issue #18 records the team's live SES/review/pickup/release
+checks and was closed by the team. This Codex session inspected activation state
+only and did not independently send emails or verify inbox delivery.
+
 The four existing application workflows were updated in place from the merged
 email workflow definitions after the team's email decision. Their IDs above are
 unchanged. The three notification workflows now use email; the fourth relays
@@ -141,6 +149,8 @@ requirements remain in the nodes. Bind the incoming header credential, platform
 event credential and SES SMTP credential before publication. Set the platform
 URL and sender variables, verify the SES sender/recipient requirements, and
 perform an authorized end-to-end check. Saving drafts does not verify delivery.
+The separate live workflows already have their own credential bindings; the
+remaining-binding notes here apply only to the older inactive draft IDs.
 
 1. Fetch latest remote branches and inspect #1/#20 for actual adapter exports.
 2. Use the module interfaces in `JOIN.md`; integrate without rewriting teammate
