@@ -1,13 +1,27 @@
 """Small bounded JSON HTTP client and local server helpers."""
 import json
 import hmac
+import math
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit
 
 
-def request_json(url, body=None, *, token=None, timeout=5, method=None):
+def seconds(value):
+    """A positive, finite timeout in seconds, from a number or an environment string."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Timeout must be a number of seconds') from exc
+    if not math.isfinite(result) or result <= 0:
+        raise ValueError('Timeout must be a positive, finite number of seconds')
+    return result
+
+
+def request_json(url, body=None, *, token=None, timeout=None, method=None):
+    # Plain service calls default to a short timeout; agent turns pass their own.
+    timeout = seconds(os.getenv('HARVESTNET_HTTP_TIMEOUT_SECONDS', '10') if timeout is None else timeout)
     parsed = urlsplit(url)
     if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.username:
         raise ValueError('An HTTP(S) service URL without embedded credentials is required')

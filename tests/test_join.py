@@ -2,7 +2,7 @@ import copy
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
-from harvestnet_platform.transport import ORGANIZATIONS, Receiver, A2ATransport, handler_for
+from harvestnet_platform.transport import ORGANIZATIONS, Receiver, A2ATransport, handler_for, role_of
 from harvestnet_platform.join import compare_fixture, require_outcomes, REQUIRED_CHECKS, MoveBridge
 
 
@@ -13,10 +13,11 @@ def fixture_policy(org, data):
 
 
 def fixture_harness(fixture, move):
-    moves = [move(org,{'turn':org,'draft':{'version':1,'terms':fixture['terms']},'facts':{}})
-             for org in ('donor','city','rural','eastside')]
+    moves = [move(org,{'role':role_of(org),'draft':{'version':1,'terms':fixture['terms']},'facts':{},
+                       'turn':{'organization_id':org,'number':n,'now':'2026-10-13T12:00:00-07:00','accepted_by':[]}})
+             for n,org in enumerate(('market','city','rural','eastside'),1)]
     # The harness fixture includes explicit human approvals, separately from moves.
-    committed = all(m['action']=='accept' for m in moves) and fixture['human_approvals'] == ['donor','city','rural','eastside']
+    committed = all(m['action']=='accept' for m in moves) and fixture['human_approvals'] == ['market','city','rural','eastside']
     return {'commitments':[{'version':1,'terms':fixture['terms']}] if committed else [],
             'pathways':fixture['pathways'], 'rule_checks':{key:True for key in REQUIRED_CHECKS}}
 
@@ -33,7 +34,7 @@ class JoinTests(unittest.TestCase):
                 threads.append(thread)
                 endpoints[org] = f'http://127.0.0.1:{server.server_port}'
             fixture = {'terms':{'apples':{'rural':250,'eastside':50},'romaine':{'city':200},'potatoes':{'rural':400}},
-                       'human_approvals':['donor','city','rural','eastside'],
+                       'human_approvals':['market','city','rural','eastside'],
                        'pathways':[{'item':'apples','pounds':300},{'item':'romaine','pounds':200},{'item':'potatoes','pounds':400}]}
             report = compare_fixture(fixture,fixture_harness,fixture_policy,A2ATransport(endpoints,'join-token'))
             self.assertEqual(report['status'],'identical_outcomes')
@@ -69,11 +70,12 @@ class JoinTests(unittest.TestCase):
                 self.calls+=1
                 if self.calls==1:
                     raise OSError('partial outage')
-                return [{'organization_id':'donor','move':fixture_policy('donor',envelope['input'])}]
+                return [{'organization_id':'market','move':fixture_policy('market',envelope['input'])}]
         bridge = MoveBridge(Partial())
-        data = {'turn':'donor','draft':{'version':1,'terms':{}},'facts':{}}
+        data = {'role':'donor','draft':{'version':1,'terms':{}},'facts':{},
+                'turn':{'organization_id':'market','number':1,'now':'2026-10-13T12:00:00-07:00','accepted_by':[]}}
         with self.assertRaises(OSError):
-            bridge('donor',data)
+            bridge('market',data)
         with self.assertRaises(ValueError):
-            bridge('donor',{**data,'draft':{'version':2}})
-        self.assertEqual(bridge('donor',data)['action'],'accept')
+            bridge('market',{**data,'draft':{'version':2}})
+        self.assertEqual(bridge('market',data)['action'],'accept')

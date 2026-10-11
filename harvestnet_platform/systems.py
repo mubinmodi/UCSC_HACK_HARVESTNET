@@ -13,11 +13,26 @@ from urllib.error import URLError
 from .http import JsonHandler, request_json, serve
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'systems.json'
+DONOR = 'market'
 BANKS = ('city', 'rural', 'eastside')
+SYSTEM_ORGANIZATIONS = (DONOR, *BANKS)
+# Older exports (the core's cooler_join) key the donor's systems by role; still read them.
+LEGACY_DONOR_KEY = 'donor'
+UPSTREAMS = ('beeceptor', 'harvestnet_systems')
 
 
 class Systems:
-    def __init__(self, base_url=None, state_path=None):
+    """Organization systems. ``upstream`` says what ``base_url`` is:
+
+    - ``beeceptor``: the Beeceptor mock. The cooler switch is applied here.
+    - ``harvestnet_systems``: this module's own service (``SYSTEMS_URL``), which already
+      applied the switch. Its labels (mode, source, disruption) are kept as they are.
+    """
+
+    def __init__(self, base_url=None, state_path=None, upstream='beeceptor'):
+        if upstream not in UPSTREAMS:
+            raise ValueError(f'Upstream must be one of {UPSTREAMS}')
+        self.upstream = upstream
         self.base_url = base_url.rstrip('/') if base_url else None
         self.fixture = json.loads(FIXTURE.read_text())
         self.state_path = Path(state_path) if state_path else None
@@ -43,9 +58,16 @@ class Systems:
                 tmp.replace(self.state_path)
             return self.read(organization, 'cooler')
 
+    def systems_of(self, organization):
+        if organization not in SYSTEM_ORGANIZATIONS:
+            raise ValueError('Unknown organization system')
+        if organization == DONOR and DONOR not in self.fixture and LEGACY_DONOR_KEY in self.fixture:
+            return self.fixture[LEGACY_DONOR_KEY]
+        return self.fixture[organization]
+
     def recorded(self, organization, resource):
         try:
-            data = copy.deepcopy(self.fixture[organization][resource])
+            data = copy.deepcopy(self.systems_of(organization)[resource])
         except KeyError as exc:
             raise ValueError('Unknown organization system') from exc
         return {'organization_id': organization, 'resource': resource,
@@ -55,7 +77,8 @@ class Systems:
 
     def read(self, organization, resource):
         with self.lock:
-            selected = 'cooler-failed' if resource == 'cooler' and organization in self.failed else resource
+            local_switch = self.upstream == 'beeceptor'
+            selected = 'cooler-failed' if local_switch and resource == 'cooler' and organization in self.failed else resource
             fallback = self.recorded(organization, selected)
             if self.base_url:
                 try:
@@ -68,11 +91,14 @@ class Systems:
                     for key, value in expected.items():
                         if type(live['data'][key]) is not type(value):
                             raise ValueError('Beeceptor response has an invalid field type')
-                    fallback = {**live, 'mode': 'synthetic', 'source': 'beeceptor'}
+                    if local_switch:
+                        fallback = {**live, 'mode': 'synthetic', 'source': 'beeceptor'}
+                    else:
+                        fallback = {**live, 'via': 'harvestnet_systems'}
                 except (URLError, TimeoutError, ValueError, OSError):
-                    fallback['fallback_reason'] = 'Beeceptor unavailable or incompatible; recorded synthetic copy'
+                    fallback['fallback_reason'] = f'{self.upstream} unavailable or incompatible; recorded synthetic copy'
             fallback['resource'] = resource
-            if resource == 'storage' and organization in self.failed:
+            if local_switch and resource == 'storage' and organization in self.failed:
                 fallback['data']['cold_available_lb'] = 0
                 fallback['disruption'] = 'synthetic_cooler_failure'
             if selected == 'cooler-failed':
@@ -81,8 +107,8 @@ class Systems:
 
     def openapi(self):
         paths = {}
-        for org in ('donor', *BANKS):
-            for resource in self.fixture[org]:
+        for org in SYSTEM_ORGANIZATIONS:
+            for resource in self.systems_of(org):
                 example = self.recorded(org, resource)
                 paths[f'/systems/{org}/{resource}'] = {'get': {
                     'summary': f'Synthetic {org} {resource}',

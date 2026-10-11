@@ -23,7 +23,7 @@ class NativeAGNTCYTests(unittest.TestCase):
             sock.bind(('127.0.0.1',0))
             port = sock.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
-        env = {**os.environ,'ORGANIZATION_ID':'donor','AGENT_PUBLIC_URL':base,
+        env = {**os.environ,'ORGANIZATION_ID':'market','AGENT_PUBLIC_URL':base,
                'TRANSPORT_TOKEN':'native-test-token','PORT':str(port),'AGENT_POLICY':'',
                'AGNTCY_DIRECTORY_ADDRESS':'','OTEL_SDK_DISABLED':'true','RECEIPTS_DB':':memory:'}
         with tempfile.TemporaryFile(mode='w+') as log:
@@ -45,7 +45,7 @@ class NativeAGNTCYTests(unittest.TestCase):
                 else:
                     log.seek(0)
                     self.fail('Native SDK startup timed out: '+log.read()[-4000:])
-                self.assertEqual(card['name'],'HarvestNet donor')
+                self.assertEqual(card['name'],'HarvestNet market')
                 with self.assertRaises(HTTPError) as denied:
                     request_json(base+'/',rpc_request(envelope()))
                 self.assertEqual(denied.exception.code,401)

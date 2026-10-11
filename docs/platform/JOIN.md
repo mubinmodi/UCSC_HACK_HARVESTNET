@@ -42,7 +42,7 @@ python -m harvestnet_platform.join --fixture path/to/mixed-batch.json \
   --harness real_core:run_fixture --policy real_agents:move
 ```
 
-`AGENT_ENDPOINTS` is a JSON map with donor/city/rural/eastside/advocate URLs and
+`AGENT_ENDPOINTS` is a JSON map with market/city/rural/eastside/advocate URLs and
 `TRANSPORT_TOKEN` authenticates the internal exchange. Native AGNTCY and small
 JSON-RPC hosts use the same wire contract. The CLI deliberately rejects the
 platform stand-in as a real policy. Missing exports fail visibly. Test both
@@ -58,13 +58,12 @@ commits. Lane A must run the same rule checks over remote results.
 ## Validation so far
 
 `harvestnet_platform.lane_b:real_rules` adapts the published typed Lane B rules.
-Install the reviewed `agents` package alongside this platform package. Supply
-`turn_context: {organization_id, number, now, accepted_by}` with each platform
-input, using the core's clock and turn number. `draft` and `facts` retain Lane B's
-typed JSON shapes. `turn` remains the transport organization string. Configure
-`LANE_B_ORGANIZATION_IDS={"donor":"market"}` only when the actual core donor ID
-is `market`; the default keeps `donor`. Bank/advocate IDs must match the wire IDs.
-No donor facts, allocations, clocks or decisions are invented or rewritten.
+Install the reviewed `agents` package alongside this platform package. The input
+is Lane B's `AgentInput` unchanged (`{role, draft, facts, turn}`), with the core's
+clock and turn number in `turn`; Lane A's earlier form (`turn_context`) is still
+read. Organization IDs are the same on the wire and in Lane B (`market`), so the
+old `LANE_B_ORGANIZATION_IDS` alias is gone. No donor facts, allocations, clocks
+or decisions are invented or rewritten.
 
 Set `LANE_B_CALCULATORS=reviewed_core_module:factory` to a callable returning the
 real calculator implementation. The production adapter refuses missing factories
@@ -73,11 +72,11 @@ local comparison process when baking the final reviewed image. `pass` is now an
 allowed nonvoting move; the advocate is restricted to counter/pass, consistent
 with Lane B's interface. The extra move remains proposed pending contract day.
 
-All **25 recorded Lane B scenarios** match direct rule outputs over five actual
+All **26 recorded Lane B scenarios** match direct rule outputs over five actual
 HTTP hosts, including duplicate retries, accept/counter/reject/hold/ask-human/pass
-and the donor alias. The test uses `lane_b:recorded_rules`, which is explicitly
-marked as using stand-in calculators and rejected by the real-join CLI. CI pins
-the source commit rather than tracking a changing teammate branch. This proves
+with Lane B's input unchanged. The test uses `lane_b:recorded_rules`, which is
+explicitly marked as using stand-in calculators and rejected by the real-join CLI.
+CI runs it against the in-repo `agents/`, so it checks the same commit. This proves
 real rules can travel over our transport with recorded calculator inputs; it
 does not prove commitments/pathways or core rule checks for #21.
 

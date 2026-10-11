@@ -11,13 +11,13 @@ x-agent: &agent
     ALLOW_INTERNAL_HTTP: '1'
     RECEIPTS_DB: /app/runtime/receipts.sqlite
 services:
-  donor:
+  market:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, donor, --host, 0.0.0.0]
+    command: [python, -m, harvestnet_platform.transport, --organization, market, --host, 0.0.0.0]
     environment:
       <<: *agent-env
-      AGENT_PUBLIC_URL: http://donor:8020
-    volumes: [donor-data:/app/runtime]
+      AGENT_PUBLIC_URL: http://market:8020
+    volumes: [market-data:/app/runtime]
   city:
     <<: *agent
     command: [python, -m, harvestnet_platform.transport, --organization, city, --host, 0.0.0.0]
@@ -50,7 +50,7 @@ networks:
   platform:
     internal: true
 volumes:
-  donor-data:
+  market-data:
   city-data:
   rural-data:
   eastside-data:

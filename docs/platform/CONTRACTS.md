@@ -1,18 +1,27 @@
 # Lane C integration contracts
 
-These are version `platform-v1` **proposed contracts**, derived from the MVP design.
-Ticket #1 has no implementation or agreed machine-readable contract yet. Lane A/B
-can supply adapters without changing these platform modules. No mock response is
-claimed to be a real household outcome or a team-approved interface.
+The team's shared contracts are **agreed** (ticket #1, October 11, 2026) and live in
+[`docs/contracts/`](../contracts/README.md), with machine-readable examples and the
+API skeleton in `api_skeleton/`. Lane C follows them: organization IDs are names
+(`market`, not `donor`), times carry an offset (October 13, 2026, `-07:00`), the
+transport wraps Lane B's agent input unchanged, approvals post `lot_id` and a
+`sha256:` terms hash, and "can't make it" calls `POST /pickups/{pickup_id}/release`.
+
+This page covers Lane C's own internal routes: the organization systems below are
+the organizations' *own* systems, so they keep their own field names
+(`cold_available_lb`); specialists translate them into the contract's facts
+(README decision 4). No mock response is a real household outcome.
 
 ## Organization systems (#16)
 
 `GET /systems/{organization}/{resource}` returns `organization_id`, `resource`,
 `synthetic: true`, `mode`, `source`, `fixture_version`, `observed_at`, and `data`.
-Organizations: `donor`, `city`, `rural`, `eastside`. Resources: donor `inventory`
-and `truck`; banks `storage`, `cooler`, `cooler-failed`, `pickup-hours`, `truck`.
-The fixture is the complete example contract. Units: pounds, degrees Celsius,
-UTC ISO-8601 timestamps. Fixture temperature values are synthetic, not safety
+Organizations: `market` (the donor), `city`, `rural`, `eastside`. Resources: market
+`inventory` and `truck`; food banks `storage`, `cooler`, `cooler-failed`,
+`pickup-hours`, `truck`. The fixture (`fixture_version: synthetic-v2`) is the
+complete example and follows the core's normal afternoon (`core_fixtures/normal-afternoon.json`).
+Units: pounds, degrees Celsius, ISO 8601 timestamps with an offset. An older export
+keyed by `donor` (the core's `cooler_join`) is still read as `market`. Fixture temperature values are synthetic, not safety
 thresholds or guidance. Specialist calculators must assess actual condition.
 
 `POST /demo/{bank}/cooler` with `{"failed": true}` selects the synthetic failed
@@ -35,7 +44,14 @@ real refrigeration control. Set `COOLER_STATE_PATH` to persist it across restart
 The exported schema intentionally describes external organization systems only,
 not HarvestNet's public API. It must not become the authoritative approval store.
 Without a connected Beeceptor account the live import remains a setup step;
-all recorded endpoints and switch behavior run locally now.
+all recorded endpoints and switch behavior run locally now. The fixture moved to
+`synthetic-v2` (the `market` routes and October 13 times), so the live Beeceptor
+mock must be re-imported from a fresh export; until then its responses don't match
+and every read is the labeled recorded copy.
+
+Agent hosts read their own systems through this service, which applies the demo
+switch: set `SYSTEMS_URL=http://systems:8010`. Its labels (`mode`, `source`,
+`disruption`) are kept as they are.
 
 Reference: [Beeceptor OpenAPI mocking](https://beeceptor.com/docs/),
 [mock rules](https://beeceptor.com/docs/mock-rules/).

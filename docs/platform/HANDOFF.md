@@ -1,5 +1,34 @@
 # Lane C handoff
 
+## Current state (October 11, contract follow-ups)
+
+The Lane C code is merged into `main` and follows the agreed contracts in
+`docs/contracts/` (ticket #1) and the API skeleton in `api_skeleton/`:
+
+- Organization IDs are `market`, `city`, `rural`, `eastside`, `advocate`. The
+  systems fixture is `synthetic-v2`, dated October 13, 2026 at `-07:00`, and
+  follows the core's normal afternoon.
+- The transport wraps Lane B's agent input unchanged, sends `facts` only to the
+  organization whose turn it is, checks moves against `agent-moves.md`, and waits
+  up to `AGENT_TURN_TIMEOUT_SECONDS` (default 60) per turn.
+- The approval bridge posts `record_approval` (`lot_id`, `sha256:` hash) with each
+  organization's own core token (`CORE_API_TOKENS`), passes core rejections
+  through, issues ISO 8601 `expires_at`, has a configurable link lifetime, and can
+  reissue a lost link. SMS replies map from the sending phone to its pickup: YES
+  confirms, CAN'T MAKE IT calls the release operation.
+- Native hosts republish their Directory record when their capabilities change.
+- One setting, `CLAUDE_RUN_CAP_USD` (default 0), caps the LLM negotiators and the
+  voice extractor.
+
+Still open, because they need deployment or accounts: re-importing the
+`synthetic-v2` Beeceptor mock, a live AGNTCY Directory daemon, published n8n
+workflows with credentials and a real SMS provider (including Twilio signature
+checking in front of the reply webhook), and Secrets Manager plus HTTPS hosting.
+
+The sections below are the earlier history.
+
+## Earlier history
+
 All five calebdbur branches have implementation work. They form a **review stack**:
 16 -> 17 -> 18 -> 19 -> 21. Each branch contains the earlier branches' platform
 foundation; each pull request uses the previous branch as its base. Review and
@@ -38,12 +67,9 @@ nonfinite Directory capacity queries. The combined Compose configuration and
 regeneration of all four n8n imports pass. Workflow graph checks do not certify an
 actual n8n import/SMS execution, and Compose validation does not run containers.
 
-The #1 branch now publishes agreed contracts at commit `36c4fe9`, including
-market as the donor ID, offset timestamps and lot_id approval payloads. Its
-README references an API skeleton, but the fetched tree contains no api_skeleton
-implementation. Align the platform seam with these new contracts before claiming
-full integration. The #20 real harness branch still has no implementation. Lane B's rules now exist at pinned commit
-`f06b14822d4379bc790a2f1d8a4525ac94cb7649`. The Lane C adapter verifies all 25
+The agreed contracts (ticket #1) and the API skeleton are on `main`, and the
+platform now follows them (see "Current state" above). The #20 real harness is
+merged. Lane B's rules are in the in-repo `agents/`. The Lane C adapter verifies all 25
 recorded rule scenarios over HTTP with exact direct-policy output equality and
 duplicate retries. It supports nonvoting `pass` and explicit donor ID aliasing.
 The production adapter requires Lane A's real calculators; its recorded-calculator
@@ -82,8 +108,8 @@ and authenticated A2A exchange pass locally; a real Directory daemon push/search
 still needs its runtime. Recorded system capabilities are synthetic snapshots;
 owners must recheck current facts/reservations before any commitment.
 
-No Claude calls or provider credits were spent. Lane B's future client must use
-the budget wrapper; configuration alone does not intercept an arbitrary client.
+No Claude calls or provider credits were spent. Lane B's LLM negotiators and
+front-desk extractor now read their cap from `CLAUDE_RUN_CAP_USD` (default 0).
 
 ## Resume work
 

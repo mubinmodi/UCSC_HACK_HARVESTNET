@@ -8,4 +8,4 @@ ARG INSTALL_AGNTCY=0
 RUN if [ "$INSTALL_AGNTCY" = "1" ]; then pip install --no-cache-dir -r requirements-agntcy.txt; fi
 RUN useradd --uid 10001 --create-home harvestnet && mkdir /app/runtime /app/budget && chown harvestnet /app/runtime /app/budget
 USER harvestnet
-CMD ["python", "-m", "harvestnet_platform.transport", "--organization", "donor", "--host", "0.0.0.0"]
+CMD ["python", "-m", "harvestnet_platform.transport", "--organization", "market", "--host", "0.0.0.0"]

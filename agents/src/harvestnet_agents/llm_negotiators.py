@@ -37,7 +37,8 @@ decides only for its own organization (ADR 0001) and never invents a number (ADR
    decision, so evaluation can count them.
 
 **Spending.** ``SpendingCap`` is a hard cap per run, shared by every negotiator in the
-run. Before each API call it reserves a worst-case cost (a conservative input-token
+run. Its deployed value is one setting, ``CLAUDE_RUN_CAP_USD`` (``SpendingCap.from_env()``),
+which defaults to 0: with no setting, no live call is made. Before each API call it reserves a worst-case cost (a conservative input-token
 estimate plus ``max_tokens`` of output). If that doesn't fit under the cap, no call is
 made and the move falls back to the rules-based one. After the call it settles the
 actual cost from ``response.usage`` and logs it (``SpendingCap.entries``, and the
@@ -55,6 +56,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import re
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime
@@ -91,8 +93,10 @@ __all__ = [
     "NumberPool",
     "SpendingCap",
     "SpendingCapReached",
+    "RUN_CAP_ENV",
     "check_move",
     "load_llm_config",
+    "run_cap_usd_from_env",
     "precompute",
     "render_input",
 ]
@@ -147,6 +151,21 @@ def load_llm_config(data: Mapping[str, Any] | None = None) -> LLMConfig:
 # --- Spending -----------------------------------------------------------------------------
 
 
+RUN_CAP_ENV = "CLAUDE_RUN_CAP_USD"
+
+
+def run_cap_usd_from_env(env: Mapping[str, str] | None = None) -> float:
+    """The run's spending cap in USD, from ``CLAUDE_RUN_CAP_USD``. Unset means 0 (no live calls)."""
+    raw = (os.environ if env is None else env).get(RUN_CAP_ENV, "") or "0"
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{RUN_CAP_ENV} must be a number of US dollars, not {raw!r}") from exc
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{RUN_CAP_ENV} must be a finite, nonnegative number of US dollars")
+    return value
+
+
 class SpendingCapReached(RuntimeError):
     """A call's worst-case cost doesn't fit under the run's cap. No call was made."""
 
@@ -191,6 +210,11 @@ class SpendingCap:
     limit_usd: float
     entries: list[CostEntry] = field(default_factory=list)
     reserved_usd: float = 0.0
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "SpendingCap":
+        """The deployed cap: ``CLAUDE_RUN_CAP_USD``, default 0."""
+        return cls(run_cap_usd_from_env(env))
 
     @property
     def spent_usd(self) -> float:

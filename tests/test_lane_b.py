@@ -30,22 +30,19 @@ class LaneBTests(unittest.TestCase):
             fixtures = sorted(Path(os.environ['LANE_B_FIXTURES']).glob('*.json'))
             self.assertGreaterEqual(len(fixtures), 25)
             network = A2ATransport(endpoints, 'lane-b-test')
-            with patch.dict(os.environ, {'LANE_B_ORGANIZATION_IDS': '{"donor":"market"}'}):
-                for file in fixtures:
-                    raw = json.loads(file.read_text())
-                    role, typed = parse_agent_input(raw)
-                    actor = 'donor' if role.value == 'donor' else raw['turn']['organization_id']
-                    expected = rules_negotiator(role, typed.turn.organization_id).move(typed).to_dict()
-                    self.assertEqual(expected['action'], raw['expected']['kind'])
-                    expected['organization_id'] = actor
-                    if 'resource_owner' in expected:
-                        expected['resource_owner'] = actor
-                    data = {'turn': actor, 'turn_context': raw['turn'], 'draft': raw['draft'], 'facts': raw['facts']}
-                    envelope = {'event_id': file.stem, 'sequence': 1, 'turn': actor, 'input': data}
-                    with self.subTest(fixture=file.stem):
-                        receipts = network.broadcast(envelope)
-                        self.assertEqual(next(r['move'] for r in receipts if r['organization_id'] == actor), expected)
-                        self.assertEqual(network.broadcast(envelope), receipts)
+            for file in fixtures:
+                raw = json.loads(file.read_text())
+                role, typed = parse_agent_input(raw)
+                actor = raw['turn']['organization_id']  # organization IDs are the same on the wire
+                expected = rules_negotiator(role, actor).move(typed).to_dict()
+                self.assertEqual(expected['action'], raw['expected']['kind'])
+                # Lane B's AgentInput travels unchanged inside the envelope.
+                data = {key: raw[key] for key in ('role', 'draft', 'facts', 'turn')}
+                envelope = {'event_id': file.stem, 'sequence': 1, 'turn': actor, 'input': data}
+                with self.subTest(fixture=file.stem):
+                    receipts = network.broadcast(envelope)
+                    self.assertEqual(next(r['move'] for r in receipts if r['organization_id'] == actor), expected)
+                    self.assertEqual(network.broadcast(envelope), receipts)
         finally:
             for server in servers:
                 server.shutdown()
@@ -55,14 +52,19 @@ class LaneBTests(unittest.TestCase):
 
     def test_real_adapter_requires_core_calculators_and_explicit_matching_turn(self):
         raw = json.loads((Path(os.environ['LANE_B_FIXTURES']) / 'donor_accepts_plan_before_deadline.json').read_text())
-        data = {'turn': 'donor', 'turn_context': raw['turn'], 'draft': raw['draft'], 'facts': raw['facts']}
-        with patch.dict(os.environ, {'LANE_B_ORGANIZATION_IDS': '{"donor":"market"}', 'LANE_B_CALCULATORS': ''}):
+        data = {key: raw[key] for key in ('role', 'draft', 'facts', 'turn')}
+        self.assertEqual(recorded_rules('market', data)['action'], 'accept')
+        # Lane A's earlier wire form gives the same move.
+        legacy = {'turn': 'market', 'turn_context': raw['turn'], 'draft': raw['draft'], 'facts': raw['facts']}
+        self.assertEqual(recorded_rules('market', legacy), recorded_rules('market', data))
+        with patch.dict(os.environ, {'LANE_B_CALCULATORS': ''}):
             with self.assertRaises(ValueError):
-                real_rules('donor', data)
-            missing = copy.deepcopy(data)
-            del missing['turn_context']
+                real_rules('market', data)
+        missing = copy.deepcopy(legacy)
+        del missing['turn_context']
+        for bad in (missing, {**data, 'role': 'food_bank'}, {**data, 'turn': {**raw['turn'], 'number': 0}}):
             with self.assertRaises(ValueError):
-                recorded_rules('donor', missing)
+                recorded_rules('market', bad)
 
 
 class AdvocateTransportTests(unittest.TestCase):
