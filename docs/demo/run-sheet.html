@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HarvestNet Demo Run Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one readable column like a stage manager's run sheet; time marks sit in a left gutter, wide tables scroll inside their own frames. */
+:root {
+  --paper: #f6f8f5;
+  --panel: #ffffff;
+  --ink: #18211c;
+  --muted: #5b6760;
+  --rule: #d5ddd7;
+  --leaf: #2f6b4c;
+  --berry: #b02a3f;
+  --cold: #2a5d82;
+  --tint-leaf: #e4f0e8;
+  --tint-berry: #f8e8eb;
+  --tint-cold: #e4edf5;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121815; --panel: #1a221e; --ink: #e6ece8; --muted: #9aa8a0; --rule: #2e3a34;
+    --leaf: #7cc39a; --berry: #f08a9a; --cold: #8ab8dc;
+    --tint-leaf: #1d3027; --tint-berry: #3a2228; --tint-cold: #1c2b38; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121815; --panel: #1a221e; --ink: #e6ece8; --muted: #9aa8a0; --rule: #2e3a34;
+  --leaf: #7cc39a; --berry: #f08a9a; --cold: #8ab8dc;
+  --tint-leaf: #1d3027; --tint-berry: #3a2228; --tint-cold: #1c2b38; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--body); }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 800; font-stretch: 85%; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 700; font-stretch: 90%; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+section { display: grid; gap: 16px; }
+.eyebrow { font: 600 0.75rem/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em; color: var(--leaf); }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.head { display: grid; gap: 12px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--muted); font-size: 0.92rem; }
+.facts b { color: var(--ink); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+.urls { display: grid; gap: 8px; }
+.url { display: grid; grid-template-columns: 11rem 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; }
+.url span { font-weight: 600; }
+.url a { color: var(--cold); font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywhere; min-width: 0; }
+button.copy { font: 500 0.8rem var(--body); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+button.copy:hover { border-color: var(--leaf); }
+button.copy:focus-visible, a:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: 1.4rem 1fr; gap: 8px; }
+.checks input { margin-top: 0.35rem; accent-color: var(--leaf); }
+.checks label { min-width: 0; }
+.run { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.moment { display: grid; grid-template-columns: 5.5rem 1fr; gap: 20px; padding-block: 22px; border-bottom: 1px solid var(--rule); }
+.mark { font: 500 0.95rem/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.mark small { display: block; font-size: 0.75rem; margin-top: 4px; }
+.body { display: grid; gap: 10px; min-width: 0; }
+.tag { justify-self: start; font: 600 0.72rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; border-radius: 3px; }
+.l1 { background: var(--tint-leaf); color: var(--leaf); }
+.l2 { background: var(--tint-cold); color: var(--cold); }
+.l3 { background: var(--tint-berry); color: var(--berry); }
+.ev { background: var(--rule); color: var(--ink); }
+.say { border-left: 3px solid var(--leaf); padding-left: 14px; font-style: italic; color: var(--ink); }
+.do, .if { font-size: 0.95rem; }
+.do b, .if b { font-weight: 600; }
+.if { color: var(--muted); }
+.note { background: var(--tint-cold); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+.warn { background: var(--tint-berry); }
+.table { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 0.75rem var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.dont { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; font: 0.82rem/1.5 var(--mono); }
+@media (max-width: 560px) {
+  .url { grid-template-columns: 1fr auto; }
+  .url span { grid-column: 1 / -1; }
+  .moment { grid-template-columns: 1fr; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div class="eyebrow">Cisco "When AI Agents Disagree" · Level 3</div>
+    <h1>HarvestNet Demo Run Sheet</h1>
+    <p class="lede">Everything the team needs to run the 3-minute demo on the live system: what to open, who does what, what to click and say at each mark, and what to switch to when something fails.</p>
+    <div class="facts">
+      <div>Target <b>2:50</b>, hard stop <b>3:00</b></div>
+      <div><b>7</b> moments</div>
+      <div>All data <b>synthetic</b></div>
+      <div>Updated <b>Oct 11, 2026</b></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Open these, in this order</h2>
+    <div class="urls">
+      <div class="url"><span>1. Slides</span><a class="mono" href="https://github.com/mubinmodi/UCSC_HACK_HARVESTNET/blob/main/docs/demo/slides.html" target="_blank" rel="noopener">docs/demo/slides.html</a><button class="copy" type="button" data-copy="docs/demo/slides.html">Copy</button></div>
+      <div class="url"><span>2. Household page</span><a href="https://18-217-110-223.sslip.io/household/" target="_blank" rel="noopener">https://18-217-110-223.sslip.io/household/</a><button class="copy" type="button" data-copy="https://18-217-110-223.sslip.io/household/">Copy</button></div>
+      <div class="url"><span>3. Donor page and dashboards</span><a href="https://18-217-110-223.sslip.io/donor-dashboard/" target="_blank" rel="noopener">https://18-217-110-223.sslip.io/donor-dashboard/</a><button class="copy" type="button" data-copy="https://18-217-110-223.sslip.io/donor-dashboard/">Copy</button></div>
+      <div class="url"><span>4. Results strip</span><a href="https://18-217-110-223.sslip.io/results-strip/" target="_blank" rel="noopener">https://18-217-110-223.sslip.io/results-strip/</a><button class="copy" type="button" data-copy="https://18-217-110-223.sslip.io/results-strip/">Copy</button></div>
+      <div class="url"><span>5. Backup replay (offline)</span><a class="mono" href="https://github.com/mubinmodi/UCSC_HACK_HARVESTNET/blob/main/docs/demo/replay.html" target="_blank" rel="noopener">docs/demo/replay.html</a><button class="copy" type="button" data-copy="docs/demo/replay.html">Copy</button></div>
+    </div>
+    <p>Open the slides and the replay from a laptop copy of the repo, so they work with no network. Use the arrow keys to move; press <b>T</b> on the slides for a dark theme and <b>L</b> on the replay to switch English and Spanish.</p>
+  </section>
+
+  <section>
+    <h2>15 minutes before</h2>
+    <ul class="checks">
+      <li><input type="checkbox" id="c1"><label for="c1"><a href="https://18-217-110-223.sslip.io/api/health" target="_blank" rel="noopener">/api/health</a> says <code>"status": "ok"</code> and <code>"mode": "synthetic"</code>.</label></li>
+      <li><input type="checkbox" id="c2"><label for="c2"><a href="https://18-217-110-223.sslip.io/platform/health" target="_blank" rel="noopener">/platform/health</a> answers. This is the approvals service; if it's down, review links and emails won't work.</label></li>
+      <li><input type="checkbox" id="c3"><label for="c3">The results strip shows numbers, each labeled <b>Synthetic</b>.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4">Every approver can open their inbox (see "Who gets which email"). Check spam once for <code>calebdburnham@gmail.com</code>.</label></li>
+      <li><input type="checkbox" id="c5"><label for="c5">The cooler switch is back on "working" from the last run, and the scenario is fresh.</label></li>
+      <li><input type="checkbox" id="c6"><label for="c6">The replay is current: <code>python -m harvestnet_core.demo_replay --check</code> prints "recording matches the code".</label></li>
+      <li><input type="checkbox" id="c7"><label for="c7">The phone for the Spanish voice call is charged. If the voice line isn't live yet, the Caller uses the household page instead.</label></li>
+      <li><input type="checkbox" id="c8"><label for="c8">Everyone knows their role and has the tab they need open.</label></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Roles</h2>
+    <div class="table"><table>
+      <thead><tr><th>Role</th><th>Does</th><th>Moments</th></tr></thead>
+      <tbody>
+        <tr><td><b>Presenter</b></td><td>Says the script, moves the slides, keeps eye contact.</td><td>All</td></tr>
+        <tr><td><b>Caller</b></td><td>Makes the Spanish call, or types the same answers into the household page.</td><td>1, 6</td></tr>
+        <tr><td><b>Operator</b></td><td>Drives the donor page and food bank dashboards, flips the cooler switch.</td><td>2, 3, 5</td></tr>
+        <tr><td><b>Approvers</b></td><td>Open the review email for their organization and approve the exact version.</td><td>4, 5</td></tr>
+        <tr><td><b>Timekeeper</b></td><td>Calls "skip ahead" at each mark, opens the replay if the network fails.</td><td>All</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Run sheet</h2>
+    <p>If a moment runs 10 seconds past its mark, skip to the next one. Read every number from the screen; never say one that isn't shown.</p>
+    <div class="run">
+      <div class="moment"><div class="mark">0:00<small>slides 1–3</small></div><div class="body">
+        <h3>Opening</h3>
+        <p class="say">Good produce goes to waste every day, while families nearby could use it. HarvestNet gives every donor and every food bank its own AI agent. They negotiate how each batch is shared. Nobody sits in the middle and decides.</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">0:15<small>slide 6</small></div><div class="body">
+        <span class="tag l1">Level 1</span>
+        <h3>1. A household asks, in Spanish</h3>
+        <p class="do"><b>Caller:</b> calls the voice line in Spanish (family of four, near Watsonville, after 6 pm, small fridge, gets CalFresh). If voice is down, type the same answers into the household page.</p>
+        <p class="say">The assistant reads it all back and asks before it saves anything. Their weekly fair share comes from the calculator, not from the AI.</p>
+        <p class="if"><b>Proves:</b> no app, no account, no name or address. <b>If it fails:</b> "Voice is down, so we use the web page. Same questions, same read-back."</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">0:40<small>slide 6</small></div><div class="body">
+        <span class="tag l1">Level 1</span>
+        <h3>2. The farmers market reports surplus</h3>
+        <p class="do"><b>Operator:</b> on the donor page, report apples, romaine and potatoes with a "must be gone by" time and drop-off available, then press <b>Offer this surplus</b>.</p>
+        <p class="say">At closing time, a farmers market has extra produce that must be gone today.</p>
+        <p class="if"><b>Proves:</b> any donor can join.</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">0:55<small>slides 7–8</small></div><div class="body">
+        <span class="tag l3">Level 3</span>
+        <h3>3. The agents negotiate</h3>
+        <p class="do"><b>Operator:</b> open the lot's version history on the donor page or a food bank dashboard. If it's still running at 1:15, show the finished history instead of waiting.</p>
+        <p class="say">The food banks bid item by item. Every change is a new version, with a reason. The advocate speaks for the households furthest below their fair share. It can propose, but it can't vote.</p>
+        <p class="if"><b>Proves:</b> real disagreement, no central decider.</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">1:25<small>slide 7</small></div><div class="body">
+        <span class="tag l3">Level 3</span>
+        <h3>4. A live approval</h3>
+        <p class="do"><b>Approvers:</b> open the review email ("HarvestNet: review version …") and approve on the page it links to. Or press Accept on the dashboard; it asks you to confirm the exact version.</p>
+        <p class="say">Each manager approves the exact version. If anyone changes the terms, old approvals stop counting. Nothing is ever committed automatically.</p>
+        <p class="if"><b>If email is slow:</b> use the dashboard's Accept, or the local review link. Say "This is the local approval page."</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">1:40<small>slide 9</small></div><div class="body">
+        <span class="tag l2">Level 2</span>
+        <h3>5. The cooler fails</h3>
+        <p class="do"><b>Operator:</b> flip the city food bank's cooler switch, then open the city dashboard. Reason cards for every candidate appear under the cooler failure.</p>
+        <p class="say">Now the city's walk-in cooler fails. Its agent checks the produce profiles: romaine must stay cold, apples are fine. It searches the Directory for food banks with cold space and writes a reason card for each one. It's a new version, so both managers approve again.</p>
+        <p class="if"><b>If the switch or Directory fails:</b> open the replay at the cooler step and say "This is a recorded replay of the same scenario, made from our code."</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">2:10<small>slide 10</small></div><div class="body">
+        <span class="tag ev">Evidence</span>
+        <h3>6. The household gets an email</h3>
+        <p class="do"><b>Caller:</b> show the pickup email on the phone, or the pickup screen on the household page.</p>
+        <p class="say">The parent gets an email in Spanish: which food bank, what time, what's in it, and their code. If they can't make it, one tap passes it to the next family.</p>
+        <p class="if"><b>Proves:</b> a household counts as reached only when it confirms pickup.</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">2:25<small>slides 11–12</small></div><div class="body">
+        <span class="tag ev">Evidence</span>
+        <h3>7. The results strip</h3>
+        <p class="do"><b>Presenter:</b> switch to the results strip and read the numbers from the screen.</p>
+        <p class="say">We compare against first-come-first-served on the same inputs, in synthetic scenarios. We show where negotiation does better and where it does worse.</p>
+        <p class="if">Every pound is counted once: collected by households, committed to a food bank that can hand it out in time, or wasted. LLM results show "Not run" until the paid Claude runs happen; say so if asked.</p>
+      </div></div>
+
+      <div class="moment"><div class="mark">2:45<small>slide 16</small></div><div class="body">
+        <h3>Close</h3>
+        <p class="say">Every organization keeps its own keys. The food still moves. Thank you.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Who gets which email</h2>
+    <p>Emails come from <code>calebdburnham@gmail.com</code> through n8n and Amazon SES. SES is in test mode, so only these verified addresses receive mail. Add a new address only after AWS has verified it.</p>
+    <div class="table"><table>
+      <thead><tr><th>Organization</th><th>Role</th><th>Approval emails go to</th></tr></thead>
+      <tbody>
+        <tr><td>market</td><td>Donor</td><td class="mono">calebdburnham@gmail.com</td></tr>
+        <tr><td>city</td><td>Food bank</td><td class="mono">mubinmodi@gmail.com</td></tr>
+        <tr><td>rural</td><td>Food bank</td><td class="mono">ylwzry36@gmail.com</td></tr>
+        <tr><td>eastside</td><td>Food bank</td><td class="mono">Girththegreat2@gmail.com</td></tr>
+        <tr><td>advocate</td><td>Advocate</td><td>None; it proposes but never approves</td></tr>
+      </tbody>
+    </table></div>
+    <p>Household pickup emails go to whatever address the household typed on the household page, if it's one of the four above.</p>
+  </section>
+
+  <section>
+    <h2>When something fails</h2>
+    <p>Switch as soon as a step fails, and say the label out loud. Every fallback is labeled on screen.</p>
+    <div class="table"><table>
+      <thead><tr><th>If this fails</th><th>Switch to</th><th>Say</th></tr></thead>
+      <tbody>
+        <tr><td>Voice line (ElevenLabs)</td><td>Household page, same questions and read-back</td><td>"Voice is down, so we use the web page."</td></tr>
+        <tr><td>Email (n8n or SES)</td><td>Dashboard Accept, or the local review link; show the pickup screen</td><td>"This is the local approval page."</td></tr>
+        <tr><td>Organization systems (Beeceptor)</td><td>Recorded readings, labeled replay</td><td>"These readings are a recorded copy."</td></tr>
+        <tr><td>Directory (AGNTCY)</td><td>Local Directory, flagged on the dashboard</td><td>"Discovery is running locally today."</td></tr>
+        <tr><td>Claude (cap or outage)</td><td>Rules-based negotiators, automatically</td><td>"These moves come from the rules-based negotiators."</td></tr>
+        <tr><td>Network or the whole system</td><td>Offline replay on a laptop</td><td>"This is a recorded replay, made from our code. It is not live."</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Never say</h2>
+    <ul class="dont">
+      <li>"The AI decides who gets food." Agents negotiate; people approve.</li>
+      <li>"We fed X people." We count households that confirmed a pickup.</li>
+      <li>"The LLM agents beat the baseline." They weren't run for these results.</li>
+      <li>Any number that isn't on a screen or a slide.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>After each run</h2>
+    <ul class="checks">
+      <li><input type="checkbox" id="a1"><label for="a1">Switch the city cooler back to working.</label></li>
+      <li><input type="checkbox" id="a2"><label for="a2">Write the run in the rehearsal record in <code>docs/demo/REHEARSAL.md</code>: total time, moments that ran over, fallbacks used and whether they worked.</label></li>
+      <li><input type="checkbox" id="a3"><label for="a3">Tell Mubin about anything broken so it's fixed before the next run.</label></li>
+    </ul>
+    <div class="note">
+      <h3>Full script and slide notes</h3>
+      <p>The complete speaker script is <code>docs/demo/SCRIPT.md</code>, and the rehearsal checklist is <code>docs/demo/REHEARSAL.md</code>, both in the repo.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+document.querySelectorAll('button.copy').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var text = b.getAttribute('data-copy');
+    var done = function () { var t = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = t; }, 1400); };
+    try {
+      navigator.clipboard.writeText(text).then(done, function () { select(b); });
+    } catch (e) { select(b); }
+  });
+});
+function select(b) {
+  var a = b.parentNode.querySelector('a');
+  var r = document.createRange(); r.selectNodeContents(a);
+  var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+document.querySelectorAll('.checks input').forEach(function (box) {
+  var key = 'hn-demo-' + box.id;
+  try { box.checked = localStorage.getItem(key) === '1'; } catch (e) {}
+  box.addEventListener('change', function () { try { localStorage.setItem(key, box.checked ? '1' : '0'); } catch (e) {} });
+});
+</script>
+
+</html>
