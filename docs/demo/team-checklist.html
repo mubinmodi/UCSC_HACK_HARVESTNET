@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HarvestNet Team Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of per-person task cards, like a crew call sheet; commands sit in their own scrolling blocks. */
+:root {
+  --paper: #f6f8f5; --panel: #ffffff; --ink: #18211c; --muted: #5b6760; --rule: #d5ddd7;
+  --leaf: #2f6b4c; --berry: #b02a3f; --cold: #2a5d82;
+  --tint-leaf: #e4f0e8; --tint-berry: #f8e8eb; --tint-cold: #e4edf5;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121815; --panel: #1a221e; --ink: #e6ece8; --muted: #9aa8a0; --rule: #2e3a34;
+    --leaf: #7cc39a; --berry: #f08a9a; --cold: #8ab8dc;
+    --tint-leaf: #1d3027; --tint-berry: #3a2228; --tint-cold: #1c2b38; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121815; --panel: #1a221e; --ink: #e6ece8; --muted: #9aa8a0; --rule: #2e3a34;
+  --leaf: #7cc39a; --berry: #f08a9a; --cold: #8ab8dc;
+  --tint-leaf: #1d3027; --tint-berry: #3a2228; --tint-cold: #1c2b38; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--body); }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 800; font-stretch: 85%; }
+h2 { font-size: 1.4rem; font-weight: 700; font-stretch: 90%; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+section { display: grid; gap: 16px; }
+.eyebrow { font: 600 0.75rem/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em; color: var(--leaf); }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.head { display: grid; gap: 12px; }
+code { font-family: var(--mono); font-size: 0.88em; }
+.person { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 20px 22px; display: grid; gap: 14px; }
+.who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.who span { color: var(--muted); font-size: 0.9rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.checks > li { display: grid; grid-template-columns: 1.4rem 1fr; gap: 8px; }
+.checks input { margin-top: 0.35rem; accent-color: var(--leaf); }
+.item { display: grid; gap: 6px; min-width: 0; }
+.item label { font-weight: 600; }
+.item p { color: var(--muted); font-size: 0.95rem; }
+.tag { font: 600 0.7rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 3px; background: var(--tint-cold); color: var(--cold); margin-left: 6px; vertical-align: 2px; }
+.tag.now { background: var(--tint-berry); color: var(--berry); }
+pre { margin: 0; padding: 10px 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; overflow-x: auto; font: 0.8rem/1.5 var(--mono); }
+.note { background: var(--tint-leaf); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+.warn { background: var(--tint-berry); }
+.table { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 0.72rem var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+a { color: var(--cold); }
+a:focus-visible, input:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div class="eyebrow">HarvestNet · handoff · Oct 11, 2026</div>
+    <h1>HarvestNet Team Checklist</h1>
+    <p class="lede">What's left before the demo, who does it, and the exact commands. The code, the live server and the email pipeline are done; what remains is mostly checks only people can do.</p>
+  </header>
+
+  <section class="note">
+    <h3>Where things are</h3>
+    <p>Live system: <a href="https://18-217-110-223.sslip.io/household/" target="_blank" rel="noopener">household</a> · <a href="https://18-217-110-223.sslip.io/donor-dashboard/" target="_blank" rel="noopener">donor and food bank dashboards</a> · <a href="https://18-217-110-223.sslip.io/results-strip/" target="_blank" rel="noopener">results strip</a> · <a href="https://18-217-110-223.sslip.io/api/health" target="_blank" rel="noopener">API health</a>. Demo steps: <code>docs/demo/run-sheet.html</code>, script <code>docs/demo/SCRIPT.md</code>, rehearsal <code>docs/demo/REHEARSAL.md</code>, offline backup <code>docs/demo/replay.html</code>. Tickets: GitHub issues on <code>mubinmodi/UCSC_HACK_HARVESTNET</code>.</p>
+  </section>
+
+  <section>
+    <h2>Gianellerella · frontend and demo</h2>
+    <div class="person">
+      <ul class="checks">
+        <li><input type="checkbox" id="g1"><div class="item"><label for="g1">#2 · Try the household page on an old phone and a slow connection</label>
+          <p>Open the household page on the oldest phone you can find. In Chrome DevTools also try "Slow 3G". Fill it in, check the read-back and consent screens, and that nothing scrolls sideways. Comment results on issue #2; close it if it works.</p></div></li>
+        <li><input type="checkbox" id="g2"><div class="item"><label for="g2">#5 · Check the results strip on the projector</label>
+          <p>Open the results strip on the room's projector from the back row. The numbers and the "Synthetic" / "Not run" labels must be readable. Comment and close #5.</p></div></li>
+        <li><input type="checkbox" id="g3"><div class="item"><label for="g3">#6 · Get a native Spanish speaker to review the wording</label>
+          <p>They go through <code>docs/demo/WORDING_REVIEW.md</code> and the Spanish screens of the household page. Fix what they flag (or list it on #6), then close #6.</p></div></li>
+        <li><input type="checkbox" id="g4"><div class="item"><label for="g4">#25 · Lead one full rehearsal on the live system <span class="tag">team</span></label>
+          <p>Follow the run sheet, hit the time marks, try each fallback once, and fill in the record block in <code>docs/demo/REHEARSAL.md</code>. Close #25 when it runs under 3:00 and every fallback worked.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>calebdbur · email and n8n</h2>
+    <div class="person">
+      <ul class="checks">
+        <li><input type="checkbox" id="c1"><div class="item"><label for="c1">Keep the sender inbox ready</label>
+          <p>All demo emails come from <code>calebdburnham@gmail.com</code> through n8n Cloud and Amazon SES. You also get the donor ("market") approval emails. Check spam once and mark HarvestNet "not spam".</p></div></li>
+        <li><input type="checkbox" id="c2"><div class="item"><label for="c2">Don't switch on the old n8n drafts</label>
+          <p>Only these three workflows should be active in n8n: "email human review requests", "email committed pickup and verified Market Match tip", "email the thank-you after Can't make it". The older Twilio/SMS drafts stay off (see <code>docs/platform/HANDOFF.md</code>).</p></div></li>
+        <li><input type="checkbox" id="c3"><div class="item"><label for="c3">Play Operator in the rehearsal</label>
+          <p>You drive the donor page and the dashboards and flip the cooler (moment 5). The command is in the run sheet; the token is read from AWS, so run it on a laptop logged in with <code>aws login --profile incubator</code>.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Haha36 · voice and evaluation</h2>
+    <div class="person">
+      <ul class="checks">
+        <li><input type="checkbox" id="h1"><div class="item"><label for="h1">#24 · Read the live results before the demo</label>
+          <p>Open the results strip and check every card matches what the slides say. The paid Claude runs are being run now; if a card says "Partial" or "Fallback only", the presenter must say so. Close #24 if its checklist is met.</p></div></li>
+        <li><input type="checkbox" id="h2"><div class="item"><label for="h2">#22 · One live voice call, after the ElevenLabs agent exists</label>
+          <p>Once Mubin has created the agent (below), call it in English and in Spanish and check: the read-back is word for word, consent comes before saving, and the code is read twice. Then close #22.</p></div></li>
+        <li><input type="checkbox" id="h3"><div class="item"><label for="h3">Be an Approver in the rehearsal</label>
+          <p>Approval emails go to the addresses in the table below. Open the review link and approve the exact version shown.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Mubin · keys, AWS and voice</h2>
+    <div class="person">
+      <ul class="checks">
+        <li><input type="checkbox" id="m1"><div class="item"><label for="m1">#4 · Make a new ElevenLabs key and create the voice agent <span class="tag now">blocking</span></label>
+          <p>The current key can't create agents. In ElevenLabs, create a key with <b>Agents (ConvAI) read and write</b> and <b>Voices read</b>. Save it, then create the agent and run a test call:</p>
+          <pre>deploy/aws/set-keys.sh        # paste only the ElevenLabs key; Enter skips the others
+set -a; . deploy/aws/.env; set +a
+python3 integrations/elevenlabs/sync_agent.py --simulate "Hi, we are four people near Watsonville"
+git add integrations/elevenlabs/agent.json   # then commit and open a PR</pre>
+          <p>Then check the agent's privacy settings (recording and transcript retention) in the ElevenLabs dashboard. Close #4.</p></div></li>
+        <li><input type="checkbox" id="m2"><div class="item"><label for="m2">Share the run sheet and this checklist</label>
+          <p>Both pages are private until you share them from their Share menu.</p></div></li>
+        <li><input type="checkbox" id="m3"><div class="item"><label for="m3">Right before the demo: reset the data</label>
+          <pre>deploy/aws/reset_data.sh      # asks first; wipes test runs, keeps results and the Claude spend log</pre></div></li>
+        <li><input type="checkbox" id="m4"><div class="item"><label for="m4">After the hackathon: shut AWS down</label>
+          <p>The server costs about $11 a month (estimate). This removes everything HarvestNet created and leaves clinical-trials-viz alone:</p>
+          <pre>set -a; . deploy/aws/.env; set +a
+deploy/aws/teardown.sh --dry-run    # preview
+deploy/aws/teardown.sh              # delete</pre></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Commands anyone may need</h2>
+    <p>Run from the repo root on a laptop signed in with <code>aws login --profile incubator</code>.</p>
+    <div class="table"><table>
+      <thead><tr><th>Do this</th><th>Run</th></tr></thead>
+      <tbody>
+        <tr><td>Start the demo from a fresh scenario</td><td><code>deploy/aws/reset_data.sh</code></td></tr>
+        <tr><td>See a service's logs</td><td><code>deploy/aws/logs.sh core 50</code> (or <code>city</code>, <code>approvals</code>, …)</td></tr>
+        <tr><td>Check the Directory and memory</td><td><code>deploy/aws/check_directory.sh</code></td></tr>
+        <tr><td>Redeploy after merging to main</td><td><code>set -a; . deploy/aws/.env; set +a; deploy/aws/setup.sh</code></td></tr>
+        <tr><td>Add or change an API key</td><td><code>deploy/aws/set-keys.sh</code>, then redeploy</td></tr>
+        <tr><td>Check the backup replay is current</td><td><code>python -m harvestnet_core.demo_replay --check</code></td></tr>
+        <tr><td>Run all tests</td><td>see "Repository shape" in <code>CLAUDE.md</code></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Who gets which email</h2>
+    <p>Amazon SES is in test mode: only these verified addresses can receive mail. To add someone, they must click AWS's verification email first.</p>
+    <div class="table"><table>
+      <thead><tr><th>Organization</th><th>Approval emails go to</th></tr></thead>
+      <tbody>
+        <tr><td>market (donor)</td><td><code>calebdburnham@gmail.com</code></td></tr>
+        <tr><td>city (food bank)</td><td><code>mubinmodi@gmail.com</code></td></tr>
+        <tr><td>rural (food bank)</td><td><code>ylwzry36@gmail.com</code></td></tr>
+        <tr><td>eastside (food bank)</td><td><code>Girththegreat2@gmail.com</code></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="note warn">
+    <h3>Ground rules</h3>
+    <p>Never paste API keys into chat or commit <code>deploy/aws/.env</code>. Every number we show is synthetic; say so. Don't touch the clinical-trials-viz stack in the AWS account. Claude spending is capped at $5 per run and $50 total.</p>
+  </section>
+</div>
+
+<script>
+document.querySelectorAll('.checks input').forEach(function (box) {
+  var key = 'hn-team-' + box.id;
+  try { box.checked = localStorage.getItem(key) === '1'; } catch (e) {}
+  box.addEventListener('change', function () { try { localStorage.setItem(key, box.checked ? '1' : '0'); } catch (e) {} });
+});
+</script>
+
+</html>
