@@ -132,6 +132,12 @@ set -a; . deploy/aws/.env; set +a
 python3 integrations/elevenlabs/sync_agent.py --simulate "Hi, we are four people near Watsonville"
 git add integrations/elevenlabs/agent.json   # then commit and open a PR</pre>
           <p>Then check the agent's privacy settings (recording and transcript retention) in the ElevenLabs dashboard. Close #4.</p></div></li>
+        <li><input type="checkbox" id="m5"><div class="item"><label for="m5">Deploy the last fix, then finish #24 <span class="tag now">first</span></label>
+          <p>PR #75 (the lot page shows the new split after a cooler change) is merged but not on the server yet. The paid Claude evaluation was stopped partway, so its results may be incomplete. Deploy, clear the data, then re-run the evaluation (see <code>docs/core/README.md</code>, #24 section; cap at most $5 per run, $50 total) and check the results strip:</p>
+          <pre>set -a; . deploy/aws/.env; set +a
+deploy/aws/setup.sh                # deploys PR #75
+deploy/aws/reset_data.sh           # clears test data, re-publishes free results</pre>
+          <p>If there's no time for paid runs, keep the LLM cards as "Not run" and say so in the demo.</p></div></li>
         <li><input type="checkbox" id="m2"><div class="item"><label for="m2">Share the run sheet and this checklist</label>
           <p>Both pages are private until you share them from their Share menu.</p></div></li>
         <li><input type="checkbox" id="m3"><div class="item"><label for="m3">Right before the demo: reset the data</label>
