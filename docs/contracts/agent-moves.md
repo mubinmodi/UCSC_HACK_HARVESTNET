@@ -13,7 +13,9 @@ Examples: [`examples/agent-moves.json`](examples/agent-moves.json), four input/o
 | `donor_asks_human_on_condition_doubt` | Farmers market | `ask_human`: the romaine's cold chain is unknown |
 | `donor_requests_holds` | Farmers market | `request_hold`: its own lot and drop-off slot, after everyone accepted |
 
-All numbers in them are synthetic. More recorded pairs (25 in all, one per rule) are in #11's `agents/tests/fixtures/negotiators/`.
+All numbers in them are synthetic. More recorded pairs (26 in all, one per rule) are in #11's `agents/tests/fixtures/negotiators/`.
+
+Food banks may now bid beyond fair share once their households' gap is met (user direction, October 11, 2026). That changes which moves a food bank makes, not this interface: an extra bid is an ordinary `counter` with `set_pounds`, and its `reason` says "beyond fair share". Re-running the four examples above after that change gives the same outputs, so they are unchanged (an `agents` test checks this).
 
 ## Input
 
