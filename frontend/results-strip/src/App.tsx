@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Sprout, Trash2, Users } from 'lucide-react';
 import { resultsApi, type MethodId, type MethodResult, type Results } from './api';
 import { cardLabel, type CardLabel } from './labels';
-import { earlierMeasure, produceSplit, wastedLegend } from './split';
+import { earlierMeasure, hasProduceSplit, produceSplit, wastedLegend } from './split';
 
 // The four methods, always in this order. Labels only: every number comes from the API.
 const methods: [MethodId, string, string][] = [
@@ -69,14 +69,14 @@ export default function App() {
       {!label.measured && !example && label.status !== 'fallback_only' && label.showNumbers && <p className="unmeasured">{t('Not a measured result.', 'No es un resultado medido.')}</p>}
       {label.reason && label.status !== 'completed' && <p className="reason">{label.reason}</p>}
       <dl>
-        {metric('produce_wasted_lb', <Trash2 aria-hidden="true"/>, t('Produce wasted', 'Producto desperdiciado'), label.showNumbers ? run?.produce_wasted_lb : null, pounds, missing)}
+        {metric('produce_wasted_lb', <Trash2 aria-hidden="true"/>, t('Produce wasted', 'Producto desperdiciado'), label.showNumbers && run && hasProduceSplit(run) ? run.produce_wasted_lb : null, pounds, missing)}
         {label.showNumbers && run && <div className="split">
           <dt className="split-title">{t('Where each pound went', 'Adónde fue cada libra')}</dt>
-          <dd><ul>
+          <dd>{hasProduceSplit(run) ? <ul>
             {produceSplit(run, language).map(row => <li key={row.key} className={`split-${row.key}`}>
               <span>{row.label}</span><b>{has(row.value) ? pounds(row.value) : <span className="missing">{missing}</span>}</b>
             </li>)}
-          </ul>
+          </ul> : <p className="split-unavailable">{t('Updated breakdown unavailable from this API.', 'El desglose actualizado no está disponible en esta API.')}</p>}
           {earlier && <p className="earlier">{earlier.label}: {pounds(earlier.value)}</p>}
           </dd>
         </div>}

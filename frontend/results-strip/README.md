@@ -37,7 +37,8 @@ their own.
   pathway at the scenario end. Under it, each card shows where every pound went, as the API sent it:
   collected by households, committed to food banks, wasted. Then, in small type, the earlier measure
   (not collected by the scenario's households). `src/split.ts` holds these labels and the legend in
-  English and Spanish; `npm test` checks them. A part the API doesn't send shows "Not measured yet".
+  English and Spanish; `npm test` checks them. If an older API omits the new split, the page leaves
+  the new waste measure unavailable and labels the old `produce_wasted_lb` as the earlier measure.
   Pounds are shown with at most one decimal.
 - The banner appears whenever the API says `measured: false` or `synthetic: true`.
 - Each card also follows its own method's `status` and `measured` (the evaluation runner's labels,

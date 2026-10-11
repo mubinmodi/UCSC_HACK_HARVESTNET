@@ -3,7 +3,7 @@
 // test values in the evaluation runner's shape (harvestnet_core/evaluation.py), not measured results.
 import { describe, expect, it } from 'vitest';
 import { exampleResults, type MethodResult } from './api';
-import { earlierMeasure, produceSplit, wastedLegend } from './split';
+import { earlierMeasure, hasProduceSplit, produceSplit, wastedLegend } from './split';
 
 const run: MethodResult = {
   method: 'rules_based', status: 'completed', measured: true,
@@ -24,9 +24,11 @@ describe('produceSplit', () => {
     expect(produceSplit(run, 'es').map(r => r.label)).toEqual(['Recogido por hogares', 'Comprometido con bancos de alimentos', 'Desperdiciado']);
   });
 
-  it('leaves a missing part missing instead of inventing it', () => {
+  it('does not mislabel the old API waste value as the new measure', () => {
     const old: MethodResult = { method: 'llm', produce_wasted_lb: 50, worst_served_coverage: 0.6, households_reached: 6 };
-    expect(produceSplit(old, 'en').map(r => r.value)).toEqual([null, null, 50]);
+    expect(hasProduceSplit(old)).toBe(false);
+    expect(produceSplit(old, 'en').map(r => r.value)).toEqual([null, null, null]);
+    expect(earlierMeasure(old, 'en')).toEqual({ label: 'Not collected by the scenario households (earlier measure)', value: 50 });
   });
 
   it('keeps the earlier measure visible, labeled as such', () => {
@@ -36,7 +38,10 @@ describe('produceSplit', () => {
   });
 
   it('the contract example carries the whole split', () => {
-    for (const m of exampleResults.methods) expect(produceSplit(m, 'en').every(r => typeof r.value === 'number')).toBe(true);
+    for (const m of exampleResults.methods) {
+      expect(hasProduceSplit(m)).toBe(true);
+      expect(produceSplit(m, 'en').every(r => typeof r.value === 'number')).toBe(true);
+    }
   });
 });
 

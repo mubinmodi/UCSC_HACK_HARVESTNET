@@ -51,6 +51,7 @@ h1{font-size:clamp(28px,2.8vw,56px);line-height:1.15;font-weight:700;letter-spac
 .split li{display:flex;justify-content:space-between;gap:.6em;font-size:.9em}
 .split li b{font-variant-numeric:tabular-nums;color:#143f35}
 .split .split-produce_wasted_lb b{color:#7a2e0e}
+.split .split-unavailable{margin:.3em 0;color:#4f5f58;font-size:.85em}
 .split .earlier{margin-top:.4em;font-size:.75em;color:#4f5f58}
 
 .legend{margin-top:1.4em;color:#4f5f58;font-size:.75em}

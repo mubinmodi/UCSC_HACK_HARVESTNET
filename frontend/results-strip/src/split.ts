@@ -20,13 +20,21 @@ export interface SplitRow {
   value: number | null;
 }
 
+// An older API response uses produce_wasted_lb for pounds not collected by the scenario's
+// households. Require the new split before displaying that field with its new meaning.
+export function hasProduceSplit(run: MethodResult): boolean {
+  return parts.every(([key]) => typeof run[key] === 'number');
+}
+
 export function produceSplit(run: MethodResult, language: Language): SplitRow[] {
-  return parts.map(([key, en, es]) => ({ key, label: language === 'es' ? es : en, value: run[key] ?? null }));
+  const complete = hasProduceSplit(run);
+  return parts.map(([key, en, es]) => ({ key, label: language === 'es' ? es : en, value: complete ? run[key] ?? null : null }));
 }
 
 /** The earlier "produce wasted" (everything the scenario's households didn't collect), kept so the change is visible. */
 export function earlierMeasure(run: MethodResult, language: Language): { label: string; value: number } | null {
-  const value = run.uncollected_by_scenario_households_lb;
+  // Before the split was added, produce_wasted_lb carried exactly this earlier measure.
+  const value = run.uncollected_by_scenario_households_lb ?? (!hasProduceSplit(run) ? run.produce_wasted_lb : null);
   if (value === null || value === undefined) return null;
   return {
     label: language === 'es' ? 'No recogido por los hogares del escenario (medida anterior)' : 'Not collected by the scenario households (earlier measure)',
