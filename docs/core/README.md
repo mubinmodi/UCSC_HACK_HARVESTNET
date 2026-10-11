@@ -17,3 +17,7 @@ Real public API and HTTP server, consent/privacy/expiry, owner authentication, c
 ## Issue #10
 
 First-come-first-served and nearest-food-bank baselines share the real harness and safety checks. Five synthetic fixtures, measured deterministic metrics and replay. Missing live LLM runs are explicitly not_run, not invented.
+
+## Issue #22
+
+Actual HTTP tests for browser requests and the Lane C human capability relay; real agents compared over five A2A hosts and in-process. Recorded voice extraction remains a labeled replay. External provider configuration and a reachable core deployment remain acceptance gates.
