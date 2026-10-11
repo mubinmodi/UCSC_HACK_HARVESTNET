@@ -72,8 +72,11 @@ messages call `/pickups/{pickup_id}/release` using the pickup-scoped token. A
 missing/offline core reports `release_pending`, never pretends food was released.
 The core owns reassignment to the next household and expiry of requests.
 
-Live n8n, SMS delivery and the real core integration remain unverified until
-their accounts/URLs and ticket #1 are supplied. Tests verify the real local HTTP
+The four workflows are now imported as unpublished drafts in the HarvestNet n8n
+Cloud workspace. A separate manual connection check successfully calls the live
+Beeceptor service. Credential binding, SMS delivery and the real core integration
+remain unverified until the public platform/core URLs, credentials, SMS provider
+and ticket #1 are available. Tests verify the real local HTTP
 callbacks, stale-version rejection, eligibility filtering, and release adapter.
 
 Sources: [n8n Webhook authentication](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/),

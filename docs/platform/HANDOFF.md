@@ -43,11 +43,25 @@ the remote branches as last checked. Proposed Lane C interfaces need review with
 Lane A/B. Real-agent fixture equality and actual core rule checks for #21 cannot
 be certified until those adapters exist. Do not replace them with constant checks.
 
-Beeceptor and n8n accounts/URLs have not been configured; OpenAPI and inactive
-workflow imports are ready. No real SMS delivery was attempted. No verified
-Market Match market is shipped; test markets are explicitly synthetic.
+Beeceptor is configured at `https://harvestnet.proxy.beeceptor.com` with the
+OpenAPI contract and fixed synthetic examples. All 17 system routes were tested
+against the live service; city failure returned a failed cooler reading and zero
+cold capacity while rural stayed working. The local ignored `.env` has this URL.
 
-No AWS host, account, secret ARN, domain or core API image is configured. Secrets
+The four application workflows were imported and saved as unpublished drafts in
+`https://harvestnet.app.n8n.cloud`. A fifth manual-only Beeceptor connection check
+ran successfully from n8n Cloud. Application workflows still need their Header
+Auth credentials, public platform/core URLs and SMS provider credentials before
+publication. No real SMS delivery was attempted. No verified Market Match market
+is shipped; test markets are explicitly synthetic.
+
+Cloud workflow IDs (not credentials): review requests `7Qkc7a0X3TuYhwYd`, pickup
+texts `Ez4Sir1ssOKZfjuo`, replies `ESzgVkSoQOjzQeU3`, human receipt relay
+`c2jM64ZyOnRp49tA`, manual connection check `X9bHymRDirw1LDq8`.
+
+The user has an AWS account, but no AWS host, authenticated session, secret ARN,
+domain or core API image is configured. **User hosting budget is $0: prepare only
+until credits are confirmed. Do not provision chargeable resources.** Secrets
 Manager storage and actual HTTPS deployment are not verified. Docker Compose is
 validated, but Docker Engine/container runtime is absent. Native App SDK startup
 and authenticated A2A exchange pass locally; a real Directory daemon push/search
