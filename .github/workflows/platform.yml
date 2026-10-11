@@ -1,0 +1,22 @@
+name: Platform checks
+on: [push, pull_request]
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -v
+      - run: python integrations/n8n/build_workflows.py && git diff --exit-code -- integrations/n8n
+      - name: Validate deployment configuration without revealing secrets
+        env:
+          TRANSPORT_TOKEN: ci-placeholder
+          API_EVENTS_TOKEN: ci-placeholder
+          DEMO_SWITCH_TOKEN: ci-placeholder
+          POSTGRES_PASSWORD: ci-placeholder
+          APPROVAL_PUBLIC_URL: https://example.invalid
+          HARVESTNET_DOMAIN: example.invalid
+          CORE_API_IMAGE: example.invalid/harvestnet-core:ci
+        run: docker compose -f compose.platform.yaml -f compose.deployment.yaml -f compose.agntcy.yaml config --quiet

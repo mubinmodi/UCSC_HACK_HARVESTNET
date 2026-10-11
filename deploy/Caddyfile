@@ -1,0 +1,17 @@
+{$HARVESTNET_DOMAIN} {
+    handle_path /platform/* {
+        reverse_proxy approvals:8030
+    }
+    handle /human/* {
+        reverse_proxy approvals:8030
+    }
+    handle_path /api/* {
+        reverse_proxy core:8000
+    }
+    handle /health {
+        respond "HarvestNet gateway is up; check /platform/health for adapter status" 200
+    }
+    handle {
+        respond "HarvestNet platform. Household application is supplied by the frontend lane." 200
+    }
+}

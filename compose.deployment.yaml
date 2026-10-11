@@ -1,0 +1,77 @@
+services:
+  systems:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    command: [python, -m, harvestnet_platform.systems, --host, 0.0.0.0]
+    environment:
+      BEECEPTOR_BASE_URL: ${BEECEPTOR_BASE_URL:-}
+      DEMO_SWITCH_TOKEN: ${DEMO_SWITCH_TOKEN:?set DEMO_SWITCH_TOKEN}
+      COOLER_STATE_PATH: /app/runtime/coolers.json
+    volumes: [systems-data:/app/runtime]
+    networks: [platform, egress]
+    restart: unless-stopped
+  approvals:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    command: [python, -m, harvestnet_platform.approvals, --host, 0.0.0.0]
+    environment:
+      API_EVENTS_TOKEN: ${API_EVENTS_TOKEN:?set API_EVENTS_TOKEN}
+      APPROVAL_PUBLIC_URL: ${APPROVAL_PUBLIC_URL:?set APPROVAL_PUBLIC_URL}
+      CORE_API_URL: ${CORE_API_URL:-}
+      CORE_API_TOKEN: ${CORE_API_TOKEN:-}
+      ALLOW_INTERNAL_HTTP: '1'
+      APPROVALS_DB: /app/runtime/approvals.sqlite
+    volumes: [approvals-data:/app/runtime]
+    networks: [platform, egress]
+    restart: unless-stopped
+  postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_DB: harvestnet
+      POSTGRES_USER: harvestnet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?load from Secrets Manager}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [platform]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U harvestnet -d harvestnet]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  core:
+    image: ${CORE_API_IMAGE:?set the reviewed Lane A API image before deployment}
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: harvestnet
+      POSTGRES_USER: harvestnet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      API_EVENTS_TOKEN: ${API_EVENTS_TOKEN}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [platform, egress]
+    restart: unless-stopped
+  gateway:
+    image: caddy:2.10.2-alpine
+    environment:
+      HARVESTNET_DOMAIN: ${HARVESTNET_DOMAIN:?set public DNS hostname}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [platform, egress]
+    depends_on: [approvals, core]
+    restart: unless-stopped
+networks:
+  egress:
+volumes:
+  systems-data:
+  approvals-data:
+  postgres-data:
+  caddy-data:
+  caddy-config:
