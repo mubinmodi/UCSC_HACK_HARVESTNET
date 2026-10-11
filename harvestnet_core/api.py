@@ -5,6 +5,7 @@ import secrets
 from urllib.parse import urlsplit, parse_qs
 from harvestnet_agents import front_desk as desk
 from .engine import Engine, jsonable
+from . import changes
 from .protocol import Conflict, dt, terms_hash, named, number
 
 
@@ -232,6 +233,14 @@ class API:
                 from .workflows import negotiate_pending
                 negotiate_pending(self.engine,path[1])
                 return 200,{'lot_id':path[1],'version':updated['version'],'status':'condition_recorded','committed':False}
+            # Proposed (#23): a food bank's holding and its changed version after a disruption.
+            if method=='GET' and path[2:]==['holding']:
+                self.authorize(q.get('food_bank_id'),token)
+                return 200,changes.holding(self.engine,path[1],q['food_bank_id'])
+            if method=='POST' and path[2:]==['changes']:
+                owner=(b.get('terms') or {}).get('proposer_id')
+                self.authorize(owner,token)
+                return 201,changes.propose(self.engine,path[1],b,owner)
         if root=='approvals':
             owner=b.get('organization_id') if method=='POST' else q.get('organization_id')
             self.authorize(owner,token)
@@ -241,10 +250,15 @@ class API:
                     d=lot['draft']
                     if owner in named(d) and lot['status']!='committed' and dt(d['deadline'])>dt(self.engine.now):
                         approvals.append({"lot_id":d['lot_id'],"version":d['version'],"terms_hash":terms_hash(d),"requested_at":self.engine.now,"expires_at":d['deadline'],"why_you":["exact_version_review"],"summary":d['reason'],"terms":d,"status":"awaiting_decision"})
+                approvals+=changes.pending_approvals(self.records,owner)
                 return 200,{"organization_id":owner,"approvals":approvals}
             if method=='POST':
                 receipt={k:b[k] for k in ('lot_id','version','organization_id','terms_hash','decision')}
                 if b.get('receipt_id'): receipt['receipt_id']=b['receipt_id']
+                if changes.find(self.records,receipt['lot_id'],receipt['version']):
+                    # A changed version of a committed plan takes its own fresh approvals.
+                    result=changes.approve(self.engine,receipt,owner)
+                    return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","change_status":result['status'],"committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
                 result=self.engine.protocol.approve(receipt,owner,self.engine.now,self.engine.validate)
                 self.engine.distribute(b['lot_id'])
                 return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
@@ -284,7 +298,7 @@ class API:
                         incoming.append({"lot_id":d['lot_id'],"version":d['version'],"donor_id":d['donor_id'],"donor_name":self.engine.names[d['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":None,"agent_reason":d['reason'],"needs_your_approval":lot['status']!='committed'})
                         if transport: arrivals.append({"lot_id":d['lot_id'],"version":d['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
                         if lot.get('stop_reason'): disagreements.append({"lot_id":d['lot_id'],"reason":lot['stop_reason']})
-                    return 200,{"food_bank_id":bid,"name":self.engine.names[bid],"capacity":{k:bank.get(k) for k in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bid),"disagreements":disagreements,"expected_arrivals":arrivals}
+                    return 200,{"food_bank_id":bid,"name":self.engine.names[bid],"capacity":{k:bank.get(k) for k in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bid),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bid)}
         if root=='results' and method=='GET':
             return 200,self.records.get('results',q['scenario_id'])
         return 404,{"error":{"code":"not_found","message":"Unknown operation"}}
