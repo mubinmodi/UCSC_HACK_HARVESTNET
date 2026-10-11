@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-# Only the live front-desk extractor needs the Claude SDK; tests never call the API.
+# Only live Claude calls (front-desk extractor, LLM negotiators) need the SDK; tests never call the API.
 claude = ["anthropic>=1.13"]
 
 [dependency-groups]

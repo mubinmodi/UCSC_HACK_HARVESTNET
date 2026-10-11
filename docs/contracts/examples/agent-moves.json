@@ -1,0 +1,496 @@
+{
+  "kind": "agent_move_examples",
+  "contract_version": "contract-v0.1",
+  "synthetic": true,
+  "note": "Synthetic. Each output was produced by running Lane B's rules-based negotiators (#11, commit f06b148) on the input shown, with stand-in calculators. Inputs are #11's recorded fixtures with UTC offsets added to every time.",
+  "pairs": [
+    {
+      "name": "food_bank_counters_on_cold_storage",
+      "shows": "A food bank counters with one amendment: its cold space at arrival is 50 lb short, so it takes 50 lb less romaine.",
+      "source_fixture": "agents/tests/fixtures/negotiators/city_counters_when_cold_storage_is_short.json",
+      "input": {
+        "role": "food_bank",
+        "draft": {
+          "lot_id": "lot-market-1013",
+          "version": 3,
+          "donor_id": "market",
+          "deadline": "2026-10-13T15:00:00-07:00",
+          "items": [
+            {
+              "produce_id": "apples",
+              "pounds": 300,
+              "condition_grade": "good",
+              "usable_until": "2026-11-01T00:00:00-07:00"
+            },
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "condition_grade": "good",
+              "usable_until": "2026-10-15T12:00:00-07:00"
+            },
+            {
+              "produce_id": "potatoes",
+              "pounds": 400,
+              "condition_grade": "good",
+              "usable_until": "2026-11-10T00:00:00-07:00"
+            }
+          ],
+          "allocations": [
+            {
+              "produce_id": "romaine",
+              "food_bank_id": "city",
+              "pounds": 200
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "pounds": 250
+            },
+            {
+              "produce_id": "potatoes",
+              "food_bank_id": "rural",
+              "pounds": 400
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "eastside",
+              "pounds": 50
+            }
+          ],
+          "transports": [
+            {
+              "food_bank_id": "city",
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T14:00:00-07:00",
+              "arrives_at": "2026-10-13T14:20:00-07:00"
+            },
+            {
+              "food_bank_id": "rural",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:40:00-07:00"
+            },
+            {
+              "food_bank_id": "eastside",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:25:00-07:00"
+            }
+          ],
+          "drop_off_to": [
+            "rural",
+            "eastside"
+          ],
+          "drop_off_refrigerated": false,
+          "proposer_id": "market",
+          "reason": "Surplus offer",
+          "names": {
+            "market": "Farmers market",
+            "city": "City food bank",
+            "rural": "Rural food bank",
+            "eastside": "Eastside food bank"
+          }
+        },
+        "facts": {
+          "food_bank_id": "city",
+          "name": "City food bank",
+          "storage": [
+            {
+              "window": {
+                "start": "2026-10-13T12:00:00-07:00",
+                "end": "2026-10-13T23:59:00-07:00"
+              },
+              "cold_free_lb": 150,
+              "dry_free_lb": 300
+            }
+          ],
+          "pickup_windows": [
+            {
+              "start": "2026-10-13T18:00:00-07:00",
+              "end": "2026-10-13T20:00:00-07:00"
+            }
+          ],
+          "truck": {
+            "window": {
+              "start": "2026-10-13T13:00:00-07:00",
+              "end": "2026-10-13T17:00:00-07:00"
+            },
+            "refrigerated": true,
+            "capacity_lb": 500
+          },
+          "travel_minutes_from_donor": 20,
+          "demand": {
+            "households": 60,
+            "people": 180,
+            "below_fair_share_lb": 200,
+            "limited_fridge": 10,
+            "evening_only": 40
+          }
+        },
+        "turn": {
+          "organization_id": "city",
+          "number": 8,
+          "now": "2026-10-13T12:30:00-07:00",
+          "accepted_by": []
+        }
+      },
+      "output": {
+        "organization_id": "city",
+        "version": 3,
+        "action": "counter",
+        "reason": "At arrival (2:20 pm) we have 150 lb of cold space free and our share needs 200 lb, 50 lb too much. Taking 50 lb less romaine lettuce.",
+        "amendment": {
+          "kind": "set_pounds",
+          "produce_id": "romaine",
+          "food_bank_id": "city",
+          "pounds": 150.0
+        }
+      }
+    },
+    {
+      "name": "advocate_shifts_toward_largest_gap",
+      "shows": "The advocate, which can't vote, proposes moving potatoes from a food bank planned above its fair-share gap to the one furthest below.",
+      "source_fixture": "agents/tests/fixtures/negotiators/advocate_shifts_pounds_above_fair_share_to_the_largest_gap.json",
+      "input": {
+        "role": "advocate",
+        "draft": {
+          "lot_id": "lot-market-1013",
+          "version": 4,
+          "donor_id": "market",
+          "deadline": "2026-10-13T15:00:00-07:00",
+          "items": [
+            {
+              "produce_id": "apples",
+              "pounds": 300,
+              "condition_grade": "good",
+              "usable_until": "2026-11-01T00:00:00-07:00"
+            },
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "condition_grade": "good",
+              "usable_until": "2026-10-15T12:00:00-07:00"
+            },
+            {
+              "produce_id": "potatoes",
+              "pounds": 400,
+              "condition_grade": "good",
+              "usable_until": "2026-11-10T00:00:00-07:00"
+            }
+          ],
+          "allocations": [
+            {
+              "produce_id": "romaine",
+              "food_bank_id": "city",
+              "pounds": 200
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "city",
+              "pounds": 100
+            },
+            {
+              "produce_id": "potatoes",
+              "food_bank_id": "city",
+              "pounds": 300
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "pounds": 150
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "eastside",
+              "pounds": 50
+            },
+            {
+              "produce_id": "potatoes",
+              "food_bank_id": "eastside",
+              "pounds": 100
+            }
+          ],
+          "transports": [],
+          "drop_off_to": [
+            "rural",
+            "eastside"
+          ],
+          "drop_off_refrigerated": false,
+          "proposer_id": "city",
+          "reason": "Surplus offer",
+          "names": {
+            "market": "Farmers market",
+            "city": "City food bank",
+            "rural": "Rural food bank",
+            "eastside": "Eastside food bank"
+          }
+        },
+        "facts": {
+          "gaps": [
+            {
+              "food_bank_id": "city",
+              "name": "City food bank",
+              "households": 60,
+              "below_fair_share_lb": 200
+            },
+            {
+              "food_bank_id": "rural",
+              "name": "Rural food bank",
+              "households": 42,
+              "below_fair_share_lb": 310,
+              "low_access": true
+            },
+            {
+              "food_bank_id": "eastside",
+              "name": "Eastside food bank",
+              "households": 20,
+              "below_fair_share_lb": 90
+            }
+          ]
+        },
+        "turn": {
+          "organization_id": "advocate",
+          "number": 8,
+          "now": "2026-10-13T12:30:00-07:00",
+          "accepted_by": []
+        }
+      },
+      "output": {
+        "organization_id": "advocate",
+        "version": 4,
+        "action": "counter",
+        "reason": "Rural food bank's 42 households are 160 lb below fair share under version 4, the largest gap (others: City food bank 0 lb, Eastside food bank 0 lb). It is in a low-access area (USDA Food Access Research Atlas). City food bank is planned 400 lb above its households' fair-share gap. Proposing 160 lb of its potatoes move to Rural food bank.",
+        "amendment": {
+          "kind": "shift_pounds",
+          "produce_id": "potatoes",
+          "from_food_bank_id": "city",
+          "to_food_bank_id": "rural",
+          "pounds": 160.0
+        }
+      }
+    },
+    {
+      "name": "donor_asks_human_on_condition_doubt",
+      "shows": "A donor asks its own human before offering: the romaine's cold chain is unknown.",
+      "source_fixture": "agents/tests/fixtures/negotiators/donor_asks_human_on_condition_doubt.json",
+      "input": {
+        "role": "donor",
+        "draft": {
+          "lot_id": "lot-market-1013",
+          "version": 1,
+          "donor_id": "market",
+          "deadline": "2026-10-13T15:00:00-07:00",
+          "items": [
+            {
+              "produce_id": "apples",
+              "pounds": 300,
+              "condition_grade": "good",
+              "usable_until": "2026-11-01T00:00:00-07:00"
+            },
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "condition_grade": "good",
+              "usable_until": "2026-10-15T12:00:00-07:00",
+              "condition_doubt": "cold chain unknown"
+            },
+            {
+              "produce_id": "potatoes",
+              "pounds": 400,
+              "condition_grade": "good",
+              "usable_until": "2026-11-10T00:00:00-07:00"
+            }
+          ],
+          "allocations": [],
+          "transports": [],
+          "drop_off_to": [
+            "rural",
+            "eastside"
+          ],
+          "drop_off_refrigerated": false,
+          "proposer_id": "market",
+          "reason": "Surplus offer",
+          "names": {
+            "market": "Farmers market",
+            "city": "City food bank",
+            "rural": "Rural food bank",
+            "eastside": "Eastside food bank"
+          }
+        },
+        "facts": {
+          "donor_id": "market",
+          "travel_minutes": {
+            "city": 20,
+            "rural": 40,
+            "eastside": 25
+          },
+          "drop_off": {
+            "window": {
+              "start": "2026-10-13T13:00:00-07:00",
+              "end": "2026-10-13T15:00:00-07:00"
+            },
+            "refrigerated": false,
+            "capacity_lb": 700,
+            "food_bank_ids": [
+              "rural",
+              "eastside"
+            ]
+          }
+        },
+        "turn": {
+          "organization_id": "market",
+          "number": 1,
+          "now": "2026-10-13T12:30:00-07:00",
+          "accepted_by": []
+        }
+      },
+      "output": {
+        "organization_id": "market",
+        "version": 1,
+        "action": "ask_human",
+        "reason": "Romaine lettuce: cold chain unknown. Our staff must check its condition before it is offered."
+      }
+    },
+    {
+      "name": "donor_requests_holds",
+      "shows": "Everyone named has accepted version 3, so the donor asks to hold its own lot and drop-off slot until its human approves.",
+      "source_fixture": "agents/tests/fixtures/negotiators/donor_requests_hold_when_everyone_accepted.json",
+      "input": {
+        "role": "donor",
+        "draft": {
+          "lot_id": "lot-market-1013",
+          "version": 3,
+          "donor_id": "market",
+          "deadline": "2026-10-13T15:00:00-07:00",
+          "items": [
+            {
+              "produce_id": "apples",
+              "pounds": 300,
+              "condition_grade": "good",
+              "usable_until": "2026-11-01T00:00:00-07:00"
+            },
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "condition_grade": "good",
+              "usable_until": "2026-10-15T12:00:00-07:00"
+            },
+            {
+              "produce_id": "potatoes",
+              "pounds": 400,
+              "condition_grade": "good",
+              "usable_until": "2026-11-10T00:00:00-07:00"
+            }
+          ],
+          "allocations": [
+            {
+              "produce_id": "romaine",
+              "food_bank_id": "city",
+              "pounds": 200
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "pounds": 250
+            },
+            {
+              "produce_id": "potatoes",
+              "food_bank_id": "rural",
+              "pounds": 400
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "eastside",
+              "pounds": 50
+            }
+          ],
+          "transports": [
+            {
+              "food_bank_id": "city",
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T14:00:00-07:00",
+              "arrives_at": "2026-10-13T14:20:00-07:00"
+            },
+            {
+              "food_bank_id": "rural",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:40:00-07:00"
+            },
+            {
+              "food_bank_id": "eastside",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:25:00-07:00"
+            }
+          ],
+          "drop_off_to": [
+            "rural",
+            "eastside"
+          ],
+          "drop_off_refrigerated": false,
+          "proposer_id": "market",
+          "reason": "Surplus offer",
+          "names": {
+            "market": "Farmers market",
+            "city": "City food bank",
+            "rural": "Rural food bank",
+            "eastside": "Eastside food bank"
+          }
+        },
+        "facts": {
+          "donor_id": "market",
+          "travel_minutes": {
+            "city": 20,
+            "rural": 40,
+            "eastside": 25
+          },
+          "drop_off": {
+            "window": {
+              "start": "2026-10-13T13:00:00-07:00",
+              "end": "2026-10-13T15:00:00-07:00"
+            },
+            "refrigerated": false,
+            "capacity_lb": 700,
+            "food_bank_ids": [
+              "rural",
+              "eastside"
+            ]
+          }
+        },
+        "turn": {
+          "organization_id": "market",
+          "number": 11,
+          "now": "2026-10-13T12:30:00-07:00",
+          "accepted_by": [
+            "market",
+            "city",
+            "rural",
+            "eastside"
+          ]
+        }
+      },
+      "output": {
+        "organization_id": "market",
+        "version": 3,
+        "action": "request_hold",
+        "reason": "Everyone named has accepted version 3. Holding the 900 lb in the plan until our 3 pm deadline, and our drop-off of 700 lb, 1 pm to 1:40 pm, pending our staff's approval.",
+        "resource_owner": "market",
+        "holds": [
+          {
+            "resource": "lot",
+            "pounds": 900.0,
+            "start": "2026-10-13T12:30:00-07:00",
+            "end": "2026-10-13T15:00:00-07:00"
+          },
+          {
+            "resource": "drop_off",
+            "pounds": 700.0,
+            "start": "2026-10-13T13:00:00-07:00",
+            "end": "2026-10-13T13:40:00-07:00"
+          }
+        ]
+      }
+    }
+  ]
+}

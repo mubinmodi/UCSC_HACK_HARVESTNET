@@ -14,7 +14,7 @@ Read `docs/MVP_DESIGN.md` for the current design, with `CONTEXT.md` (vocabulary)
 
 ## Repository shape
 
-`main` has no application code yet, so there are no build, lint, or test commands there. Lane C code exists on the unmerged `calebdbur/16`–`19` branches; each ticket's PR should add its own commands here. The repo is design documents for a hackathon entry (Cisco "When AI Agents Disagree", Level 3).
+`main` now has Lane B code in `agents/` (the Python package `harvestnet_agents`; see `agents/README.md`). Run its tests with `cd agents && uv run pytest`, or one test with `uv run pytest tests/<file>::<test>`. There are no build or lint commands yet. Lane C code exists on the unmerged `calebdbur/16`–`19` branches; each ticket's PR should add its own commands here. Everything else in the repo is design documents for a hackathon entry (Cisco "When AI Agents Disagree", Level 3).
 
 - **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0009`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP. If any other file disagrees with these, these win.
 - **Derived copies:** `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` are styled renderings of `docs/MVP_DESIGN.md`. When the Markdown changes materially, the copies go stale; say so, or regenerate them if asked.

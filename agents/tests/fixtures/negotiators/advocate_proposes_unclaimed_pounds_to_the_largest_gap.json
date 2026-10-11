@@ -1,0 +1,100 @@
+{
+  "_note": "Recorded negotiator input for ticket #11. Synthetic: it stands in for contract day's example input/output pairs (ticket #1 is not done). All numbers and times are synthetic.",
+  "role": "advocate",
+  "draft": {
+    "lot_id": "lot-market-1013",
+    "version": 2,
+    "donor_id": "market",
+    "deadline": "2026-10-13T15:00",
+    "items": [
+      {
+        "produce_id": "apples",
+        "pounds": 300,
+        "condition_grade": "good",
+        "usable_until": "2026-11-01T00:00"
+      },
+      {
+        "produce_id": "romaine",
+        "pounds": 200,
+        "condition_grade": "good",
+        "usable_until": "2026-10-15T12:00"
+      },
+      {
+        "produce_id": "potatoes",
+        "pounds": 400,
+        "condition_grade": "good",
+        "usable_until": "2026-11-10T00:00"
+      }
+    ],
+    "allocations": [
+      {
+        "produce_id": "romaine",
+        "food_bank_id": "city",
+        "pounds": 200
+      },
+      {
+        "produce_id": "apples",
+        "food_bank_id": "eastside",
+        "pounds": 50
+      }
+    ],
+    "transports": [],
+    "drop_off_to": [
+      "rural",
+      "eastside"
+    ],
+    "drop_off_refrigerated": false,
+    "proposer_id": "eastside",
+    "reason": "Surplus offer",
+    "names": {
+      "market": "Farmers market",
+      "city": "City food bank",
+      "rural": "Rural food bank",
+      "eastside": "Eastside food bank"
+    }
+  },
+  "facts": {
+    "gaps": [
+      {
+        "food_bank_id": "city",
+        "name": "City food bank",
+        "households": 60,
+        "below_fair_share_lb": 200
+      },
+      {
+        "food_bank_id": "rural",
+        "name": "Rural food bank",
+        "households": 42,
+        "below_fair_share_lb": 310,
+        "low_access": true
+      },
+      {
+        "food_bank_id": "eastside",
+        "name": "Eastside food bank",
+        "households": 20,
+        "below_fair_share_lb": 90
+      }
+    ]
+  },
+  "turn": {
+    "organization_id": "advocate",
+    "number": 4,
+    "now": "2026-10-13T12:30",
+    "accepted_by": []
+  },
+  "expected": {
+    "kind": "counter",
+    "amendment": {
+      "kind": "set_pounds",
+      "produce_id": "apples",
+      "food_bank_id": "rural",
+      "pounds": 250
+    },
+    "reason_includes": [
+      "Rural food bank",
+      "310 lb",
+      "42 households",
+      "low-access"
+    ]
+  }
+}

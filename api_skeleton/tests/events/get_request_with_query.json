@@ -1,0 +1,39 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/requests/K7P4",
+  "rawQueryString": "language=en",
+  "headers": {
+    "host": "abcdefghijklmnopqrstuvwxyz012345.lambda-url.us-west-2.on.aws",
+    "user-agent": "Mozilla/5.0 (synthetic test event)",
+    "origin": "http://localhost:5173",
+    "x-forwarded-for": "203.0.113.10",
+    "x-forwarded-proto": "https",
+    "x-forwarded-port": "443",
+    "x-amzn-trace-id": "Root=1-00000000-000000000000000000000000",
+    "accept": "application/json"
+  },
+  "requestContext": {
+    "accountId": "anonymous",
+    "apiId": "abcdefghijklmnopqrstuvwxyz012345",
+    "domainName": "abcdefghijklmnopqrstuvwxyz012345.lambda-url.us-west-2.on.aws",
+    "domainPrefix": "abcdefghijklmnopqrstuvwxyz012345",
+    "http": {
+      "method": "GET",
+      "path": "/requests/K7P4",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "203.0.113.10",
+      "userAgent": "Mozilla/5.0 (synthetic test event)"
+    },
+    "requestId": "synthetic-get_request_with_query",
+    "routeKey": "$default",
+    "stage": "$default",
+    "time": "13/Oct/2026:19:00:00 +0000",
+    "timeEpoch": 1791918000000
+  },
+  "isBase64Encoded": false,
+  "queryStringParameters": {
+    "language": "en"
+  },
+  "_note": "Synthetic event in the Lambda Function URL payload format version 2.0, for tests. Not captured from a live call."
+}

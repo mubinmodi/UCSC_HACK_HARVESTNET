@@ -1,0 +1,48 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "donor_requests_hold_when_everyone_accepted",
+  "role": "donor",
+  "responses": [
+    {
+      "model": "claude-sonnet-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "request_hold",
+            "reason": "Everyone named has accepted version 3. We hold the 900 lb in the plan until 3 pm and our 700 lb drop-off from 1 pm to 1:40 pm, for our staff to approve.",
+            "amendment": null,
+            "holds": [
+              {
+                "resource": "lot",
+                "pounds": 900.0,
+                "start": "2026-10-13T12:30",
+                "end": "2026-10-13T15:00"
+              },
+              {
+                "resource": "drop_off",
+                "pounds": 700.0,
+                "start": "2026-10-13T13:00",
+                "end": "2026-10-13T13:40"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

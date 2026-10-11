@@ -1,0 +1,101 @@
+{
+  "_note": "Recorded negotiator input for ticket #11. Synthetic: it stands in for contract day's example input/output pairs (ticket #1 is not done). All numbers and times are synthetic. City's walk-in has only 150 lb free.",
+  "role": "food_bank",
+  "draft": {
+    "lot_id": "lot-market-1013",
+    "version": 1,
+    "donor_id": "market",
+    "deadline": "2026-10-13T15:00",
+    "items": [
+      {
+        "produce_id": "apples",
+        "pounds": 300,
+        "condition_grade": "good",
+        "usable_until": "2026-11-01T00:00"
+      },
+      {
+        "produce_id": "romaine",
+        "pounds": 200,
+        "condition_grade": "good",
+        "usable_until": "2026-10-15T12:00"
+      },
+      {
+        "produce_id": "potatoes",
+        "pounds": 400,
+        "condition_grade": "good",
+        "usable_until": "2026-11-10T00:00"
+      }
+    ],
+    "allocations": [],
+    "transports": [],
+    "drop_off_to": [
+      "rural",
+      "eastside"
+    ],
+    "drop_off_refrigerated": false,
+    "proposer_id": "market",
+    "reason": "Surplus offer",
+    "names": {
+      "market": "Farmers market",
+      "city": "City food bank",
+      "rural": "Rural food bank",
+      "eastside": "Eastside food bank"
+    }
+  },
+  "facts": {
+    "food_bank_id": "city",
+    "name": "City food bank",
+    "storage": [
+      {
+        "window": {
+          "start": "2026-10-13T12:00",
+          "end": "2026-10-13T23:59"
+        },
+        "cold_free_lb": 150,
+        "dry_free_lb": 300
+      }
+    ],
+    "pickup_windows": [
+      {
+        "start": "2026-10-13T18:00",
+        "end": "2026-10-13T20:00"
+      }
+    ],
+    "truck": {
+      "window": {
+        "start": "2026-10-13T13:00",
+        "end": "2026-10-13T17:00"
+      },
+      "refrigerated": true,
+      "capacity_lb": 500
+    },
+    "travel_minutes_from_donor": 20,
+    "demand": {
+      "households": 60,
+      "people": 180,
+      "below_fair_share_lb": 200,
+      "limited_fridge": 10,
+      "evening_only": 40
+    }
+  },
+  "turn": {
+    "organization_id": "city",
+    "number": 1,
+    "now": "2026-10-13T12:30",
+    "accepted_by": []
+  },
+  "expected": {
+    "kind": "counter",
+    "amendment": {
+      "kind": "set_pounds",
+      "produce_id": "romaine",
+      "food_bank_id": "city",
+      "pounds": 150
+    },
+    "reason_includes": [
+      "150 lb",
+      "200 lb",
+      "60 households"
+    ]
+  }
+}

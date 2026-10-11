@@ -1,0 +1,61 @@
+{
+  "operation": "get_request",
+  "group": "household",
+  "method": "GET",
+  "path": "/requests/{request_code}",
+  "summary": "A household's pickup page: this week's balance and committed pickups only.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/requests/K7P4",
+      "query": {
+        "language": "en"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "request_code": "K7P4",
+        "household_size": 4,
+        "fair_share_lb": 12,
+        "received_this_week_lb": 0,
+        "chosen_food_bank_ids": [
+          "rural",
+          "city"
+        ],
+        "expires_at": "2026-10-20T11:05:00-07:00",
+        "pickups": [
+          {
+            "pickup_id": "pk-1013-0001",
+            "food_bank_id": "rural",
+            "food_bank_name": "Rural food bank",
+            "window": {
+              "start": "2026-10-14T18:00:00-07:00",
+              "end": "2026-10-14T20:00:00-07:00"
+            },
+            "items": [
+              {
+                "produce_id": "apples",
+                "name": "Apples",
+                "pounds": 4
+              },
+              {
+                "produce_id": "potatoes",
+                "name": "Potatoes",
+                "pounds": 4
+              }
+            ],
+            "pounds": 8,
+            "lot_id": "lot-market-1013",
+            "version": 3,
+            "status": "committed",
+            "wording": "Ready for pickup at Rural food bank, 6 to 8 pm: 4 lb apples and 4 lb potatoes. Your code is K7P4. This week: 0 of 12 lb received. Please wash produce before eating."
+          }
+        ],
+        "market_match_tip": null
+      }
+    }
+  }
+}

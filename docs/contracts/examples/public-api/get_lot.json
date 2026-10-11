@@ -1,0 +1,172 @@
+{
+  "operation": "get_lot",
+  "group": "donor",
+  "method": "GET",
+  "path": "/lots/{lot_id}",
+  "summary": "A lot's live status, item by item, with the current draft agreement.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/lots/lot-market-1013"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "lot_id": "lot-market-1013",
+        "donor_id": "market",
+        "status": "held",
+        "current_version": 3,
+        "deadline": "2026-10-13T15:00:00-07:00",
+        "items": [
+          {
+            "produce_id": "apples",
+            "name": "Apples",
+            "pounds": 300,
+            "status": "held",
+            "split": [
+              {
+                "food_bank_id": "rural",
+                "pounds": 250,
+                "mover": "donor"
+              },
+              {
+                "food_bank_id": "eastside",
+                "pounds": 50,
+                "mover": "donor"
+              }
+            ],
+            "unclaimed_lb": 0,
+            "households_reached": 0
+          },
+          {
+            "produce_id": "romaine",
+            "name": "Romaine lettuce",
+            "pounds": 200,
+            "status": "held",
+            "split": [
+              {
+                "food_bank_id": "city",
+                "pounds": 200,
+                "mover": "food_bank"
+              }
+            ],
+            "unclaimed_lb": 0,
+            "households_reached": 0
+          },
+          {
+            "produce_id": "potatoes",
+            "name": "Potatoes",
+            "pounds": 400,
+            "status": "held",
+            "split": [
+              {
+                "food_bank_id": "rural",
+                "pounds": 400,
+                "mover": "donor"
+              }
+            ],
+            "unclaimed_lb": 0,
+            "households_reached": 0
+          }
+        ],
+        "draft": {
+          "lot_id": "lot-market-1013",
+          "version": 3,
+          "based_on_version": 2,
+          "proposer_id": "market",
+          "reason": "Drop-off to rural and eastside on one route; city collects the romaine in its refrigerated truck.",
+          "donor_id": "market",
+          "deadline": "2026-10-13T15:00:00-07:00",
+          "items": [
+            {
+              "produce_id": "apples",
+              "pounds": 300,
+              "condition_grade": "good",
+              "usable_until": "2026-11-01T00:00:00-07:00"
+            },
+            {
+              "produce_id": "romaine",
+              "pounds": 200,
+              "condition_grade": "good",
+              "usable_until": "2026-10-15T12:00:00-07:00"
+            },
+            {
+              "produce_id": "potatoes",
+              "pounds": 400,
+              "condition_grade": "good",
+              "usable_until": "2026-11-10T00:00:00-07:00"
+            }
+          ],
+          "allocations": [
+            {
+              "produce_id": "romaine",
+              "food_bank_id": "city",
+              "pounds": 200
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "rural",
+              "pounds": 250
+            },
+            {
+              "produce_id": "potatoes",
+              "food_bank_id": "rural",
+              "pounds": 400
+            },
+            {
+              "produce_id": "apples",
+              "food_bank_id": "eastside",
+              "pounds": 50
+            }
+          ],
+          "transports": [
+            {
+              "food_bank_id": "city",
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T14:00:00-07:00",
+              "arrives_at": "2026-10-13T14:20:00-07:00"
+            },
+            {
+              "food_bank_id": "rural",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:40:00-07:00"
+            },
+            {
+              "food_bank_id": "eastside",
+              "mover": "donor",
+              "departs_at": "2026-10-13T13:00:00-07:00",
+              "arrives_at": "2026-10-13T13:25:00-07:00"
+            }
+          ],
+          "drop_off_to": [
+            "rural",
+            "eastside"
+          ],
+          "drop_off_refrigerated": false,
+          "names": {
+            "market": "Farmers market",
+            "city": "City food bank",
+            "rural": "Rural food bank",
+            "eastside": "Eastside food bank"
+          }
+        },
+        "approvals": [
+          {
+            "organization_id": "market",
+            "version": 3,
+            "decision": "approve"
+          }
+        ],
+        "awaiting_approval_from": [
+          "city",
+          "rural",
+          "eastside"
+        ],
+        "disagreement": null
+      }
+    }
+  }
+}

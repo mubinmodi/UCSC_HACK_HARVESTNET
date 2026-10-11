@@ -1,0 +1,22 @@
+{
+  "operation": "get_health",
+  "group": "system",
+  "method": "GET",
+  "path": "/health",
+  "summary": "Check the API is up, and which contract version it serves.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/health"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "status": "ok",
+        "contract_version": "contract-v0.1"
+      }
+    }
+  }
+}

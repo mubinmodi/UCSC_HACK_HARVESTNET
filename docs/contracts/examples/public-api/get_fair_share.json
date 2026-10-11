@@ -1,0 +1,30 @@
+{
+  "operation": "get_fair_share",
+  "group": "household",
+  "method": "GET",
+  "path": "/fair-share",
+  "summary": "A household's weekly fair share for its size, with the wording to show.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/fair-share",
+      "query": {
+        "household_size": "4",
+        "language": "en"
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "household_size": 4,
+        "fair_share_lb": 12,
+        "period": "week",
+        "table_version": "0.1.0-placeholder",
+        "is_placeholder": true,
+        "wording": "Your household's fresh produce share: 12 lb a week."
+      }
+    }
+  }
+}

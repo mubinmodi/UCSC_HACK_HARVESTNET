@@ -1,0 +1,81 @@
+{
+  "operation": "create_surplus_offer",
+  "group": "donor",
+  "method": "POST",
+  "path": "/surplus-offers",
+  "summary": "A donor reports a surplus lot: items, amounts, condition, deadline, recall check, and drop-off ability.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/surplus-offers",
+      "body": {
+        "donor_id": "market",
+        "deadline": "2026-10-13T15:00:00-07:00",
+        "recall_notice": false,
+        "items": [
+          {
+            "produce_id": "apples",
+            "quantity": 300,
+            "unit": "lb",
+            "condition_grade": "good"
+          },
+          {
+            "produce_id": "romaine",
+            "quantity": 200,
+            "unit": "lb",
+            "condition_grade": "good"
+          },
+          {
+            "produce_id": "potatoes",
+            "quantity": 8,
+            "unit": "sack",
+            "lb_per_unit": 50,
+            "condition_grade": "good"
+          }
+        ],
+        "drop_off": {
+          "can_drop_off": true,
+          "window": {
+            "start": "2026-10-13T13:00:00-07:00",
+            "end": "2026-10-13T15:00:00-07:00"
+          },
+          "refrigerated": false,
+          "capacity_lb": 700,
+          "food_bank_ids": [
+            "rural",
+            "eastside"
+          ]
+        }
+      }
+    },
+    "response": {
+      "status": 201,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "lot_id": "lot-market-1013",
+        "version": 1,
+        "status": "offered",
+        "items": [
+          {
+            "produce_id": "apples",
+            "name": "Apples",
+            "pounds": 300
+          },
+          {
+            "produce_id": "romaine",
+            "name": "Romaine lettuce",
+            "pounds": 200
+          },
+          {
+            "produce_id": "potatoes",
+            "name": "Potatoes",
+            "pounds": 400
+          }
+        ],
+        "needs_human": [],
+        "message": "Your surplus is offered to nearby food banks. Nothing is promised until your staff approve a plan."
+      }
+    }
+  }
+}
