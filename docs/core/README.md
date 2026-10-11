@@ -18,6 +18,10 @@ Real public API and HTTP server, consent/privacy/expiry, owner authentication, c
 
 First-come-first-served and nearest-food-bank baselines share the real harness and safety checks. Five synthetic fixtures, measured deterministic metrics and replay. Missing live LLM runs are explicitly not_run, not invented.
 
+## Issue #20 (join: real agents in the harness)
+
+`harvestnet_core/join.py`. `run_join(fixture)` runs one contract fixture through Lane A's harness (`run_fixture`) with Lane B's rules-based negotiators and the real calculators, and a `HarnessLog` writes Lane B's event log for that same run. So the fixture's eight checks (from the harness records) and Lane B's six (from the log) are both real results on one run, with nothing pending. Every calculator call is compared with Lane B's stand-ins; a difference carries both answers and the reason from `Calculators.stand_in_differences`. `run_join` also runs Lane B's `run_scenario` with the real calculators as a cross-check, and for its cooler-failure logic (#15). `python -m harvestnet_core.join` prints one line per fixture. The fixtures in `core_fixtures/` are already contract-v0.1 scenarios, so they load unchanged. Test: `core_tests/test_join.py`.
+
 ## Issue #22
 
 Actual HTTP tests for browser requests and the Lane C human capability relay; real agents compared over five A2A hosts and in-process. Recorded voice extraction remains a labeled replay. External provider configuration and a reachable core deployment remain acceptance gates.

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from harvestnet_agents.calculators import StandInCalculators
 from harvestnet_agents.lane_b_rule_checks import LANE_B_RULE_CHECKS, run_lane_b_rule_checks
 from harvestnet_agents.scenario import load_scenario
 from harvestnet_agents.scenario_runner import run_scenario
@@ -17,7 +18,7 @@ CONTRACT_EXAMPLE = Path(__file__).parents[2] / "docs" / "contracts" / "examples"
 
 @pytest.fixture(scope="module")
 def run():
-    return run_scenario(load_scenario(CONTRACT_EXAMPLE))
+    return run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators())
 
 
 @pytest.fixture

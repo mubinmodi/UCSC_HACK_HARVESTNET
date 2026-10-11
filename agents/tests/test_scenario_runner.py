@@ -1,8 +1,8 @@
 """The contract's scenario, run end to end with the real rules-based negotiators (#20).
 
-Lane A's harness (#7) and real calculators (#8) don't exist yet, so the runner takes any
-``Calculators`` implementation (the stand-ins here) and checks Lane B's rules over its
-event log. Every number is synthetic. No test calls the Claude API."""
+The runner takes any ``Calculators`` implementation. These unit tests pass the stand-ins
+explicitly; the harness join (``core_tests/test_join.py``) runs it with Lane A's real
+calculators. Every number is synthetic. No test calls the Claude API."""
 
 import json
 from dataclasses import dataclass, replace
@@ -18,6 +18,7 @@ from harvestnet_agents.negotiation import Role, StorageSlot, TimeWindow, amendme
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.scenario import load_scenario
 from harvestnet_agents.scenario_runner import (
+    FIXTURE_CHECKS_IN_HARNESS,
     LANE_A_PENDING,
     EventLog,
     RecordedCalculators,
@@ -38,7 +39,7 @@ def events(run, kind):
 
 @pytest.fixture(scope="module")
 def normal():
-    return run_scenario(load_scenario(CONTRACT_EXAMPLE))
+    return run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators())
 
 
 # --- The normal afternoon -----------------------------------------------------------------
@@ -65,9 +66,18 @@ def test_every_lane_b_rule_check_passes_on_the_normal_afternoon(normal):
     assert all(normal.rule_checks().values())
 
 
-def test_the_fixtures_own_rule_checks_are_reported_as_pending_lane_a_never_faked(normal):
+def test_the_fixtures_own_rule_checks_are_left_to_lane_as_harness_never_faked(normal):
     assert set(normal.fixture_rule_checks) == set(raw()["rule_checks"])
-    assert all(v == LANE_A_PENDING for v in normal.fixture_rule_checks.values())
+    assert all(v == FIXTURE_CHECKS_IN_HARNESS for v in normal.fixture_rule_checks.values())
+    assert LANE_A_PENDING == FIXTURE_CHECKS_IN_HARNESS
+    assert "pending" not in FIXTURE_CHECKS_IN_HARNESS
+
+
+def test_the_runner_never_picks_the_stand_ins_silently():
+    with pytest.raises(TypeError):
+        run_scenario(load_scenario(CONTRACT_EXAMPLE))
+    with pytest.raises(TypeError):
+        run_scenario(load_scenario(CONTRACT_EXAMPLE), None)
 
 
 def test_the_commitment_needs_every_named_organizations_human_on_that_exact_version(normal):
@@ -199,7 +209,7 @@ def test_a_donor_vehicle_too_small_for_the_extra_pounds_gets_them_back_never_fai
     # food bank to collect; it takes back pounds beyond fair share instead of asking again and again.
     data = raw()
     data["donors"][0]["drop_off"]["capacity_lb"] = capacity_lb
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "committed", events(run, "stop")
     assert all(run.rule_checks().values()), {k: v.failures for k, v in run.lane_b_rule_checks.items()}
     take_backs = [m for m in events(run, "move") if m["role"] == "food_bank" and "take back" in m["move"]["reason"]]
@@ -250,8 +260,8 @@ def test_each_move_records_the_calculator_calls_it_made(normal):
 
 
 def test_the_same_inputs_give_the_same_run():
-    a = run_scenario(load_scenario(CONTRACT_EXAMPLE))
-    b = run_scenario(load_scenario(CONTRACT_EXAMPLE))
+    a = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators())
+    b = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators())
     assert a.events == b.events
 
 
@@ -259,7 +269,7 @@ def test_the_same_inputs_give_the_same_run():
 
 
 def test_the_deadline_stops_the_negotiation_unclaimed_and_nothing_commits():
-    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), minutes_per_turn=20)
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), minutes_per_turn=20)
     assert run.status == "unclaimed_deadline"
     assert not events(run, "commitment")
     assert all(i["unclaimed_lb"] == i["pounds"] for i in run.outcome["items"])
@@ -270,7 +280,7 @@ def test_approvals_arriving_after_the_deadline_commit_nothing():
     data = raw()
     for h in data["humans"]:
         h["after_minutes"] = 240
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "unclaimed_deadline" and not events(run, "commitment")
     assert all(run.rule_checks().values())
 
@@ -278,7 +288,7 @@ def test_approvals_arriving_after_the_deadline_commit_nothing():
 def test_a_human_decline_commits_nothing():
     data = raw()
     data["humans"][1]["on_approval_request"] = "decline"  # city
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "declined_by_human"
     assert not events(run, "commitment")
     assert all(run.rule_checks().values())
@@ -287,7 +297,7 @@ def test_a_human_decline_commits_nothing():
 def test_an_organization_with_no_human_script_never_approves_so_nothing_commits():
     data = raw()
     data["humans"] = [h for h in data["humans"] if h["organization_id"] != "rural"]
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "no_human_response"
     assert not events(run, "commitment")
 
@@ -295,7 +305,7 @@ def test_an_organization_with_no_human_script_never_approves_so_nothing_commits(
 def test_a_condition_doubt_stops_for_a_human_check():
     data = raw()
     data["surplus_offers"][0]["items"][1]["condition_doubt"] = "cold chain unknown"
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "waiting_for_human"
     stop = events(run, "stop")[-1]
     assert stop["rule"] == "ask_human" and "cold chain unknown" in stop["reason"]
@@ -305,7 +315,7 @@ def test_a_condition_doubt_stops_for_a_human_check():
 def test_a_recalled_lot_is_never_offered():
     data = raw()
     data["surplus_offers"][0]["recall_notice"] = True
-    run = run_scenario(load_scenario(data))
+    run = run_scenario(load_scenario(data), StandInCalculators())
     assert run.status == "recalled"
     assert not events(run, "version") and not events(run, "move")
 
@@ -327,7 +337,7 @@ def test_three_rounds_without_new_terms_preserve_the_disagreement():
         n = rules_negotiator(role, org, calculators)
         return Stubborn(n) if org == "market" else n
 
-    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), negotiator_factory=factory)
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), negotiator_factory=factory)
     assert run.status == "preserved_disagreement"
     assert events(run, "stop")[-1]["rule"] == "preserved_disagreement"
     assert not events(run, "commitment")
@@ -351,7 +361,7 @@ def test_a_move_about_an_old_version_or_not_a_move_at_all_is_logged_and_changes_
         n = rules_negotiator(role, org, calculators)
         return Stale(n) if org == "eastside" else n
 
-    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), negotiator_factory=factory)
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), negotiator_factory=factory)
     invalid = events(run, "invalid_move")
     assert [i["organization_id"] for i in invalid] == ["eastside", "eastside"]
     assert "not a move" in invalid[0]["problem"] and "names version" in invalid[1]["problem"]
@@ -424,7 +434,7 @@ def test_llm_negotiators_can_take_a_role_and_their_fallbacks_are_logged():
             return LLMNegotiator(role, org, cap=cap, client=client, calculators=calculators)
         return rules_negotiator(role, org, calculators)
 
-    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), negotiator_factory=factory)
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), negotiator_factory=factory)
     advocate_moves = [m for m in events(run, "move") if m["role"] == "advocate"]
     assert advocate_moves and all(m["negotiator"] == "llm" for m in advocate_moves)
     assert all(m["llm"]["source"] == "fallback" for m in advocate_moves)
@@ -472,9 +482,11 @@ def test_the_recorder_logs_every_contract_calculator_example_in_the_contracts_sh
     examples = json.loads(CALCULATOR_EXAMPLES.read_text())["examples"]
     log = EventLog()
     calc = RecordedCalculators(StandInCalculators(), log, lambda: datetime.fromisoformat("2026-10-13T12:00:00-07:00"))
-    covered = [e for e in examples if hasattr(calc, e["calculator"])]
-    # fair_share and household_portions aren't in the interface yet: Lane A adds them (#8).
+    covered = [e for e in examples if hasattr(calc.primary, e["calculator"])]
+    # The stand-ins have no fair_share or household_portions; Lane A's calculators do, and
+    # core_tests/test_join.py records those two contract examples through this recorder.
     assert {e["calculator"] for e in examples} - {e["calculator"] for e in covered} == {"fair_share", "household_portions"}
+    assert hasattr(calc, "fair_share") and hasattr(calc, "household_portions")
     for ex in covered:
         method = getattr(calc, ex["calculator"])
         if "error" in ex:
@@ -485,3 +497,37 @@ def test_the_recorder_logs_every_contract_calculator_example_in_the_contracts_sh
         logged = log.events[-1]
         assert logged["input"] == ex["input"], ex["name"]
         assert logged.get("output") == ex.get("output") and logged.get("error") == ex.get("error"), ex["name"]
+
+
+class WithFairShare(StandInCalculators):
+    """A non-stand-in with a fair_share calculator the stand-ins don't have."""
+
+    label = "test calculators (with fair_share)"
+
+    def fair_share(self, household_size):
+        from harvestnet_agents.fair_share import fair_share
+        return fair_share(household_size, self.table)
+
+
+def test_a_calculator_the_stand_ins_lack_is_logged_as_not_compared_never_as_agreeing():
+    log = EventLog()
+    clock = lambda: datetime.fromisoformat("2026-10-13T12:00:00-07:00")  # noqa: E731
+    calc = RecordedCalculators(WithFairShare(), log, clock, reference=StandInCalculators())
+    calc.fair_share(4)
+    event = log.events[-1]
+    assert event["calculator"] == "fair_share" and event["output"]["pounds"] == 12
+    assert event["difference_from_stand_in"] is None
+    assert "no fair_share calculator" in event["not_compared"]
+    calc.gap_after_plan(10, 4)
+    assert "not_compared" not in log.events[-1]
+
+
+def test_a_known_reason_for_a_difference_is_added_to_its_explanation():
+    log = EventLog()
+    clock = lambda: datetime.fromisoformat("2026-10-13T12:00:00-07:00")  # noqa: E731
+    calc = RecordedCalculators(SlowerRoutes(), log, clock, reference=StandInCalculators(),
+                               explanations={"arrival_time": "every route is 5 minutes slower in this test"})
+    calc.arrival_time(datetime.fromisoformat("2026-10-13T13:00:00-07:00"), 20)
+    d = log.events[-1]["difference_from_stand_in"]
+    assert d["fields"] == ["arrives_at"]
+    assert d["explanation"].endswith("Why: every route is 5 minutes slower in this test")
