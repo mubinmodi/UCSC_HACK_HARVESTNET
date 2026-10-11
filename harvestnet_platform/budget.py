@@ -44,6 +44,8 @@ class Budget:
             try:
                 if self.db.execute('SELECT 1 FROM charges WHERE run=? AND call=?',(run,call)).fetchone():
                     raise BudgetExceeded('Call ID already reserved; do not repeat the live API request')
+                if self.db.execute('SELECT 1 FROM charges WHERE settled=-1').fetchone():
+                    raise BudgetExceeded('Underestimated call cost recorded; reconcile pricing before any more live calls')
                 total = self.db.execute('SELECT COALESCE(SUM(cents),0) FROM charges').fetchone()[0]
                 used = self.db.execute('SELECT COALESCE(SUM(cents),0) FROM charges WHERE run=?',(run,)).fetchone()[0]
                 if used+maximum > self.run_cap or total+maximum > self.total_cap:
@@ -60,8 +62,12 @@ class Budget:
             self.db.execute('BEGIN IMMEDIATE')
             try:
                 row = self.db.execute('SELECT cents,settled FROM charges WHERE run=? AND call=?',(run,call)).fetchone()
-                if not row or row[1] or actual > row[0]:
-                    raise BudgetExceeded('Missing, repeated or underestimated cost reservation')
+                if not row or row[1]:
+                    raise BudgetExceeded('Missing or repeated cost reservation')
+                if actual > row[0]:
+                    self.db.execute('UPDATE charges SET cents=?,settled=-1 WHERE run=? AND call=?',(actual,run,call))
+                    self.db.commit()
+                    raise BudgetExceeded('Actual cost exceeded its bound; actual cost recorded and further calls blocked')
                 self.db.execute('UPDATE charges SET cents=?,settled=1 WHERE run=? AND call=?',(actual,run,call))
                 self.db.commit()
             except Exception:

@@ -5,24 +5,64 @@ x-native: &native
     args:
       INSTALL_AGNTCY: '1'
   command: [python, -m, harvestnet_platform.agntcy_server]
+  networks: [platform, egress]
 services:
   donor:
     <<: *native
     environment:
       ORGANIZATION_ID: donor
+      AGENT_POLICY: ${AGENT_POLICY_DONOR:-}
+      AGNTCY_DIRECTORY_ADDRESS: ${AGNTCY_DIRECTORY_ADDRESS:-}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [donor-data:/app/runtime, budget-data:/app/budget]
   city:
     <<: *native
     environment:
       ORGANIZATION_ID: city
+      AGENT_POLICY: ${AGENT_POLICY_CITY:-}
+      AGNTCY_DIRECTORY_ADDRESS: ${AGNTCY_DIRECTORY_ADDRESS:-}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [city-data:/app/runtime, budget-data:/app/budget]
   rural:
     <<: *native
     environment:
       ORGANIZATION_ID: rural
+      AGENT_POLICY: ${AGENT_POLICY_RURAL:-}
+      AGNTCY_DIRECTORY_ADDRESS: ${AGNTCY_DIRECTORY_ADDRESS:-}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [rural-data:/app/runtime, budget-data:/app/budget]
   eastside:
     <<: *native
     environment:
       ORGANIZATION_ID: eastside
+      AGENT_POLICY: ${AGENT_POLICY_EASTSIDE:-}
+      AGNTCY_DIRECTORY_ADDRESS: ${AGNTCY_DIRECTORY_ADDRESS:-}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [eastside-data:/app/runtime, budget-data:/app/budget]
   advocate:
     <<: *native
     environment:
       ORGANIZATION_ID: advocate
+      AGENT_POLICY: ${AGENT_POLICY_ADVOCATE:-}
+      AGNTCY_DIRECTORY_ADDRESS: ${AGNTCY_DIRECTORY_ADDRESS:-}
+      CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [advocate-data:/app/runtime, budget-data:/app/budget]
+networks:
+  egress:
+volumes:
+  budget-data:

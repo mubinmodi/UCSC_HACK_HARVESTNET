@@ -60,7 +60,7 @@ class Systems:
             if self.base_url:
                 try:
                     live = request_json(f'{self.base_url}/systems/{organization}/{selected}')
-                    if live.get('synthetic') is not True or live.get('organization_id') != organization or live.get('resource') != selected:
+                    if not isinstance(live, dict) or live.get('synthetic') is not True or live.get('organization_id') != organization or live.get('resource') != selected or live.get('fixture_version') != self.fixture['fixture_version'] or not live.get('observed_at'):
                         raise ValueError('Unlabeled or mismatched Beeceptor reading')
                     expected = fallback['data']
                     if not isinstance(live.get('data'), dict) or set(live['data']) != set(expected):

@@ -2,7 +2,9 @@
 import argparse
 import asyncio
 import json
+import math
 import os
+from datetime import datetime
 from .systems import Systems, BANKS
 from .transport import ORGANIZATIONS, agent_card
 
@@ -21,22 +23,33 @@ def record_for(organization, endpoint, systems):
     card = agent_card(organization, endpoint)
     # OASF A2A envelope follows the official app-sdk converter.
     # Values are declared capabilities; actual reservations need owner rechecks.
-    return {'name': card['name'], 'schema_version': '1.0.0', 'version': '1.0.0',
+    return {'name': f'harvestnet.org/agents/{organization}', 'schema_version': '1.0.0', 'version': '1.0.0',
             'description': card['description'], 'authors': [card['name']],
             'created_at': systems.fixture['observed_at'], 'skills': [{'id': 101}], 'domains': [],
             'modules': [{'id': 203, 'name': 'integration/a2a', 'data': {'card_data': card, 'card_schema_version': 'v1.0.0'}}],
-            'annotations': {'harvestnet': {'organization_id': organization, 'capabilities': capabilities(organization, systems)}}}
+            'annotations': {'harvestnet': json.dumps({'organization_id': organization, 'capabilities': capabilities(organization, systems)}, sort_keys=True)}}
+
+
+def record_info(record):
+    return json.loads(record.get('annotations', {}).get('harvestnet', '{}'))
+
+
+def instant(value):
+    time = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if time.tzinfo is None:
+        raise ValueError('Capability query/window timestamps require timezone')
+    return time
 
 
 def search_capability(records, *, min_cold_lb=0, pickup_at=None):
-    if type(min_cold_lb) not in (int, float) or min_cold_lb < 0:
+    if type(min_cold_lb) not in (int, float) or not math.isfinite(min_cold_lb) or min_cold_lb < 0:
         raise ValueError('Nonnegative cold capacity required')
     matches = []
     for record in records:
-        caps = record.get('annotations', {}).get('harvestnet', {}).get('capabilities', {})
+        caps = record_info(record).get('capabilities', {})
         if caps.get('role') != 'food_bank' or caps.get('cold_space_lb', 0) < min_cold_lb:
             continue
-        if pickup_at and not any(window['start'] <= pickup_at < window['end'] for window in caps.get('pickup_hours', [])):
+        if pickup_at and not any(instant(window['start']) <= instant(pickup_at) < instant(window['end']) for window in caps.get('pickup_hours', [])):
             continue
         matches.append(record)
     return matches
@@ -74,7 +87,7 @@ class AgntcyDirectory:
         from agntcy.dir_sdk.models import search_v1
         from google.protobuf.json_format import MessageToDict
         request = search_v1.SearchRecordsRequest(queries=[search_v1.RecordQuery(
-            type=search_v1.RecordQueryType.RECORD_QUERY_TYPE_NAME, value='HarvestNet')], limit=100)
+            type=search_v1.RecordQueryType.RECORD_QUERY_TYPE_NAME, value='harvestnet.org/agents/*')], limit=100)
         records = [MessageToDict(response.record.data, preserving_proto_field_name=True)
                    for response in self.client.search_records(request)]
         # Search returns records; exact current capacity/time is checked locally.

@@ -35,9 +35,13 @@ Maximum cost must cover input tokens, capped output tokens, tool calls/retries,
 and current configured prices. Do not estimate a smaller average. Reservations
 are atomic/durable, repeated call IDs cannot repeat a live request, and uncertain
 failures retain the entire reservation. Unexpected actual cost above the bound
-fails and leaves the reservation charged. Correct conservative bounds are a
+records the actual cost and blocks further live calls until pricing is reconciled.
+Correct conservative bounds are a
 prerequisite, not a guaranteed provider billing cap. Share ONE ledger across all
 processes using the same credit, or give each its own partition of the cap.
+The native deployment mounts one `budget-data` ledger into all five organizations
+and the core. The reviewed core image must support the shared path and write as
+UID 10001 (or explicitly arrange equivalent volume permissions).
 Lane B's Claude client must use this guard; that client does not yet exist here.
 
 ## AWS deployment (prepared, not executed)
@@ -75,7 +79,8 @@ docker compose --env-file runtime/deploy.env -f compose.platform.yaml -f compose
    registry/Postgres. Configure `AGNTCY_DIRECTORY_ADDRESS` to a reachable private
    gRPC endpoint, then register the five cards with `harvestnet_platform.directory`.
    Test push/search before a live demo. Native daemon/container execution remains
-   unverified on this Windows machine; base HTTP and SDK message shapes are tested.
+   unverified on this Windows machine; the native App SDK process, authenticated
+   A2A request, base HTTP and SDK message shapes are tested.
 6. Import/configure the inactive n8n workflows and Beeceptor examples. Send only
    explicit test traffic after confirming credentials and recipient ownership.
    Verify stale approvals return 409, unsigned callbacks fail, all five agent

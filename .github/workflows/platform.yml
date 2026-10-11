@@ -8,6 +8,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: pip install a2a-sdk==0.3.20 agntcy-dir==1.0.0
       - run: python -m unittest discover -s tests -v
       - run: python integrations/n8n/build_workflows.py && git diff --exit-code -- integrations/n8n
       - name: Validate deployment configuration without revealing secrets
@@ -20,3 +21,30 @@ jobs:
           HARVESTNET_DOMAIN: example.invalid
           CORE_API_IMAGE: example.invalid/harvestnet-core:ci
         run: docker compose -f compose.platform.yaml -f compose.deployment.yaml -f compose.agntcy.yaml config --quiet
+  native-agntcy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-agntcy.txt
+      - run: python -m unittest discover -s tests -p test_native_agntcy.py -v
+  lane-b-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mubinmodi/UCSC_HACK_HARVESTNET
+          ref: f06b14822d4379bc790a2f1d8a4525ac94cb7649
+          path: runtime/lane-b
+          sparse-checkout: agents
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify pinned real rules with recorded calculators over HTTP
+        env:
+          PYTHONPATH: runtime/lane-b/agents/src
+          LANE_B_FIXTURES: runtime/lane-b/agents/tests/fixtures/negotiators
+        run: python -m unittest discover -s tests -p test_lane_b.py -v

@@ -51,5 +51,7 @@ came from AGNTCY.
 Reference implementation inspected at AGNTCY app-sdk 0.5.5:
 [factory and server examples](https://github.com/agntcy/app-sdk),
 [Directory SDK](https://docs.agntcy.org/dir/directory-sdk/).
-Docker/native Directory execution still needs Docker and a configured Directory
-daemon; neither is available on this development machine. Local HTTP is tested.
+The native App SDK process was also started successfully and exchanged an
+authenticated A2A message in a subprocess test. Docker/native Directory execution
+still needs Docker Engine and a configured Directory daemon; neither is available
+on this development machine. Compose syntax is validated separately.
