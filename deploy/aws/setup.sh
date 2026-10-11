@@ -548,6 +548,17 @@ health_check() {
   while [ "$waited" -lt 600 ]; do
     if curl -fsS --max-time 10 "https://$DOMAIN/api/health" >/dev/null 2>&1; then
       info "https://$DOMAIN/api/health answers"
+      # The approvals service also serves /platform and /human; a bad setting can crash it alone.
+      local tries=0
+      until curl -fsS --max-time 10 "https://$DOMAIN/platform/health" >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 8 ]; then
+          warn "https://$DOMAIN/platform/health is not answering: the approvals service is down (see deploy/aws/logs.sh approvals)"
+          return
+        fi
+        sleep 15
+      done
+      info "https://$DOMAIN/platform/health answers"
       return
     fi
     sleep 15; waited=$((waited + 15))
