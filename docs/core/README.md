@@ -36,8 +36,14 @@ and never resets existing household balances on restart.
 The default fixture is synthetic, and responses retain that label. A real
 deployment must supply reviewed organization facts, a real clock, and a fixture
 without scripted households. Changing a label does not turn recorded facts into
-live evidence. The existing AWS address serves the example skeleton, not this
-new core. AWS remains deferred by the user; no resources were provisioned here.
+live evidence. The original Lambda address serves the example skeleton. The
+team subsequently deployed the core at `https://18-217-110-223.sslip.io/api`
+and the household, donor-dashboard and results-strip pages on the same host.
+Read-only checks on October 11 verified HTTP 200 responses for health, fair share,
+food banks, published results and all three pages. API responses remain explicitly
+synthetic. These checks do not verify browser interactions, voice calls, SMS,
+n8n publication or Directory registration. AWS work remains deferred for this
+Codex session; no resources were provisioned here.
 
 ## #7: scenario harness and records
 
