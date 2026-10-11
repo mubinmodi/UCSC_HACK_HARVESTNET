@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
-from harvestnet_platform.approvals import ApprovalStore, CoreAPI, handler_for, pickup_message
+from harvestnet_platform.approvals import ApprovalStore, CoreAPI, handler_for, pickup_email
 from harvestnet_platform.budget import Budget, BudgetExceeded
 from harvestnet_platform.directory import search_capability
 from harvestnet_platform.http import request_json
@@ -29,7 +29,8 @@ def envelope():
 def notice():
     return {'committed': True, 'food_bank': 'City', 'items': [{'name': 'apples', 'pounds': 8}],
             'window': {'start': '18:00', 'end': '20:00'}, 'request_code': 'TEST',
-            'pickup_id': 'pickup-test', 'version': 1, 'release_url': 'https://example.invalid/release'}
+            'pickup_id': 'pickup-test', 'version': 1, 'release_url': 'https://example.invalid/household/#pickup=pickup-test&code=TEST',
+            'to': 'test@example.invalid'}
 
 
 class ResilienceTests(unittest.TestCase):
@@ -64,11 +65,14 @@ class ResilienceTests(unittest.TestCase):
         url = f'http://127.0.0.1:{server.server_port}/notifications/prepare'
         try:
             with self.assertRaises(HTTPError) as failure:
-                request_json(url, {**notice(), 'items': [None], 'to': '+18315550100'}, token='events')
+                request_json(url, {**notice(), 'items': [None]}, token='events')
             self.assertEqual(failure.exception.code, 400)
-            result = request_json(url, {**notice(), 'to': '+18315550100'}, token='events')
+            with self.assertRaises(HTTPError) as no_address:
+                request_json(url, {**notice(), 'to': '+18315550100'}, token='events')  # a phone is not an email
+            self.assertEqual(no_address.exception.code, 400)
+            result = request_json(url, notice(), token='events')
             self.assertFalse(result['sent'])
-            self.assertIn('8 lb apples', result['message'])
+            self.assertIn('8 lb apples', result['text'])
         finally:
             server.shutdown()
             server.server_close()
@@ -96,8 +100,9 @@ class ResilienceTests(unittest.TestCase):
             self.assertEqual(visited | {'Respond'}, set(nodes))
             self.assertEqual(flow['settings']['saveDataSuccessExecution'], 'none')
             self.assertEqual(flow['settings']['saveDataErrorExecution'], 'none')
+        self.assertEqual(set(workflows), {'approval-requests', 'pickup-emails', 'cannot-make-it', 'human-decisions'})
         decision = workflows['human-decisions']
-        self.assertFalse(any(node['type'] == 'n8n-nodes-base.twilio' for node in decision['nodes']))
+        self.assertFalse(any(node['type'] == 'n8n-nodes-base.emailSend' for node in decision['nodes']))
         api = next(node for node in decision['nodes'] if node['type'] == 'n8n-nodes-base.httpRequest')
         self.assertIn('HARVESTNET_CORE_URL', api['parameters']['url'])
         self.assertEqual(api['parameters']['jsonBody'], '={{ JSON.stringify($json.body) }}')
@@ -201,10 +206,10 @@ class ResilienceTests(unittest.TestCase):
                    [{'name': 'apples', 'pounds': math.nan}], [{'name': '', 'pounds': 8}]]
         for items in invalid:
             with self.subTest(items=items), self.assertRaises(ValueError):
-                pickup_message({**notice(), 'items': items})
-        for key, value in [('window', []), ('release_url', ''), ('version', True)]:
+                pickup_email({**notice(), 'items': items})
+        for key, value in [('window', []), ('release_url', ''), ('version', True), ('to', None)]:
             with self.subTest(key=key), self.assertRaises(ValueError):
-                pickup_message({**notice(), key: value})
+                pickup_email({**notice(), key: value})
 
     def test_capacity_query_nonfinite_values_rejected(self):
         for amount in (math.nan, math.inf, -math.inf, True):

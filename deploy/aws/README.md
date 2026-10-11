@@ -22,7 +22,9 @@ ALERT_EMAIL=you@example.org deploy/aws/setup.sh
 
 The first run takes about 15 to 25 minutes, mostly the machine installing Docker. At the end it prints the URLs, the monthly cost estimate and the teardown command, and writes them to `deploy/aws/outputs.json` (no secrets; ignored by Git).
 
-Optional settings (defaults in brackets): `PROFILE` [incubator], `REGION` [us-east-2], `GIT_REF` [main], `BUDGET_USD` [15], `INSTANCE_TYPE` [t4g.micro], `VOLUME_GB` [10], `CPU_CREDITS` [standard], `HARVESTNET_DOMAIN` [`<ip>.sslip.io`], `CLAUDE_RUN_CAP_USD` [0], `CLAUDE_TOTAL_CAP_USD` [same as the run cap]. Provider settings are stored in the secret only when you set them: `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `BEECEPTOR_BASE_URL`, `DEMO_SWITCH_TOKEN`, `N8N_DECISION_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN`, `CORE_API_TOKEN`. Run `deploy/aws/setup.sh --help` for the list.
+Optional settings (defaults in brackets): `PROFILE` [incubator], `REGION` [us-east-2], `GIT_REF` [main], `BUDGET_USD` [15], `INSTANCE_TYPE` [t4g.micro], `VOLUME_GB` [10], `CPU_CREDITS` [standard], `HARVESTNET_DOMAIN` [`<ip>.sslip.io`], `CLAUDE_RUN_CAP_USD` [0], `CLAUDE_TOTAL_CAP_USD` [same as the run cap]. Provider settings are stored in the secret only when set. For pickup email, set `N8N_PICKUP_WEBHOOK_URL`, `N8N_RELEASE_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN`, and `SES_TEST_RECIPIENTS`. For human review email, also set `N8N_APPROVAL_WEBHOOK_URL` and `APPROVER_EMAILS_JSON` (organization ID to authorized staff address). `SES_SENDER_EMAIL` is stored for configuration reference; set the same address as n8n Cloud's `HARVESTNET_EMAIL_FROM` variable. Run `deploy/aws/setup.sh --help` for the list.
+
+SES SMTP credentials must be created in n8n Cloud; the deployment does not create or copy them. The From identity and all recipients need verification while the us-east-2 SES account is in its sandbox. Adding addresses to `.env` alone does not verify them or send mail. The workflows in `integrations/n8n/` are inactive drafts until imported, connected to credentials, and published. Keep `SES_TEST_RECIPIENTS` limited to verified demo addresses.
 
 ## What it creates
 

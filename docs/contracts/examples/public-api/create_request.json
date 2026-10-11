@@ -32,7 +32,7 @@
         "snap": "yes",
         "channel": "web",
         "consent": true,
-        "phone": "+15555550142"
+        "email": "household@example.invalid"
       }
     },
     "response": {
@@ -46,7 +46,7 @@
         "received_this_week_lb": 0,
         "table_version": "0.1.0-placeholder",
         "chosen_food_bank_ids": [],
-        "texts": true,
+        "emails": true,
         "expires_at": "2026-10-20T11:05:00-07:00",
         "next": "choose_food_banks"
       }

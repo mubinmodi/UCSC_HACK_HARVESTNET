@@ -21,7 +21,7 @@ README = (VOICE / "README.md").read_text(encoding="utf-8")
 BY_NAME = {t["name"]: t for t in TOOLS["tools"]}
 
 # Contract fields the voice line deliberately never sends, with the reason recorded in tools.json.
-VOICE_OMITS = {"create_request": {"phone"}}
+VOICE_OMITS = {"create_request": {"email"}}
 
 REQUIRED_TOOLS = {"voice_intake", "create_request", "list_food_banks", "choose_food_banks"}
 
@@ -95,7 +95,7 @@ def test_voice_intake_sends_call_id_and_transcript_and_reads_the_agreed_fields()
     }
 
 
-def test_create_request_saves_the_draft_as_voice_with_boolean_consent_and_no_phone():
+def test_create_request_saves_the_draft_as_voice_with_boolean_consent_and_no_contact():
     tool = BY_NAME["create_request"]
     body = params(tool, "body")
     draft = example(BY_NAME["voice_intake"])["example"]["response"]["body"]["draft_request"]
@@ -107,6 +107,7 @@ def test_create_request_saves_the_draft_as_voice_with_boolean_consent_and_no_pho
     assert body["consent"]["value"] is True
     assert body["consent"]["type"] == "boolean"
     assert "phone" not in body
+    assert "email" not in body
     assert "request_code" in tool["response_fields"]
     assert "fair_share_lb" in tool["response_fields"]
 

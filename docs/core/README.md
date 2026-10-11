@@ -226,8 +226,8 @@ When the next call's worst case doesn't fit, no call is made: 503
 Local HTTP tests exercise browser-style request creation and the existing
 capability-verified human approval relay. Tests also cover pickup views, wrong
 request releases, retries, reassignment and fair-share conservation. Live
-ElevenLabs calls, n8n publication, SMS delivery and the actual frontend screens
-still require their configuration/deployment. No real SMS was sent.
+ElevenLabs calls, n8n publication, SES email delivery and the actual frontend screens
+still require their configuration/deployment. No real pickup email was sent.
 
 ## #23: join, cooler failure end to end (local only)
 

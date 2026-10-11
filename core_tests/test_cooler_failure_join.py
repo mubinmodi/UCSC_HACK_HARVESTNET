@@ -27,8 +27,8 @@ TOKENS = {'market': 'synthetic-market-staff', 'city': 'synthetic-city-staff', 'r
 EVENTS, DEMO = 'synthetic-events-token', 'synthetic-demo-switch'
 # The same Spanish name as the produce profile's name_es (ticket #6); passed explicitly here.
 ITEM_NAMES = {'es': {'romaine': 'lechuga romana'}}
-# Fictional 555 numbers, only to show where the core attaches a phone.
-PHONES = {'C4N6': '+15555550101', 'K7P4': '+15555550102'}
+# Reserved example.invalid addresses, only to show where the core attaches a household's email.
+EMAILS = {'C4N6': 'c4n6@example.invalid', 'K7P4': 'k7p4@example.invalid'}
 
 
 def call(method, url, body=None, token=None):
@@ -69,8 +69,8 @@ class CoolerFailureJoin(unittest.TestCase):
         self.clock = {'now': self.fault['at']}
         self.api = API(self.engine, clock=lambda: self.clock['now'], staff_tokens=TOKENS)
         with self.engine.records.transaction():
-            for code, phone in PHONES.items():
-                self.engine.records.put('phone', code, {'phone': phone, 'expires_at': self.engine.records.get('request', code)['expires_at']})
+            for code, email in EMAILS.items():
+                self.engine.records.put('email', code, {'email': email, 'expires_at': self.engine.records.get('request', code)['expires_at']})
         self.servers = []
         core = make_server(self.api, port=0)
         self.core_url = self.serve(core)
@@ -208,26 +208,34 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertEqual(romaine, [('city', 50.0, 'same_day_offer'), ('eastside', 150.0, None)])
         self.assertIn({'produce_id': 'apples', 'food_bank_id': 'city', 'pounds': 50.0}, lot['commitments'])
 
-        # 4. Affected households get a new text and can decline.
+        # 4. Affected households get a new pickup email and can decline.
         notices = self.texts()
         by_code = {n['request_code']: n for n in notices}
         self.assertEqual(sorted(by_code), ['C4N6', 'D9H3', 'G1L7', 'K7P4'])
         self.assertEqual({c: n['reply_expected'] for c, n in by_code.items()}, {'C4N6': True, 'D9H3': False, 'G1L7': False, 'K7P4': True})
-        self.assertTrue(all(n['food_bank_id'] == 'eastside' and n['version'] == self.new and n['decline_replies'] for n in notices))
-        self.assertIn('NO PUEDO IR', by_code['K7P4']['message'])
+        self.assertTrue(all(n['food_bank_id'] == 'eastside' and n['version'] == self.new and n['kind'] == 'pickup_changed' for n in notices))
+        self.assertIn('enlace No puedo ir', by_code['K7P4']['message'])
         self.assertIn('lechuga romana', by_code['K7P4']['message'])
-        self.assertIn("CAN'T MAKE IT", by_code['C4N6']['message'])
-        self.assertEqual({c: n['to'] for c, n in by_code.items() if n['to']}, PHONES)
+        self.assertIn("Can't make it link", by_code['C4N6']['message'])
+        self.assertEqual({c: n['to'] for c, n in by_code.items() if n['to']}, EMAILS)
         pickup = self.engine.records.get('pickup', by_code['C4N6']['pickup_id'])
         self.assertEqual((pickup['food_bank_id'], pickup['version'], pickup['moved_from_food_bank_id']), ('eastside', self.new, 'city'))
         self.assertEqual(by_code['C4N6']['items'], [{'name': 'romaine lettuce', 'pounds': pickup['pounds'], 'produce_id': 'romaine'}])
         prepared = self.join.prepare_texts(self.approvals_url, EVENTS, notices)
-        self.assertEqual(sorted(p['to'] for p in prepared), sorted(PHONES.values()))
-        self.assertTrue(all(p['sent'] is False and 'Eastside food bank' in p['message'] for p in prepared))
-        self.assertTrue(all('/pickups/' in p['message'] for p in prepared))
-        # The fixture's own reply: C4N6 can't make it. The household page's button releases it.
+        self.assertEqual(sorted(p['to'] for p in prepared), sorted(EMAILS.values()))
+        self.assertTrue(all(p['sent'] is False and p['mode'] == 'prepared_email' and 'Eastside food bank' in p['text'] for p in prepared))
+        mail = {p['to']: p for p in prepared}
+        self.assertEqual(mail[EMAILS['K7P4']]['subject'], 'HarvestNet: su recogida cambió')
+        self.assertIn('lechuga romana', mail[EMAILS['K7P4']]['text'])
+        self.assertIn("This isn't a food bank you chose.", mail[EMAILS['C4N6']]['text'])
+        self.assertTrue(all(n['release_url'] in mail[n['to']]['text'] for n in notices if n['to']))
+        # The fixture's own reply: C4N6 can't make it. The email's link opens the household
+        # page on this pickup; its "Can't make it" button calls release_pickup with the link's code.
+        from urllib.parse import parse_qs, urlsplit
+        link = {k: v[0] for k, v in parse_qs(urlsplit(by_code['C4N6']['release_url']).fragment).items()}
+        self.assertEqual((link['pickup'], link['code']), (by_code['C4N6']['pickup_id'], 'C4N6'))
         self.clock['now'] = '2026-10-13T18:00:00-07:00'
-        status, released = call('POST', f"{self.core_url}/pickups/{by_code['C4N6']['pickup_id']}/release", {'request_code': 'C4N6'})
+        status, released = call('POST', f"{self.core_url}/pickups/{link['pickup']}/release", {'request_code': link['code']})
         self.assertEqual((status, released['released']), (200, True))
         self.assertEqual(self.engine.records.get('pickup', by_code['C4N6']['pickup_id'])['status'], 'released')
 

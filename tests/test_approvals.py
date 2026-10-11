@@ -6,7 +6,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 import json
 import os
-from harvestnet_platform.approvals import ApprovalStore, CoreAPI, StaleApproval, handler_for, household_reply, pickup_message
+from harvestnet_platform.approvals import ApprovalStore, CoreAPI, StaleApproval, email_address, handler_for, pickup_email
 from harvestnet_platform.http import JsonHandler, request_json
 
 
@@ -40,43 +40,74 @@ class ApprovalTests(unittest.TestCase):
         with self.assertRaises(StaleApproval):
             store.view(link['token'])
 
-    def test_pickup_text_only_committed_and_verified_snap_tips(self):
+    def test_pickup_email_only_committed_and_verified_snap_tips(self):
         notice = {'committed': True, 'food_bank': 'Rural food bank', 'items': [{'name':'apples','pounds':8}],
                   'window': {'start':'18:00','end':'20:00'}, 'request_code':'ABCD', 'pickup_id':'pickup-1',
-                  'version':2, 'release_url':'https://demo.example/release', 'snap':'yes',
+                  'version':2, 'release_url':'https://demo.example/household/#pickup=pickup-1&code=ABCD&lang=en', 'snap':'yes',
+                  'to': 'household@example.invalid',
                   'market': {'name':'Example market', 'verified':True, 'nearby':True,
                              'source_url':'https://example.org/verified', 'verified_at':'2026-10-10T00:00:00Z'}}
         now = datetime(2026,10,11,tzinfo=timezone.utc)
-        text = pickup_message(notice, now=now)
-        for part in ('Rural food bank','8 lb apples','18:00','20:00','ABCD','Market Match'):
-            self.assertIn(part,text)
+        mail = pickup_email(notice, now=now)
+        self.assertEqual((mail['to'], mail['kind'], mail['language']), ('household@example.invalid', 'pickup_ready', 'en'))
+        self.assertEqual(mail['subject'], 'HarvestNet: your produce is ready at Rural food bank')
+        for part in ('Rural food bank','8 lb apples','18:00','20:00','ABCD','Market Match', "Can't make it?", notice['release_url']):
+            self.assertIn(part,mail['text'])
+        self.assertNotIn('Reply', mail['text'])  # nothing to reply to: the link does it
         for snap in ('no','not_said',None):
-            self.assertNotIn('Market Match',pickup_message({**notice,'snap':snap},now=now))
-        self.assertNotIn('Market Match',pickup_message({**notice,'market':{**notice['market'],'verified':False}},now=now))
-        self.assertNotIn('Market Match',pickup_message({**notice,'market':{**notice['market'],'verified_at':'2025-01-01T00:00:00Z'}},now=now))
+            self.assertNotIn('Market Match',pickup_email({**notice,'snap':snap},now=now)['text'])
+        self.assertNotIn('Market Match',pickup_email({**notice,'market':{**notice['market'],'verified':False}},now=now)['text'])
+        self.assertNotIn('Market Match',pickup_email({**notice,'market':{**notice['market'],'verified_at':'2025-01-01T00:00:00Z'}},now=now)['text'])
         with self.assertRaises(ValueError):
-            pickup_message({**notice,'committed':False},now=now)
+            pickup_email({**notice,'committed':False},now=now)
 
-    def test_spanish_pickup_text_uses_the_same_facts_and_reply_words(self):
-        """Ticket #6: a Spanish household gets its text in Spanish; the numbers are unchanged."""
-        notice = {'committed': True, 'language': 'es', 'food_bank': 'Rural food bank', 'items': [{'name':'manzanas','pounds':8}],
+    def test_spanish_pickup_email_uses_the_same_facts(self):
+        """Ticket #6: a Spanish household gets its email in Spanish; the numbers are unchanged."""
+        notice = {'committed': True, 'language': 'es', 'food_bank': 'Rural food bank', 'items': [{'name':'manzanas','pounds':8},{'name':'papas','pounds':4}],
+                  'window': {'start':'2026-10-14T18:00:00-07:00','end':'2026-10-14T20:00:00-07:00'}, 'request_code':'ABCD', 'pickup_id':'pickup-1',
+                  'version':2, 'release_url':'https://demo.example/household/#pickup=pickup-1&code=ABCD&lang=es', 'to': 'hogar@example.invalid'}
+        mail = pickup_email(notice)
+        self.assertEqual(mail['subject'], 'HarvestNet: sus productos están listos en Rural food bank')
+        for part in ('8 lb de manzanas y 4 lb de papas','Rural food bank','miércoles 14 de octubre, de 6 p. m. a 8 p. m.','Su código: ABCD',
+                     '¿No puede ir?', 'No puedo ir', notice['release_url'], 'se borra con su solicitud después de 7 días'):
+            self.assertIn(part,mail['text'])
+        self.assertNotIn('Responda', mail['text'])
+        english = pickup_email({**notice, 'language': 'en'})['text']
+        self.assertIn('8 lb manzanas and 4 lb papas', english)
+        self.assertIn('Wednesday, October 14, 6 pm to 8 pm', english)
+
+    def test_changed_and_released_emails(self):
+        changed = {'kind': 'pickup_changed', 'committed': True, 'language': 'en', 'food_bank': 'Eastside food bank',
+                   'items': [{'name': 'romaine lettuce', 'pounds': 4}], 'window': {'start': '2026-10-14T01:00:00Z', 'end': '2026-10-14T03:00:00Z'},
+                   'request_code': 'C4N6', 'pickup_id': 'pk-1', 'version': 4, 'reply_expected': True,
+                   'release_url': 'https://demo.example/household/#pickup=pk-1&code=C4N6&lang=en', 'to': 'c4n6@example.invalid'}
+        mail = pickup_email(changed)
+        self.assertEqual(mail['subject'], 'HarvestNet: your pickup changed')
+        self.assertIn('Your pickup changed. It is now at Eastside food bank.', mail['text'])
+        self.assertIn("This isn't a food bank you chose.", mail['text'])
+        self.assertNotIn("This isn't a food bank you chose.", pickup_email({**changed, 'reply_expected': False})['text'])
+        thanks = pickup_email({'kind': 'pickup_released', 'released': True, 'pickup_id': 'pk-1', 'language': 'es', 'to': 'c4n6@example.invalid'})
+        self.assertEqual(thanks['subject'], 'HarvestNet: gracias por avisarnos')
+        self.assertIn('Su porción pasará a otra familia.', thanks['text'])
+        with self.assertRaises(ValueError):
+            pickup_email({'kind': 'pickup_released', 'released': False, 'pickup_id': 'pk-1', 'to': 'c4n6@example.invalid'})
+        with self.assertRaises(ValueError):
+            pickup_email({**changed, 'kind': 'sms'})
+
+    def test_pickup_email_refuses_bad_addresses_and_header_injection(self):
+        notice = {'committed': True, 'food_bank': 'Rural food bank', 'items': [{'name':'apples','pounds':8}],
                   'window': {'start':'18:00','end':'20:00'}, 'request_code':'ABCD', 'pickup_id':'pickup-1',
-                  'version':2, 'release_url':'https://demo.example/release'}
-        text = pickup_message(notice)
-        for part in ('8 lb de manzanas','Rural food bank','18:00','20:00','ABCD','SÍ','NO PUEDO IR'):
-            self.assertIn(part,text)
-        self.assertNotIn('Reply YES',text)
-
-    def test_release_calls_core_operation_with_pickup_token(self):
-        core = CoreAPI('https://core.example',{'market':'market-staff','city':'city-staff'})
-        with patch('harvestnet_platform.approvals.request_json', return_value={'released':True}) as call:
-            self.assertTrue(core.release('ABCD','pickup-1','pickup-token')['released'])
-            self.assertEqual(call.call_args.args[0], 'https://core.example/pickups/pickup-1/release')
-            self.assertEqual(call.call_args.args[1], {'request_code':'ABCD'})
-            self.assertEqual(call.call_args.kwargs['token'],'pickup-token')
-            core.release('ABCD','pickup-1')
-            self.assertIsNone(call.call_args.kwargs['token'])  # never a staff token
-        self.assertFalse(CoreAPI().release('ABCD','pickup-1','token')['released'])
+                  'version':2, 'release_url':'https://demo.example/household/#pickup=pickup-1&code=ABCD&lang=en', 'to': 'a@example.invalid'}
+        self.assertEqual(email_address(' A@Example.INVALID '), 'A@example.invalid')
+        for to in (None, '', '+18315550101', 'a@b', 'a@example.invalid\r\nBcc: b@example.invalid', 'a@example.invalid, b@example.invalid'):
+            with self.subTest(to=to), self.assertRaises(ValueError) as refused:
+                pickup_email({**notice, 'to': to})
+            if to:
+                self.assertNotIn(to, str(refused.exception))
+        for field, value in (('food_bank', 'Rural\r\nBcc: b@example.invalid'), ('release_url', 'javascript:alert(1)'),
+                             ('items', [{'name': 'apples\nBcc: x', 'pounds': 8}])):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                pickup_email({**notice, field: value})
 
     def test_n8n_only_relays_an_explicit_bound_human_receipt(self):
         store = ApprovalStore()
@@ -115,6 +146,44 @@ class ApprovalTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join()
+
+    def test_issued_review_link_can_be_emailed_without_exposing_recipient_in_response(self):
+        store = ApprovalStore()
+        handler = handler_for(store, CoreAPI(), 'events-token', 'https://demo.example',
+                              approver_emails={'market':'staff@example.org'},
+                              approval_webhook='https://n8n.example/webhook/approval',
+                              webhook_token='outbound-token', test_recipients=['staff@example.org'])
+        base, stop = serve(handler)
+        try:
+            with patch('harvestnet_platform.approvals.request_json', return_value={'sent':True}) as send:
+                result = request_json(base+'/approval-requests',
+                                      {'lot_id':'lot','version':1,'terms':{'lb':8},'organizations':['market']},
+                                      token='events-token')
+            link = result['requests'][0]
+            self.assertEqual(link['email_delivery'],'sent')
+            self.assertNotIn('staff@example.org',str(result))
+            self.assertIn('/human/review?token=',link['decision_url'])
+            self.assertEqual(send.call_args.args[0],'https://n8n.example/webhook/approval')
+            self.assertEqual(send.call_args.args[1]['to'],'staff@example.org')
+            self.assertEqual(send.call_args.kwargs['token'],'outbound-token')
+        finally:
+            stop()
+
+    def test_approval_email_needs_an_explicit_test_recipient_allowlist(self):
+        handler = handler_for(ApprovalStore(), CoreAPI(), 'events-token', 'https://demo.example',
+                              approver_emails={'market':'staff@example.org'},
+                              approval_webhook='https://n8n.example/webhook/approval',
+                              webhook_token='outbound-token')
+        base, stop = serve(handler)
+        try:
+            with patch('harvestnet_platform.approvals.request_json') as send:
+                result = request_json(base+'/approval-requests',
+                                      {'lot_id':'lot','version':1,'terms':{'lb':8},'organizations':['market']},
+                                      token='events-token')
+            self.assertEqual(result['requests'][0]['email_delivery'],'outside_test_allowlist')
+            send.assert_not_called()
+        finally:
+            stop()
 
 
 def serve(handler):
@@ -248,54 +317,40 @@ class ContractTests(unittest.TestCase):
         bare = link['terms_hash'].removeprefix('sha256:')
         self.assertEqual(store.decide(link['token'], 'approve', 1, bare, True)['decision'], 'approve')
 
-    def test_sms_replies_map_from_the_sending_phone_to_its_pickup(self):
-        store = ApprovalStore(reply_key='reply-test-key')
-        core = CoreAPI('https://core.example', {'market': 'market-staff'})
-        bridge, stop = serve(handler_for(store, core, 'events', 'http://localhost'))
+    def test_prepare_returns_one_email_and_keeps_nothing(self):
+        store = ApprovalStore()
+        bridge, stop = serve(handler_for(store, CoreAPI(), 'events', 'http://localhost'))
         notice = {'committed': True, 'food_bank': 'Rural food bank', 'items': [{'name': 'apples', 'pounds': 4}],
                   'window': {'start': '2026-10-14T18:00:00-07:00', 'end': '2026-10-14T20:00:00-07:00'},
                   'request_code': 'K7P4', 'pickup_id': 'pk-1013-0001', 'version': 3,
-                  'release_url': 'https://households.example.invalid/pickups/pk-1013-0001', 'to': '+1 (831) 555-0101'}
+                  'release_url': 'https://households.example.invalid/household/#pickup=pk-1013-0001&code=K7P4&lang=en',
+                  'to': 'k7p4@example.invalid'}
         try:
+            with self.assertRaises(HTTPError) as unauthenticated:
+                request_json(bridge + '/notifications/prepare', notice)
+            self.assertEqual(unauthenticated.exception.code, 401)
             prepared = request_json(bridge + '/notifications/prepare', notice, token='events')
-            self.assertIn('Reply YES', prepared['message'])
-            self.assertIn("CAN'T MAKE IT", prepared['message'])
-            twilio = {'From': '+18315550101'}
-            yes = request_json(bridge + '/household/replies', {**twilio, 'Body': 'Yes!'}, token='events')
-            self.assertEqual((yes['status'], yes['released'], yes['to']), ('confirmed', False, '+18315550101'))
-            self.assertIn('Rural food bank', yes['message'])
-            self.assertIn('K7P4', yes['message'])
-            other = request_json(bridge + '/household/replies', {**twilio, 'Body': 'what time?'}, token='events')
-            self.assertEqual(other['status'], 'ignored')
-            stranger = request_json(bridge + '/household/replies', {'From': '+18315550199', 'Body': "can't make it"}, token='events')
-            self.assertEqual((stranger['status'], stranger['released']), ('no_open_pickup', False))
-            released = {'pickup_id': 'pk-1013-0001', 'status': 'released', 'released': True, 'released_lb': 4,
-                        'message': 'Thanks for telling us. Your portion will go to another family.'}
-            with patch('harvestnet_platform.approvals.request_json', return_value=released) as call:
-                result = request_json(bridge + '/household/replies', {**twilio, 'Body': "Can’t make it"}, token='events')
-            self.assertTrue(result['released'])
-            self.assertEqual(call.call_args.args[0], 'https://core.example/pickups/pk-1013-0001/release')
-            self.assertEqual(call.call_args.args[1], {'request_code': 'K7P4'})
-            self.assertEqual(result['to'], '+18315550101')
-            # Released: a second reply finds nothing open.
-            again = request_json(bridge + '/household/replies', {**twilio, 'Body': "can't make it"}, token='events')
-            self.assertEqual(again['status'], 'no_open_pickup')
-            # The phone itself is never stored.
+            self.assertEqual((prepared['to'], prepared['mode'], prepared['sent']), ('k7p4@example.invalid', 'prepared_email', False))
+            self.assertIn('Wednesday, October 14, 6 pm to 8 pm', prepared['text'])
+            self.assertIn(notice['release_url'], prepared['text'])
+            # The SMS reply route is gone; there is nothing to reply to.
+            with self.assertRaises(HTTPError) as gone:
+                request_json(bridge + '/household/replies', {'From': '+18315550101', 'Body': "can't make it"}, token='events')
+            self.assertEqual(gone.exception.code, 404)
+            # The address is never stored here.
             dump = '\n'.join(store.db.iterdump())
-            for fragment in ('5550101', '8315550101'):
-                self.assertNotIn(fragment, dump)
+            self.assertNotIn('k7p4@example.invalid', dump)
+            self.assertNotIn('reply_bindings', dump)
         finally:
             stop()
 
-    def test_reply_answers_the_latest_text_and_offline_core_releases_nothing(self):
-        store = ApprovalStore(reply_key='k')
-        base = {'committed': True, 'food_bank': 'City food bank', 'items': [{'name': 'romaine', 'pounds': 3}],
-                'window': {'start': '18:00', 'end': '20:00'}, 'version': 4, 'release_url': 'https://example.invalid/r', 'to': '8315550102'}
-        for pickup in ('pk-1', 'pk-2'):
-            store.bind_reply({**base, 'pickup_id': pickup, 'request_code': 'CODE'})
-        self.assertEqual(store.reply_binding('+18315550102')['pickup_id'], 'pk-2')
-        status, result = household_reply(store, CoreAPI(), {'from': '+18315550102', 'text': 'no puedo ir'})
-        self.assertEqual((status, result['released'], result['status']), (200, False, 'release_pending'))
-        self.assertEqual(store.reply_binding('+18315550102')['pickup_id'], 'pk-2')  # kept for a retry
-        with self.assertRaises(ValueError):
-            household_reply(store, CoreAPI(), {'text': "can't make it"})
+    def test_approval_requests_carry_an_email_subject(self):
+        store = ApprovalStore()
+        bridge, stop = serve(handler_for(store, CoreAPI(), 'events', 'http://localhost'))
+        try:
+            issued = request_json(bridge + '/approval-requests', {'lot_id': 'lot-1', 'version': 2, 'terms': {'lb': 8}, 'organizations': ['city']}, token='events')
+            link = issued['requests'][0]
+            self.assertEqual(link['subject'], 'HarvestNet: review draft version 2 for lot lot-1')
+            self.assertIn(link['decision_url'], link['message'])
+        finally:
+            stop()

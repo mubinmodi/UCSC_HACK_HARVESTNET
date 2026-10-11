@@ -1,6 +1,6 @@
 # HarvestNet MVP design
 
-**October 10, 2026. Proposed by Claude from the user's decisions in ADRs 0006–0009.** This is the design for the smaller, buildable version of HarvestNet: **raw fresh produce** for **low-income households**, collected at **food banks the household chooses**, with a **SNAP-style fair share**. It keeps the general architecture of the frozen v1 framework (ADRs 0001–0005, with the full whole-chain framework now in [future scope](../future%20scope/whole-chain%20design/CURRENT_DESIGN.md)). Everything here is design only. No code has been written, and implementation still needs the user's go-ahead.
+**October 10, 2026. Proposed by Claude from the user's decisions in ADRs 0006–0009; updated October 11 for the user's email decision.** This is the design for the smaller, buildable version of HarvestNet: **raw fresh produce** for **low-income households**, collected at **food banks the household chooses**, with a **SNAP-style fair share**. It keeps the general architecture of the frozen v1 framework (ADRs 0001–0005, with the full whole-chain framework now in [future scope](../future%20scope/whole-chain%20design/CURRENT_DESIGN.md)). This document describes agreed decisions and proposed behavior; it does not assert that every workflow is deployed.
 
 Status labels: **Decided** means the user confirmed it. **Proposed** means it's Claude's design, open for review by Codex and the user. All example numbers are synthetic.
 
@@ -20,7 +20,7 @@ The hard part is splitting it fairly and fast:
 
 HarvestNet gives each donor and each food bank its own AI agent. The agents negotiate how each batch of produce is split, item by item, and who moves it. An advocate agent speaks for the households furthest below their **fair share**. That share works like a SNAP benefit: a weekly produce amount that grows with household size.
 
-Households ask for produce by web page or phone call, choose the food banks they'll collect from, and confirm when they're coming.
+Households ask for produce by web page or phone call, choose the food banks they'll collect from, and use their code at pickup. They can release a pickup they cannot collect.
 
 **Tagline:** Every organization keeps its own keys. The food still moves.
 
@@ -47,7 +47,7 @@ Region: Central Coast California (Decided). Sponsors: Cisco AGNTCY, Beeceptor, E
 
 | User | What they do | How they reach HarvestNet | Status |
 |---|---|---|---|
-| **Household** (low-income) | Gives household size, pickup times, fridge space, and anything it can't eat. Optionally says it receives SNAP/CalFresh. Chooses food banks. Hears or sees what's ready. Confirms pickup. | Mobile web page, or the ElevenLabs voice line. Text alerts through n8n. No app, no account, no name. | Decided |
+| **Household** (low-income) | Gives household size, pickup times, fridge space, and anything it can't eat. Optionally says it receives SNAP/CalFresh. Chooses food banks. Hears or sees what's ready. Shows a code at pickup. | Mobile web page or the ElevenLabs voice line. Optional pickup emails through n8n and Amazon SES. No app, no account, no name. | Decided |
 | **Donor staff** (farm, packer, distributor, grocer, farmers market, food bank with produce overflow) | Report surplus produce. Say whether they can drop it off. Approve the plan. | The same web page, or the voice line | Proposed |
 | **Food bank manager** | Sets storage, pickup hours, and truck availability. Approves incoming produce. Sees disagreements. Marks pickups. | Food bank dashboard, plus n8n approval messages | Proposed |
 
@@ -59,7 +59,7 @@ There's no driver role and no coordinator role (ADR 0009). Households **collect 
 |---|---|---|
 | **Fair share** | Each household has a weekly produce amount that grows with household size, like a SNAP benefit. It's the fairness yardstick: agents aim to bring every household toward its fair share, starting with whoever is furthest below. | Decided (idea). The table below is Proposed. |
 | **SNAP as an eligibility signal** | A household may say it receives SNAP/CalFresh. It's optional and self-reported, with no proof. Food banks can use it under their own rules: many pantries accept SNAP participation as a sign of eligibility (verify with each food bank). | Decided (idea). Handling is Proposed. |
-| **SNAP produce programs** | Farmers markets join as donors, so unsold produce at market close comes to HarvestNet. Pickup texts can tell SNAP households where their CalFresh dollars are matched for fresh produce, such as California's Market Match at farmers markets. Verify current participating markets. | Decided (idea). Details are Proposed. |
+| **SNAP produce programs** | Farmers markets join as donors, so unsold produce at market close comes to HarvestNet. Pickup emails can tell SNAP households where their CalFresh dollars are matched for fresh produce, such as California's Market Match at farmers markets. Verify current participating markets. | Decided (idea). Details are Proposed. |
 
 ### Fair-share table (Proposed, synthetic numbers)
 
@@ -172,7 +172,7 @@ flowchart LR
     B1 -.-> Dir
 
     Room --> Records["Shared records<br/>draft versions, holds, approvals, outcomes"]
-    Records --> Notify["n8n<br/>text alerts and approvals"]
+    Records --> Notify["n8n Cloud + Amazon SES<br/>pickup emails and approvals"]
     Notify --> Web
     Records --> Dash["Donor and food bank dashboards"]
     Records --> Eval["Evaluation runner"]
@@ -186,7 +186,7 @@ flowchart LR
 - Requests flow to the **food banks the household chose** (as counts) and to the **advocate** (as pooled fair-share gaps).
 - **Donor and food bank agents negotiate** in the AGNTCY room, including who moves the produce. The **Directory** finds food banks by capability, for example cold space, when one fails.
 - The **fair-share table** is a published shared policy, applied by calculators. It's not an agent and decides nothing.
-- Everything lands in **shared records**. **n8n** turns records into text alerts and approvals. **Dashboards** and the **evaluation runner** read records but can't change decisions.
+- Everything lands in **shared records**. **n8n Cloud** sends pickup and human-review emails through Amazon SES; it never decides for an Organization. **Dashboards** and the **evaluation runner** read records but can't change decisions. **Decided (user, October 11, 2026):** replace pickup texts with email. The address is optional and write-only; without one, the household can still use the web page.
 - **Beeceptor** stands in for each organization's own systems: inventory, storage, cooler status, and truck schedule.
 
 ### Inside every agent
@@ -298,9 +298,9 @@ sequenceDiagram
     alt Produce is already committed at a chosen food bank
         Desk->>Household: Pickup time, food bank, items, and code
     else Nothing yet
-        Desk->>Household: You are on the list, we will text you
+        Desk->>Household: You are on the list; we can email you if you give an address
         Rec->>Notify: Alert when produce is committed at a chosen food bank
-        Notify->>Household: Text with food bank, time, items, and code
+        Notify->>Household: Email with food bank, time, items, and code (if address supplied)
     end
 ```
 
@@ -359,10 +359,11 @@ sequenceDiagram
     N8->>Household: 8 lb apples and potatoes ready, 6 to 8 pm, your code
     Household->>Bank: Shows code at pickup
     Bank->>Rec: Pickup confirmed, fair-share balance updated
-    alt Household replies it cannot come
-        Household->>N8: Cannot make it
-        N8->>Rec: Release the portion
-        Rec->>N8: Offer it to the next household furthest below fair share
+    alt Household cannot come
+        Household->>Household: Opens email link on the pickup page
+        Household->>Rec: Taps Can't make it and confirms release
+        Rec->>Rec: Offer it to the next household furthest below fair share
+        Rec->>N8: Send release confirmation email, if address supplied
     end
     opt Household said it receives SNAP
         N8->>Household: Tip, your CalFresh dollars are matched at a nearby farmers market
@@ -409,7 +410,7 @@ sequenceDiagram
 
 - **Reason card example:** "Rural food bank: has cold space, but pickup ends at 6 pm. Its households can't collect romaine tonight. Not chosen."
 - **The produce profile decides what has to move.** Romaine must leave the failed cooler; apples and potatoes can stay.
-- Households who chose the city food bank get a text with the new location. If they didn't choose eastside, they can reply to accept or decline, and their portion is released if they decline.
+- Households who chose the city food bank get an email with the new location if they provided an address. If they didn't choose eastside, the email explains the change and offers a **Can't make it** link to release their portion. Opening the link alone changes nothing; the household must explicitly confirm the release on the page. **Decided (user, October 11, 2026):** use email through Amazon SES instead of text replies.
 - Every changed plan needs **fresh approvals**.
 
 ### Workflow 5: condition doubt or no agreement
@@ -444,14 +445,14 @@ A **recalled lot** is never offered. Produce that isn't fit for people is record
    - *Is your fridge space limited?*
    - Neighborhood, and anything you can't eat.
    - *Do you receive SNAP/CalFresh?* (Yes / No / Prefer not to say)
-   - Language (English or Spanish), and an optional phone number for texts.
+   - Language (English or Spanish), and an optional email address for pickup messages. The address is write-only and deleted with the request after seven days. **Decided (user, October 11, 2026).**
 2. **Choose your food banks.** Food banks nearby with pickup hours that fit, and what's committed there now. Badges such as *Keep cold* and *Use within 2 days*.
 3. **Your pickup.**
    - Food bank, time window, items and pounds, and a short code.
    - This week's balance, for example "8 of 12 lb received."
-   - A *Can't make it* button.
+   - A *Can't make it* button with an explicit confirmation. An emailed link opens this pickup on the page but does not release it by itself.
 
-Large text and one question per screen. It works on old phones and slow connections, and stores nothing in the browser beyond the current session.
+Large text and one question per screen. It works on old phones and slow connections. Form answers live in memory during the visit; an emailed pickup link carries its code in the URL fragment.
 
 ### Voice line (ElevenLabs)
 
@@ -507,7 +508,7 @@ Households in need deserve their data handled with care. Proposed defaults:
   - Agents see it only as counts.
   - It's deleted with the request.
 - **No income questions or verification.** Food banks keep their own eligibility rules.
-- **Phone numbers are optional,** used only for alerts, and deleted when the request expires.
+- **Email addresses are optional,** used only for pickup messages, never returned by the API, and deleted when the request expires. **Decided (user, October 11, 2026).**
 - **Requests expire after 7 days**, matching the weekly fair share. Results keep only counts.
 - **Consent** is asked in plain words before saving, on both the web page and the voice line.
 - **Agents never see individual households.**
@@ -524,7 +525,7 @@ Households in need deserve their data handled with care. Proposed defaults:
 |---|---|
 | **Cisco AGNTCY** | A2A messages in the negotiation room, and Directory discovery of food banks by capability. Skip SLIM group chat, which is marked experimental. |
 | **ElevenLabs** | The voice line for households and donors, with English and Spanish read-back |
-| **n8n** | Text alerts to households, approval requests to donor staff and food bank managers, the *Can't make it* release, SNAP produce-program tips |
+| **n8n** | Pickup and human-review emails through Amazon SES, and verified SNAP produce-program tips. The household page sends an explicit *Can't make it* release to the core. |
 | **Beeceptor** | Mock donor inventory, food bank storage, cooler status, and truck schedules, with a switch that makes a cooler fail |
 | **AWS** | Hosting |
 | **Claude API** | Negotiators, the advocate, and the front-desk assistant |
@@ -587,8 +588,8 @@ All four run on the same inputs.
 2. A farmers market manager reports end-of-day surplus: 300 lb of apples, 200 lb of romaine, 400 lb of potatoes.
 3. Food bank agents bid item by item. The advocate argues for more apples to the rural food bank, whose households are furthest below fair share. The donor offers one drop-off route, and the city food bank collects the romaine in its refrigerated truck. The draft changes on screen, with reasons.
 4. Managers approve live through n8n.
-5. The city food bank's cooler fails (Beeceptor switch). Its agent finds eastside through the Directory, with reason cards. The romaine moves, everyone re-approves, and affected households get a text.
-6. The parent gets a text: 8 lb of apples and potatoes at the rural food bank, 6 to 8 pm, with a code. Plus a tip about Market Match at a nearby farmers market.
+5. The city food bank's cooler fails (Beeceptor switch). Its agent finds eastside through the Directory, with reason cards. The romaine moves, everyone re-approves, and affected households with an email address get a pickup-change email.
+6. The parent gets an email: 8 lb of apples and potatoes at the rural food bank, 6 to 8 pm, with a code and a **Can't make it** link. Plus a tip about Market Match at a nearby farmers market.
 7. The results strip shows pounds wasted, fair-share coverage, and households reached, against first-come-first-served.
 
 ## 18. Build order (Proposed)

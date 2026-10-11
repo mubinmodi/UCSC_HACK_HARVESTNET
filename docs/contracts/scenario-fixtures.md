@@ -24,7 +24,7 @@ Example: [`examples/scenario-normal-afternoon.json`](examples/scenario-normal-af
 | `donors` | Each donor's own facts: travel minutes to each food bank, and its drop-off ability (window, refrigerated or not, capacity, food banks on its routes). `drop_off` is `null` when it can't deliver. |
 | `food_banks` | Each food bank's own facts: area, `low_access` (USDA Food Access Research Atlas context), storage over time (`cold_free_lb`, `dry_free_lb` per interval), dated pickup windows, and its truck (or `null`). |
 | `travel_minutes_between_food_banks` | Recorded travel times, used when produce moves after a cooler failure. |
-| `requests` | Households' requests. No names, addresses, or phone numbers. See below. |
+| `requests` | Households' requests. No names, addresses, phone numbers, or email addresses. See below. |
 | `surplus_offers` | Each donor's surplus lot. See below. |
 | `faults` | Timed problems, such as a cooler failure. |
 | `humans` | Scripted human decisions, standing in for each organization's staff. |

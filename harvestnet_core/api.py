@@ -10,6 +10,7 @@ from .engine import Engine, jsonable
 from . import changes
 from .protocol import Conflict, dt, terms_hash, named, number
 from .records import NotFound
+from .contact import email_address
 
 
 class Unauthorized(ValueError):
@@ -44,6 +45,9 @@ OPERATIONS = (
     ('propose_change', 'POST', '/lots/{lot_id}/changes', 'proposed'),
 )
 
+# The public API contract this serves. v0.2: households give an optional email, not a phone.
+CONTRACT_VERSION = "contract-v0.2"
+
 # Voice intake calls per process in a sliding window (#22). Each call can cost a model call.
 VOICE_RATE_LIMIT = (20, 60.0)
 
@@ -59,7 +63,8 @@ SAVED_MESSAGE = {
 
 
 class API:
-    def __init__(self, engine, *, clock=None, staff_tokens=None, extractor=None, voice_rate_limit=VOICE_RATE_LIMIT, monotonic=time.monotonic):
+    def __init__(self, engine, *, clock=None, staff_tokens=None, extractor=None, voice_rate_limit=VOICE_RATE_LIMIT, monotonic=time.monotonic,
+                 household_page_url=None):
         self.engine=engine
         self.records=engine.records
         self.clock=clock or (lambda: datetime.now(timezone.utc).isoformat())
@@ -78,6 +83,10 @@ class API:
             raise ValueError("voice rate window must be positive seconds")
         self.monotonic=monotonic
         self.voice_calls=deque()
+        self.household_page_url=household_page_url
+        self.email_dispatcher_thread=None
+        if household_page_url:
+            self.records.enable_email_outbox()
 
     def authorize(self, owner, token):
         expected=self.tokens.get(owner)
@@ -97,7 +106,8 @@ class API:
                 for r in expired:
                     code=r["request_code"]
                     self.records.delete("request",code)
-                    self.records.delete("phone",code)
+                    self.records.delete("email",code)
+                    self.records.delete("phone",code)  # retired with contract-v0.2; kept so old records still go
                     for p in self.records.all("pickup"):
                         if p["request_code"]==code:
                             self.records.delete("pickup",p["pickup_id"])
@@ -220,7 +230,7 @@ class API:
             if p["status"]!="released":
                 p["status"]="released"
                 self.records.put("pickup",pid,p)
-                self.records.event(p["lot_id"],self.engine.now,"pickup_released",{"pickup_id":pid,"pounds":p["pounds"]})
+                self.records.event(p["lot_id"],self.engine.now,"pickup_released",{"pickup_id":pid,"pounds":p["pounds"],"source":"household"})
                 lot=self.records.get("lot",p["lot_id"])
                 bank=self.records.get("bank",p["food_bank_id"])
                 bank={**bank,'pickup_windows':[p['window']]}
@@ -234,6 +244,8 @@ class API:
                         r=next(r for r in rs if r["request_code"]==part["request_code"])
                         new_id=f"pk-{secrets.token_hex(8)}"
                         new={**p,"pickup_id":new_id,"request_code":r["request_code"],"pounds":part["pounds"],"items":[{**item,"pounds":part["pounds"]}],"window":self.engine.eligible(r,bank,original,max(dt(self.engine.now),dt(p["window"]["start"]))),"status":"committed"}
+                        new.pop('moved_from_food_bank_id',None)
+                        new.pop('reply_expected',None)
                         self.records.put("pickup",new_id,new)
                         self.records.event(p["lot_id"],self.engine.now,"pickup_notice",new)
             try:
@@ -258,9 +270,11 @@ class API:
             if len(digest)==64 and all(c in '0123456789abcdef' for c in digest):
                 b['terms_hash']='sha256:'+digest
         if method=='GET' and path==['']:
-            return 200,{"contract_version":"contract-v0.1","operations":[{"operation":o,"method":m,"path":p,"status":st} for o,m,p,st in OPERATIONS]}
+            return 200,{"contract_version":CONTRACT_VERSION,"operations":[{"operation":o,"method":m,"path":p,"status":st} for o,m,p,st in OPERATIONS]}
         if method=='GET' and root=='health':
-            return 200,{"status":"ok","contract_version":"contract-v0.1"}
+            if self.email_dispatcher_thread is not None and not self.email_dispatcher_thread.is_alive():
+                return 503,{"error":{"code":"email_worker_unavailable","message":"Pickup email delivery is unavailable"}}
+            return 200,{"status":"ok","contract_version":CONTRACT_VERSION}
         if method=='GET' and root=='fair-share':
             share=calc.fair_share(int(q.get('household_size',0)))
             return 200,{"household_size":share.household_size,"fair_share_lb":share.pounds,"period":share.period,"table_version":share.table_version,"is_placeholder":share.is_placeholder,"wording":desk.fair_share_wording(share.pounds,desk.Language(q.get('language','en')))}
@@ -281,6 +295,9 @@ class API:
         if root=='requests' and method=='POST' and (len(path)==1 or path[1]=='preview'):
             if any(k in b for k in ('name','address','income')):
                 raise ValueError("names, addresses and income are not collected")
+            if 'phone' in b:
+                # contract-v0.2: pickup messages go by email, not SMS (user decision, October 11, 2026).
+                raise ValueError("phone numbers are no longer collected; give an optional email for pickup messages")
             draft=desk.draft_from_form(b,desk.Language(b.get('language','en')))
             if len(path)>1:
                 return 200,self.preview(draft)
@@ -289,6 +306,8 @@ class API:
             if b.get('channel','web') not in ('web','voice'):
                 raise ValueError("channel must be web or voice")
             share=calc.fair_share(draft.household_size)
+            # Optional, write-only, for pickup emails only. Checked before anything is saved.
+            email=email_address(b['email']) if b.get('email') not in (None,'') else None
             with self.records.transaction():
                 code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
                 try:
@@ -299,9 +318,9 @@ class API:
                     raise Conflict("request code collision; retry")
                 r={**draft.to_dict(),"request_code":code,"fair_share_lb":share.pounds,"table_version":share.table_version,"received_this_week_lb":0,"initial_received_lb":0,"chosen_food_bank_ids":[],"expires_at":(dt(self.engine.now)+timedelta(days=7)).isoformat(),"submitted_at":self.engine.now,"channel":b.get('channel','web'),"consent":True}
                 self.records.put('request',code,r)
-                if b.get('phone'):
-                    self.records.put('phone',code,{"phone":b['phone'],"expires_at":r['expires_at']})
-            return 201,{k:r[k] for k in ('request_code','household_size','fair_share_lb','received_this_week_lb','table_version','chosen_food_bank_ids','expires_at')} | {"texts":bool(b.get('phone')),"next":"choose_food_banks"}
+                if email:
+                    self.records.put('email',code,{"email":email,"expires_at":r['expires_at']})
+            return 201,{k:r[k] for k in ('request_code','household_size','fair_share_lb','received_this_week_lb','table_version','chosen_food_bank_ids','expires_at')} | {"emails":email is not None,"next":"choose_food_banks"}
         if root=='requests' and len(path)>=2:
             r=self.records.get('request',path[1])
             if method=='PUT' and path[2:]==['food-banks']:

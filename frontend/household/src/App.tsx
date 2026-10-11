@@ -20,6 +20,7 @@ import {
 import { ExampleNotice } from './components';
 import { emptyForm, toAnswers, toCreateBody, type FormState } from './form';
 import { STRINGS } from './i18n';
+import { parsePickupLink, type PickupLink } from './pickupLink';
 import { AboutScreen } from './screens/AboutScreen';
 import { ReviewScreen } from './screens/ReviewScreen';
 import { FoodBanksScreen } from './screens/FoodBanksScreen';
@@ -42,16 +43,21 @@ function initialLanguage(): Language {
   return nav?.toLowerCase().startsWith('es') ? 'es' : 'en';
 }
 
+function initialPickupLink(): PickupLink | null {
+  return typeof window === 'undefined' ? null : parsePickupLink(window.location.hash);
+}
+
 export default function App() {
-  const [form, setForm] = useState<FormState>(() => emptyForm(initialLanguage()));
-  const [screen, setScreen] = useState<Screen>('about');
+  const [linkedPickup, setLinkedPickup] = useState<PickupLink | null>(initialPickupLink);
+  const [form, setForm] = useState<FormState>(() => emptyForm(linkedPickup?.language ?? initialLanguage()));
+  const [screen, setScreen] = useState<Screen>(linkedPickup ? 'pickup' : 'about');
   const [fairShare, setFairShare] = useState<Load<FairShare>>(idle);
   const [preview, setPreview] = useState<Load<Preview>>(idle);
   const [creating, setCreating] = useState<Load<CreatedRequest>>(idle);
   const [foodBanks, setFoodBanks] = useState<Load<FoodBankList>>(idle);
   const [choosing, setChoosing] = useState<Load<ChosenFoodBanks>>(idle);
   const [status, setStatus] = useState<Load<RequestStatus>>(idle);
-  const [requestCode, setRequestCode] = useState<string | null>(null);
+  const [requestCode, setRequestCode] = useState<string | null>(linkedPickup?.requestCode ?? null);
   const [releases, setReleases] = useState<Record<string, Release>>({});
   const [releasing, setReleasing] = useState<string | null>(null);
   const [releaseError, setReleaseError] = useState<{ pickupId: string; error: unknown } | null>(null);
@@ -70,6 +76,23 @@ export default function App() {
   }, []);
 
   const update = useCallback(<K extends keyof FormState>(key: K, value: FormState[K]) => setForm(f => ({ ...f, [key]: value })), []);
+
+  // A pickup email opens this page on one pickup. Reading the link only loads its status;
+  // releasing it still takes an explicit button tap and confirmation.
+  useEffect(() => {
+    const openLink = () => {
+      const link = parsePickupLink(window.location.hash);
+      if (!link) return;
+      setLinkedPickup(link);
+      setForm(f => ({ ...f, language: link.language }));
+      setRequestCode(link.requestCode);
+      setStatus(idle);
+      setReleases({});
+      setScreen('pickup');
+    };
+    window.addEventListener('hashchange', openLink);
+    return () => window.removeEventListener('hashchange', openLink);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -138,7 +161,7 @@ export default function App() {
   // The pickup screen's wording comes from the API in the household's language.
   useEffect(() => {
     if (screen === 'pickup' && requestCode) loadStatus(requestCode, lang);
-  }, [screen, requestCode, lang, loadStatus]);
+  }, [screen, requestCode, lang, linkedPickup?.pickupId, loadStatus]);
 
   // Switching language on the review screen asks again, so the read-back matches.
   const screenRef = useRef(screen);
@@ -156,7 +179,7 @@ export default function App() {
 
   function consent(yes: boolean) {
     if (!yes) {
-      setForm(f => ({ ...f, phone: '' }));
+      setForm(f => ({ ...f, email: '' }));
       setScreen('not_saved');
       return;
     }
@@ -165,7 +188,7 @@ export default function App() {
       body => {
         note(body);
         setCreating({ loading: false, data: body, error: null });
-        setForm(f => ({ ...f, phone: '' })); // write-only: not kept once sent
+        setForm(f => ({ ...f, email: '' })); // write-only: not kept once sent
         setRequestCode(body.request_code);
         setScreen('food_banks');
         loadFoodBanks(body.request_code);
@@ -204,12 +227,15 @@ export default function App() {
   }
 
   function lookup(code: string) {
+    setLinkedPickup(null);
     setRequestCode(code);
     setStatus(idle);
     setScreen('pickup');
   }
 
   function startOver() {
+    if (linkedPickup) window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setLinkedPickup(null);
     setForm(emptyForm(lang));
     setPreview(idle);
     setCreating(idle);
@@ -238,7 +264,13 @@ export default function App() {
 
   return (
     <div className="page">
-      <a className="skip-link" href="#main-content">
+      <a className="skip-link" href="#main-content" onClick={event => {
+        // Keep an emailed pickup's fragment in the URL while moving keyboard focus.
+        if (linkedPickup) {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }
+      }}>
         {lang === 'es' ? 'Saltar al contenido' : 'Skip to content'}
       </a>
       <div className="shell">
@@ -260,7 +292,7 @@ export default function App() {
             {t.switchLanguage}
           </button>
         </header>
-        <main className="content" id="main-content">
+        <main className="content" id="main-content" tabIndex={-1}>
           <div className="step-label">
             <span>{t.step(step)}</span>
             <span>{t.stepNames[step - 1]}</span>
@@ -347,12 +379,13 @@ export default function App() {
                 loading={status.loading}
                 error={status.error}
                 retry={() => loadStatus(requestCode, lang)}
-                waitingMessage={choosing.data?.message ?? null}
-                texts={creating.data?.texts ?? false}
+                emails={creating.data?.emails ?? false}
+                targetPickupId={linkedPickup?.pickupId ?? null}
                 releases={releases}
                 releasing={releasing}
                 releaseError={releaseError}
                 onRelease={release}
+                onChangeCode={startOver}
               />
               {creating.data && (
                 <button type="button" className="secondary back" onClick={() => setScreen('food_banks')}>

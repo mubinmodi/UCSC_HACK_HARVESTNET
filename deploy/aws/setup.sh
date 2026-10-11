@@ -53,7 +53,7 @@ CLAUDE_RUN_CAP_USD="${CLAUDE_RUN_CAP_USD:-0}"
 CLAUDE_TOTAL_CAP_USD="${CLAUDE_TOTAL_CAP_USD:-$CLAUDE_RUN_CAP_USD}"
 CORE_FIXTURE="docs/contracts/examples/scenario-normal-afternoon.json"
 # Optional provider settings copied into the secret when set in the environment.
-OPTIONAL_SECRET_KEYS='["ANTHROPIC_API_KEY","ELEVENLABS_API_KEY","BEECEPTOR_BASE_URL","N8N_DECISION_WEBHOOK_URL","N8N_WEBHOOK_TOKEN","CORE_API_TOKEN"]'
+OPTIONAL_SECRET_KEYS='["ANTHROPIC_API_KEY","ELEVENLABS_API_KEY","BEECEPTOR_BASE_URL","N8N_DECISION_WEBHOOK_URL","N8N_WEBHOOK_TOKEN","N8N_APPROVAL_WEBHOOK_URL","N8N_PICKUP_WEBHOOK_URL","N8N_RELEASE_WEBHOOK_URL","APPROVER_EMAILS_JSON","SES_SENDER_EMAIL","SES_TEST_RECIPIENTS","CORE_API_TOKEN"]'
 
 is_number() { [[ "$1" =~ ^[0-9]+([.][0-9]+)?$ ]]; }
 
@@ -244,6 +244,7 @@ setup_secret() {
       | .HARVESTNET_STAFF_TOKENS = ($staff | tojson)
       | .HARVESTNET_DOMAIN = $domain
       | .APPROVAL_PUBLIC_URL = "https://\($domain)"
+      | .HARVESTNET_HOUSEHOLD_URL = "https://\($domain)/household/"
       | .HARVESTNET_ALLOWED_ORIGIN = "https://\($domain)"
       | .CORE_API_URL = "http://core:8000"
       | .CLAUDE_RUN_CAP_USD = $run_cap

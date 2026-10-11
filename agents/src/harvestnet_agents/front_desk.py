@@ -565,7 +565,7 @@ _T = {
         "code_again": "Again, your code is {code}.",
         "balance": "This week: {received} of {share} lb received.",
         "wash": "Please wash produce before eating.",
-        "waitlist": "You are on the list. We will text you when produce is ready at a food bank you chose.",
+        "waitlist": "You are on the list. We will let you know when produce is ready at a food bank you chose.",
     },
     Language.ES: {
         "intro": "Esto es lo que tengo.",
@@ -607,7 +607,7 @@ _T = {
         "balance": "Esta semana: {received} de {share} lb recibidas.",
         "wash": "Por favor lave los productos antes de comerlos.",
         "waitlist": (
-            "Ya está en la lista. Le enviaremos un mensaje cuando haya productos listos en un "
+            "Ya está en la lista. Le avisaremos cuando haya productos listos en un "
             "banco de alimentos que eligió."
         ),
     },

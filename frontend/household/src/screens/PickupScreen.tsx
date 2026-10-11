@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarX, Copy, Droplets, Lightbulb, RefreshCw, Store } from 'lucide-react';
 import { showablePickups, type Language, type Release, type RequestStatus } from '../api';
 import { ErrorBox, Loading } from '../components';
@@ -11,19 +11,32 @@ export function PickupScreen(props: {
   loading: boolean;
   error: unknown;
   retry: () => void;
-  waitingMessage: string | null;
-  texts: boolean;
+  emails: boolean;
+  targetPickupId: string | null;
   releases: Record<string, Release>;
   releasing: string | null;
   releaseError: { pickupId: string; error: unknown } | null;
   onRelease: (pickupId: string) => void;
+  onChangeCode: () => void;
 }) {
-  const { t, lang, status, loading, error, retry, waitingMessage, texts, releases, releasing, releaseError, onRelease } = props;
+  const { t, lang, status, loading, error, retry, emails, targetPickupId, releases, releasing, releaseError, onRelease, onChangeCode } = props;
   const [confirming, setConfirming] = useState<string | null>(null);
   const [copyNote, setCopyNote] = useState('');
 
+  useEffect(() => setConfirming(null), [targetPickupId]);
+
+  const targetVisible = !!status && showablePickups(status.pickups).some(p => p.pickup_id === targetPickupId);
+  useEffect(() => {
+    if (targetVisible) document.getElementById(`pickup-${targetPickupId}`)?.focus();
+  }, [targetVisible, targetPickupId, status]);
+
   if (loading && !status) return <Loading text={t.loadingPickup} />;
-  if (!status) return error != null ? <ErrorBox error={error} t={t} onRetry={retry} /> : null;
+  if (!status) return error != null ? (
+    <div className="stack">
+      <ErrorBox error={error} t={t} onRetry={retry} />
+      {targetPickupId && <button type="button" className="secondary" onClick={onChangeCode}>{t.useAnotherCode}</button>}
+    </div>
+  ) : null;
 
   const pickups = showablePickups(status.pickups);
   const code = status.request_code;
@@ -62,15 +75,16 @@ export function PickupScreen(props: {
 
       {error != null && <ErrorBox error={error} t={t} onRetry={retry} />}
 
-      {pickups.length === 0 && <p className="waiting">{waitingMessage || (texts ? t.waitingTexts : t.waiting)}</p>}
+      {targetPickupId && !targetVisible && <p className="waiting" role="status">{t.pickupLinkUnavailable}</p>}
+      {pickups.length === 0 && !targetPickupId && <p className="waiting">{emails ? t.waitingEmails : t.waiting}</p>}
 
       {pickups.map(pickup => {
         const released = releases[pickup.pickup_id];
         const titleId = `pickup-${pickup.pickup_id}`;
         return (
-          <section key={pickup.pickup_id} className={released ? 'pickup released' : 'pickup'} aria-labelledby={titleId}>
+          <section key={pickup.pickup_id} className={`pickup${released ? ' released' : ''}${targetPickupId === pickup.pickup_id ? ' link-target' : ''}`} aria-labelledby={titleId}>
             <p className="eyebrow dark">{released ? t.released : t.readyTitle}</p>
-            <h2 id={titleId}>
+            <h2 id={titleId} tabIndex={targetPickupId === pickup.pickup_id ? -1 : undefined}>
               <Store size={24} aria-hidden="true" />
               {pickup.food_bank_name}
             </h2>
@@ -129,6 +143,7 @@ export function PickupScreen(props: {
         <RefreshCw size={19} aria-hidden="true" />
         {loading ? t.loadingPickup : t.refresh}
       </button>
+      {targetPickupId && <button type="button" className="secondary" onClick={onChangeCode}>{t.useAnotherCode}</button>}
     </div>
   );
 }

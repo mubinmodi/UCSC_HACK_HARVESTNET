@@ -44,8 +44,8 @@ export interface HouseholdAnswers {
 export interface CreateRequestBody extends HouseholdAnswers {
   channel: 'web';
   consent: true;
-  /** Optional, for texts only. Write-only: the API never returns it. */
-  phone?: string;
+  /** Optional, for pickup emails only. Write-only: the API never returns it. */
+  email?: string;
 }
 
 interface Labeled {
@@ -84,7 +84,7 @@ export interface CreatedRequest extends Labeled {
   received_this_week_lb: number;
   table_version: string;
   chosen_food_bank_ids: string[];
-  texts: boolean;
+  emails: boolean;
   expires_at: string;
   next: string;
 }

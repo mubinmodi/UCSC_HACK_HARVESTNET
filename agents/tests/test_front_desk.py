@@ -351,10 +351,10 @@ def test_produce_still_being_negotiated_is_never_reported(status):
 def test_nothing_committed_means_the_waiting_list_wording():
     f = facts(ProducePortion("romaine", 2, AgreementStatus.HELD), ProducePortion("apples", 5, AgreementStatus.NEGOTIATING))
     text = pickup_wording(f, Language.EN)
-    assert text == "You are on the list. We will text you when produce is ready at a food bank you chose."
+    assert text == "You are on the list. We will let you know when produce is ready at a food bank you chose."
     assert "Rural Food Bank" not in text and "K7Q2" not in text
     assert pickup_wording(f, Language.ES) == (
-        "Ya está en la lista. Le enviaremos un mensaje cuando haya productos listos en un banco de alimentos que eligió."
+        "Ya está en la lista. Le avisaremos cuando haya productos listos en un banco de alimentos que eligió."
     )
 
 
