@@ -1,27 +1,20 @@
-"""A whole negotiation of the recorded scenario, with a **test-only** turn loop (#11).
+"""A whole negotiation of the recorded scenario (#11), through the runner's turn loop (#20).
 
-Lane A owns the real protocol (turn order, versions, holds, approvals, stop rules; ticket
-#8). This loop is a minimal stand-in so the negotiators can be checked together: it
-publishes turns in a fixed order, applies counters as new versions (old accepts stop
-counting), records which items a food bank countered down (the advocate reads that from
-the shared records), and stops when every named organization has requested its holds,
-or after three rounds with no new terms. It never commits anything.
+This used to have its own test-only turn loop. That loop is now ``scenario_runner.negotiate``
+(ticket #20): it publishes turns in a fixed order, applies counters as new versions (old
+accepts stop counting), records which items a food bank countered down (the advocate reads
+that from the shared records), and stops when every named organization has requested its
+holds, or after three rounds with no new terms. It never commits anything. Lane A still
+owns the real protocol (#7, #8).
 """
 
 import json
-from dataclasses import replace
 from pathlib import Path
 
-from harvestnet_agents.negotiation import (
-    AdvocateFacts,
-    AgentInput,
-    MoveKind,
-    Role,
-    SetPounds,
-    Turn,
-    parse_agent_input,
-)
+from harvestnet_agents.negotiation import MoveKind, Role, parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
+from harvestnet_agents.scenario_runner import EventLog
+from harvestnet_agents.scenario_runner import negotiate as run_turns
 
 FIXTURES = Path(__file__).parent / "fixtures" / "negotiators"
 ORDER = [("market", Role.DONOR), ("city", Role.FOOD_BANK), ("rural", Role.FOOD_BANK), ("eastside", Role.FOOD_BANK), ("advocate", Role.ADVOCATE)]
@@ -43,39 +36,20 @@ def scenario():
     return start.draft, start.turn.now, facts
 
 
-def negotiate(max_moves=60):
+def negotiate():
     draft, now, facts = scenario()
-    accepted, held, declined, log = set(), set(), set(), []
-    rounds_without_change = 0
-    turn_number = 0
-    while turn_number < max_moves:
-        changed = False
-        for org, role in ORDER:
-            turn_number += 1
-            org_facts = facts[org]
-            if isinstance(org_facts, AdvocateFacts):
-                org_facts = replace(org_facts, declined=tuple(sorted(declined)))
-            move = rules_negotiator(role, org).move(AgentInput(draft, org_facts, Turn(org, turn_number, now, tuple(sorted(accepted)))))
-            log.append(move)
-            assert move.version == draft.version and not move.commits
-            if move.kind is MoveKind.COUNTER:
-                a = move.amendment
-                if isinstance(a, SetPounds) and a.food_bank_id == org and a.pounds < draft.pounds(a.produce_id, org):
-                    declined.add((org, a.produce_id))
-                draft = draft.amend(a, proposer_id=org, reason=move.reason)
-                accepted, held, changed = set(), set(), True
-            elif move.kind is MoveKind.ACCEPT:
-                accepted.add(org)
-            elif move.kind is MoveKind.REQUEST_HOLD:
-                held.add(org)
-            elif move.kind in (MoveKind.REJECT, MoveKind.ASK_HUMAN):
-                return draft, log, "stopped: " + move.kind.value
-            if held and held >= set(draft.named_organizations()):
-                return draft, log, "held"
-        rounds_without_change = 0 if changed else rounds_without_change + 1
-        if rounds_without_change >= 3:
-            return draft, log, "preserved disagreement"
-    return draft, log, "move limit"
+    log = EventLog()
+    result = run_turns(
+        draft,
+        turn_order=[org for org, _ in ORDER],
+        roles=dict(ORDER),
+        facts_at=lambda org, _now: facts[org],
+        negotiators={org: rules_negotiator(role, org) for org, role in ORDER},
+        start=now,
+        log=log,
+    )
+    assert not [e for e in log.events if e["kind"] == "invalid_move"]
+    return result.draft, result.moves, result.status
 
 
 def test_the_recorded_scenario_reaches_holds_by_every_named_organization_with_no_commitment():
