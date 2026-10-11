@@ -1,22 +1,17 @@
-# HarvestNet
+# UCSC_HACK_HARVESTNET
+hackathon project
 
-A mobile household frontend built with React, TypeScript, Tailwind CSS, and Vite.
+## Lane C implementation
 
-## Run locally
+The platform integration branches now contain organization-system fixtures,
+A2A/native AGNTCY hosts, version-bound human approvals, importable n8n workflows,
+offline fallbacks, deployment configuration and a real-agent join adapter.
 
-Install Node.js 20.19+ (or 22.12+), then run:
+Start with [the platform runbook](docs/platform/DEPLOYMENT.md).
+For an account-free local rehearsal, run `python -m harvestnet_platform.demo`
+from the repo root, then open the URL saved in `runtime/demo-url.txt`.
+This is a labeled platform rehearsal; the full household/core/negotiator
+implementation and live deployments are tracked in the team's other issues.
 
-```sh
-npm install
-npm run dev
-```
-
-Open the local URL printed by Vite. `npm run build` checks TypeScript and produces the production bundle; `npm run preview` serves that bundle.
-
-## Household flow
-
-Household details → answer review and explicit consent → food bank selection → pickup window and confirmation. English and Spanish are available throughout. The layout adapts to small phones and desktop browsers. No household name, home address, or income is collected.
-
-`src/api.ts` is the placeholder backend adapter. Replace its methods with real API calls when the backend is available. Fair-share values come from that adapter, not a frontend calculation. All locations, distances, hours, pickup codes, credit amounts, confirmations, and cancellations are synthetic demo data. Nothing is booked or submitted to an external service. Answers exist only in memory and reset on reload.
-
-The UI uses example credits from the supplied reference. The design document currently proposes fair share in pounds; the backend's published policy must establish the final unit before integration.
+Tests: `python -m unittest discover -s tests -v` (Python 3.12+).
+Optional native SDK tests require `requirements-agntcy.txt`.

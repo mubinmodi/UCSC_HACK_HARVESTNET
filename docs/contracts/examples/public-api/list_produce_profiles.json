@@ -1,0 +1,77 @@
+{
+  "operation": "list_produce_profiles",
+  "group": "donor",
+  "method": "GET",
+  "path": "/produce-profiles",
+  "summary": "Produce items a donor can pick from, with the units each accepts and what households see.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/produce-profiles"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "profile_set_version": "2026-10-11.1",
+        "profiles": [
+          {
+            "produce_id": "apples",
+            "name": "Apples",
+            "units": [
+              "lb",
+              "case"
+            ],
+            "needs_fridge": false,
+            "needs_cold": false
+          },
+          {
+            "produce_id": "romaine",
+            "name": "Romaine lettuce",
+            "units": [
+              "lb",
+              "case"
+            ],
+            "needs_fridge": true,
+            "needs_cold": true
+          },
+          {
+            "produce_id": "potatoes",
+            "name": "Potatoes",
+            "units": [
+              "lb",
+              "sack"
+            ],
+            "needs_fridge": false,
+            "needs_cold": false
+          },
+          {
+            "produce_id": "tomatoes",
+            "name": "Tomatoes",
+            "units": [
+              "lb",
+              "case"
+            ],
+            "needs_fridge": false,
+            "needs_cold": false
+          }
+        ],
+        "units_needing_pack_weight": {
+          "apples": [
+            "case"
+          ],
+          "romaine": [
+            "case"
+          ],
+          "potatoes": [
+            "sack"
+          ],
+          "tomatoes": [
+            "case"
+          ]
+        }
+      }
+    }
+  }
+}

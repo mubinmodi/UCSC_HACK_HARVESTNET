@@ -1043,6 +1043,25 @@ The user asked to keep only what's relevant to the current MVP, and to put cut s
 **For Codex:** the earlier requests to update `CURRENT_DESIGN.md` and `PROJECT_BRIEF.md` no longer apply, because those files are now future scope. Please review `docs/MVP_DESIGN.md` directly.
 ---
 
+## User direction (October 11, 2026): start Lane B on the Mac mini, recorded by Claude
+
+The user asked Claude to "do everything that is required for the Mac mini." Claude took that as approval of the two-machine split in `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`, and as the explicit go-ahead to implement Lane B tickets once their blockers close.
+
+- `CLAUDE.md` and `AGENTS.md` now carry a Lane B exception to the design-only rule.
+- GitHub labels `claimed: macbook` and `claimed: mac-mini` exist. A machine adds its label and an issue comment before starting a ticket.
+- Mac mini: #12, then #15, and #14. MacBook Air: #11, then #13, then joins #20 and #23.
+- Every Lane B ticket waits on #1 (contract day), which is still open. Nothing has been built yet. Lane C's #16–#19 branches already have code against proposed, not agreed, contracts.
+
+## User direction (October 11, 2026): the contracts are agreed, recorded by Claude
+
+The user, as team lead, said the team has already discussed and agreed the four contracts for ticket #1. `docs/contracts/` marks them **Agreed**, and its "Decisions made" list records where Lane B and Lane C shapes were reconciled. The example-data API skeleton is live on AWS Lambda (address in `docs/contracts/public-api.md`). Lane B tickets #11–#15 and the Lane B side of #23 were built ahead of contract day against proposed shapes, and now follow these contracts.
+
+## User direction (October 11, 2026): food banks may take surplus beyond fair share, recorded by Claude
+
+The user decided that food banks may bid past their households' fair-share gap once that gap is met, so surplus goes out rather than waste (design §8). In the rules-based and LLM food bank negotiators, bids still go toward the fair-share gap first. Only after a version plans a food bank's whole gap may it bid beyond fair share. Those bids are bounded only by its own storage (at arrival and until pickup ends), pickup hours, truck or drop-off, and its produce profiles, and their reasons say "beyond fair share".
+
+Simulated result (synthetic numbers): in the normal-afternoon scenario, unclaimed produce drops from 818 lb (249 lb apples, 169 lb romaine, 400 lb potatoes) to 0 lb. Fair-share figures don't change, and extra pounds are recorded apart from fair share.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*

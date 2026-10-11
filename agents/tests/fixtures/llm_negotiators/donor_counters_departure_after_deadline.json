@@ -1,0 +1,71 @@
+{
+  "_note": "Synthetic stand-in for recorded Claude responses (ticket #13). Hand-written, NOT captured from a live call, so tests spend no credit. Usage numbers are synthetic.",
+  "input": "donor_counters_departure_after_deadline",
+  "role": "donor",
+  "responses": [
+    {
+      "model": "claude-sonnet-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 620,
+        "output_tokens": 380,
+        "cache_creation_input_tokens": 2900,
+        "cache_read_input_tokens": 0
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01",
+          "name": "arrival_time",
+          "input": {
+            "departs_at": "2026-10-13T15:00",
+            "travel_minutes": 20
+          }
+        }
+      ]
+    },
+    {
+      "model": "claude-sonnet-5-5",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 410,
+        "output_tokens": 260,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2900
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "",
+          "signature": "synthetic-signature"
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_09",
+          "name": "submit_move",
+          "input": {
+            "kind": "counter",
+            "reason": "City's collection at 3:30 pm is after our 3 pm deadline. Leaving at 3 pm, it arrives at 3:20 pm.",
+            "amendment": {
+              "kind": "set_transport",
+              "produce_id": null,
+              "food_bank_id": "city",
+              "from_food_bank_id": null,
+              "to_food_bank_id": null,
+              "pounds": null,
+              "mover": "food_bank",
+              "departs_at": "2026-10-13T15:00:00",
+              "arrives_at": "2026-10-13T15:20:00"
+            },
+            "holds": null
+          }
+        }
+      ]
+    }
+  ]
+}

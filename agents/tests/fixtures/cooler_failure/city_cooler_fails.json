@@ -1,0 +1,56 @@
+{
+  "_note": "Recorded scenario for ticket #15. All numbers are synthetic. Times are local to the scenario region.",
+  "failure": {
+    "food_bank_id": "city",
+    "food_bank_name": "City food bank",
+    "lot_id": "lot-farmers-market-1",
+    "current_version": 3,
+    "detected_at": "2026-10-13T15:30",
+    "items": [
+      {"produce_id": "romaine", "pounds": 200},
+      {"produce_id": "apples", "pounds": 50},
+      {"produce_id": "potatoes", "pounds": 80},
+      {"produce_id": "tomatoes", "pounds": 40}
+    ],
+    "households_pickup": {"start": "2026-10-13T18:00", "end": "2026-10-13T20:00"},
+    "own_pickup_windows": [{"start": "2026-10-13T18:00", "end": "2026-10-13T20:00"}],
+    "truck": {"refrigerated": true, "available_from": "2026-10-13T16:00"}
+  },
+  "candidates": [
+    {
+      "food_bank_id": "rural",
+      "name": "Rural food bank",
+      "response": "answered",
+      "cold_space_lb": 300,
+      "pickup_windows": [{"start": "2026-10-13T14:00", "end": "2026-10-13T18:00"}],
+      "travel_minutes": 40
+    },
+    {
+      "food_bank_id": "eastside",
+      "name": "Eastside food bank",
+      "response": "answered",
+      "cold_space_lb": 250,
+      "pickup_windows": [{"start": "2026-10-13T17:00", "end": "2026-10-13T20:00"}],
+      "travel_minutes": 15
+    },
+    {
+      "food_bank_id": "westside",
+      "name": "Westside food bank",
+      "response": "answered",
+      "cold_space_lb": 400,
+      "pickup_windows": [{"start": "2026-10-13T16:00", "end": "2026-10-13T20:00"}],
+      "travel_minutes": 30
+    },
+    {
+      "food_bank_id": "southside",
+      "name": "Southside food bank",
+      "response": "declined",
+      "declined_reason": "walk-in cooler is full until tomorrow's distribution"
+    },
+    {
+      "food_bank_id": "northside",
+      "name": "Northside food bank",
+      "response": "no_answer"
+    }
+  ]
+}

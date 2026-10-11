@@ -1,0 +1,93 @@
+{
+  "operation": "voice_intake",
+  "group": "voice",
+  "method": "POST",
+  "path": "/voice-intake",
+  "summary": "The ElevenLabs voice line posts a call transcript. Returns the draft, the read-back, and the questions still to ask. Saves nothing.",
+  "synthetic": true,
+  "example": {
+    "request": {
+      "path": "/voice-intake",
+      "body": {
+        "call_id": "call-0001",
+        "transcript": {
+          "language": "es",
+          "turns": [
+            {
+              "speaker": "assistant",
+              "text": "Hola, habla HarvestNet. ¿Cuántas personas hay en su hogar?"
+            },
+            {
+              "speaker": "household",
+              "text": "Somos tres."
+            },
+            {
+              "speaker": "assistant",
+              "text": "¿Cuándo puede recoger?"
+            },
+            {
+              "speaker": "household",
+              "text": "Depende de mi trabajo, no sé todavía."
+            },
+            {
+              "speaker": "assistant",
+              "text": "¿Tiene poco espacio en el refrigerador?"
+            },
+            {
+              "speaker": "household",
+              "text": "No, tenemos un refri grande."
+            },
+            {
+              "speaker": "assistant",
+              "text": "¿Cerca de qué vecindario está?"
+            },
+            {
+              "speaker": "household",
+              "text": "Cerca de Salinas, en el este."
+            },
+            {
+              "speaker": "assistant",
+              "text": "Si quiere, puede decirme si recibe CalFresh, o saltar esa pregunta."
+            },
+            {
+              "speaker": "household",
+              "text": "Prefiero no decir."
+            }
+          ]
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "mode": "example",
+        "synthetic": true,
+        "call_id": "call-0001",
+        "saved": false,
+        "complete": false,
+        "draft_request": {
+          "language": "es",
+          "household_size": 3,
+          "pickup_windows": null,
+          "limited_fridge": false,
+          "neighborhood": "Salinas",
+          "cant_eat": null,
+          "snap": "not_said",
+          "missing": [
+            "pickup_windows",
+            "cant_eat"
+          ],
+          "dropped": []
+        },
+        "fair_share_lb": 10,
+        "read_back": "Esto es lo que tengo. Hogar: 3 personas. Espacio en el refrigerador: no limitado. Vecindario: Salinas. SNAP/CalFresh: prefiere no decir. Todavía necesito algunas respuestas. ¿Cuándo puede recoger? ¿Hay algo que no puedan comer en su hogar?",
+        "missing_questions": [
+          "¿Cuándo puede recoger?",
+          "¿Hay algo que no puedan comer en su hogar?"
+        ],
+        "consent_question": null,
+        "next": "ask_missing_questions"
+      }
+    }
+  }
+}
