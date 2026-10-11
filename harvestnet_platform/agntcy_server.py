@@ -21,6 +21,12 @@ async def main():
         raise ValueError('Transport token required')
     policy, _label = load_policy(os.getenv('AGENT_POLICY'))
     receiver = Receiver(organization, policy, os.getenv('RECEIPTS_DB', ':memory:'))
+    if os.getenv('AGNTCY_DIRECTORY_ADDRESS'):
+        from .directory import AgntcyDirectory, record_for
+        from .systems import Systems
+        directory = AgntcyDirectory(os.environ['AGNTCY_DIRECTORY_ADDRESS'])
+        record = record_for(organization, os.environ['AGENT_PUBLIC_URL'], Systems(os.getenv('BEECEPTOR_BASE_URL')))
+        directory.register(record)
 
     class Executor(AgentExecutor):
         async def execute(self, context, event_queue):

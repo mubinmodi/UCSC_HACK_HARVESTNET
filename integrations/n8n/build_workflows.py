@@ -57,10 +57,14 @@ def main():
     code = node('Prepare review text','n8n-nodes-base.code',{'jsCode':
         "const b = $json.body; if (!b.to || !b.message || !b.decision_url || !Number.isInteger(b.version)) throw new Error('Issued human review request required'); return [{json: {to:b.to, message:b.message}}];"},260)
     code['typeVersion'] = 2
+    decision_api = api('/approvals')
+    decision_api['parameters']['url'] = '={{ $vars.HARVESTNET_CORE_URL + "/approvals" }}'
+    decision_api['credentials'] = {'httpHeaderAuth':{'id':'CONFIGURE_IN_N8N','name':'HarvestNet core approval receipt bearer'}}
     files = {
         'approval-requests.json': workflow('HarvestNet - carry human review requests', [webhook('harvestnet-approval-request'),code,sms(),respond()]),
         'pickup-texts.json': workflow('HarvestNet - committed pickup and verified Market Match text',[webhook('harvestnet-pickup'),api('/notifications/prepare'),sms(),respond()]),
-        'cannot-make-it.json': workflow('HarvestNet - authenticated cannot make it reply',[webhook('harvestnet-household-reply'),api('/household/replies'),respond()])}
+        'cannot-make-it.json': workflow('HarvestNet - authenticated cannot make it reply',[webhook('harvestnet-household-reply'),api('/household/replies'),respond()]),
+        'human-decisions.json': workflow('HarvestNet - relay explicit version-bound human decision',[webhook('harvestnet-human-decision'),decision_api,respond()])}
     for file, data in files.items():
         (ROOT/file).write_text(json.dumps(data,indent=2)+'\n')
     print(f'Generated {len(files)} inactive workflows')

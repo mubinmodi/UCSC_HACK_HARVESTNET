@@ -3,7 +3,7 @@ import threading
 import unittest
 from http.server import ThreadingHTTPServer
 from harvestnet_platform.transport import Receiver, InProcess, A2ATransport, ORGANIZATIONS, handler_for
-from harvestnet_platform.directory import LocalDirectory
+from harvestnet_platform.directory import LocalDirectory, record_info
 from harvestnet_platform.systems import Systems
 from harvestnet_platform.http import request_json
 from urllib.error import HTTPError
@@ -66,6 +66,8 @@ class TransportTests(unittest.TestCase):
         query = dict(min_cold_lb=100, pickup_at='2026-10-12T02:00:00Z')
         result = directory.search(**query)
         self.assertEqual(result['mode'], 'local_directory_fallback')
-        self.assertEqual([r['annotations']['harvestnet']['organization_id'] for r in result['records']], ['city','eastside'])
+        self.assertEqual([record_info(r)['organization_id'] for r in result['records']], ['city','eastside'])
         systems.switch('city', True)
-        self.assertEqual([r['annotations']['harvestnet']['organization_id'] for r in directory.search(**query)['records']], ['eastside'])
+        self.assertEqual([record_info(r)['organization_id'] for r in directory.search(**query)['records']], ['eastside'])
+        equivalent = dict(min_cold_lb=100, pickup_at='2026-10-11T19:00:00-07:00')
+        self.assertEqual(len(directory.search(**equivalent)['records']),1)

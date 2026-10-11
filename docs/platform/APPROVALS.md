@@ -31,7 +31,7 @@ operations are proposed pending ticket #1/#9, not deployed endpoints.
 
 ## Import n8n workflows
 
-Run `python integrations/n8n/build_workflows.py`, then import the three JSON files
+Run `python integrations/n8n/build_workflows.py`, then import the four JSON files
 into n8n. They start inactive; import does not send anything. Configure:
 
 - Incoming webhook Header Auth credential (a dedicated incoming secret).
@@ -44,6 +44,16 @@ into n8n. They start inactive; import does not send anything. Configure:
 Approval workflow receives one issued request `{to, message, decision_url,
 version}`. It carries the review request only. The human opens the page and
 submits the decision there; n8n never approves or changes the terms.
+
+For live n8n decision relay, set `N8N_DECISION_WEBHOOK_URL` to the published
+`human-decisions.json` webhook and `N8N_WEBHOOK_TOKEN` to its Header Auth bearer
+secret. The platform verifies the human capability and exact terms before sending
+the decision receipt. This workflow forwards the receipt unchanged to the core's
+`/approvals`, using `HARVESTNET_CORE_URL` and a separate restricted core approval
+credential. It never creates a receipt or defaults the decision. Without this
+webhook the direct core path serves as the labeled fallback. Missing core is
+still local-only. The core must authenticate this trusted receipt bridge and
+recheck the current version/holds; it must not accept arbitrary public receipts.
 
 Pickup workflow forwards trusted core notice data to `/notifications/prepare`:
 `committed: true`, `food_bank`, calculator `items: [{name, pounds}]`, `window:

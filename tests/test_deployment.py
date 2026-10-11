@@ -45,6 +45,15 @@ class DeploymentTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Budget(run_cap_usd=invalid)
 
+    def test_underestimated_cost_is_recorded_and_blocks_all_future_calls(self):
+        budget = Budget(run_cap_usd=10,total_cap_usd=10)
+        budget.reserve('run','call',.1)
+        with self.assertRaises(BudgetExceeded):
+            budget.settle('run','call',.2)
+        self.assertEqual(budget.db.execute('SELECT cents FROM charges').fetchone()[0],20)
+        with self.assertRaises(BudgetExceeded):
+            budget.reserve('another-run','another-call',.01)
+
     def test_secrets_export_does_not_allow_environment_injection(self):
         content = secrets_loader.env_file({'TRANSPORT_TOKEN':'test$with#characters'})
         self.assertEqual(content,"TRANSPORT_TOKEN='test$with#characters'\n")

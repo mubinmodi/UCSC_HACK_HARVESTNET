@@ -63,6 +63,20 @@ class ApprovalTests(unittest.TestCase):
             self.assertEqual(call.call_args.kwargs['token'],'pickup-token')
         self.assertFalse(CoreAPI().release('ABCD','pickup-1','token')['released'])
 
+    def test_n8n_only_relays_an_explicit_bound_human_receipt(self):
+        store = ApprovalStore()
+        link = store.request('lot',1,{'lb':8},['donor'])[0]
+        record = store.decide(link['token'],'approve',1,link['terms_hash'],True)
+        core = CoreAPI(decision_webhook='https://n8n.example/webhook/human-decision',webhook_token='relay-token')
+        with patch('harvestnet_platform.approvals.request_json',return_value={'status':'recorded'}) as call:
+            core.decision(record)
+            payload = call.call_args.args[1]
+            self.assertEqual(payload['receipt_id'],record['receipt_id'])
+            self.assertEqual(payload['terms_hash'],link['terms_hash'])
+            self.assertEqual(payload['decision'],'approve')
+            self.assertNotIn('token',payload)
+            self.assertEqual(call.call_args.kwargs['token'],'relay-token')
+
     def test_http_human_decision_and_stale_callback(self):
         store = ApprovalStore()
         server = ThreadingHTTPServer(('127.0.0.1',0),handler_for(store,CoreAPI(),'events-token','http://localhost'))

@@ -1,6 +1,7 @@
 """Version-bound human decisions. Neither n8n nor this store commits produce."""
 import hashlib
 import html
+import math
 import json
 import os
 import secrets
@@ -112,15 +113,20 @@ class ApprovalStore:
 
 
 class CoreAPI:
-    def __init__(self, base_url=None, token=None):
+    def __init__(self, base_url=None, token=None, decision_webhook=None, webhook_token=None):
         self.base_url = base_url.rstrip('/') if base_url else None
         self.token = token
+        self.decision_webhook, self.webhook_token = decision_webhook, webhook_token
 
     def decision(self, record):
-        if not self.base_url:
+        if not self.base_url and not self.decision_webhook:
             return {'mode': 'local_approval_fallback', 'status': 'human_decision_recorded',
                     'committed': False, 'requires_core_validation': True, 'receipt_id': record['receipt_id']}
         payload = {key: record[key] for key in ('event_id', 'version', 'organization_id', 'terms_hash', 'decision', 'receipt_id')}
+        if self.decision_webhook:
+            if not self.webhook_token:
+                raise ValueError('Authenticated n8n decision webhook token required')
+            return request_json(self.decision_webhook, payload, token=self.webhook_token)
         return request_json(self.base_url + '/approvals', payload, token=self.token)
 
     def release(self, code, pickup_id, release_token):
@@ -144,7 +150,7 @@ def pickup_message(notice, *, now=None):
     for field in ('food_bank', 'items', 'window', 'request_code', 'pickup_id', 'version'):
         if not notice.get(field):
             raise ValueError(f'Pickup notice requires {field}')
-    if not isinstance(notice['items'], list) or any(type(item.get('pounds')) not in (int,float) or item['pounds'] <= 0 for item in notice['items']):
+    if not isinstance(notice['items'], list) or any(type(item.get('pounds')) not in (int,float) or not math.isfinite(item['pounds']) or item['pounds'] <= 0 for item in notice['items']):
         raise ValueError('Pickup pounds must come from positive calculator results')
     items = ', '.join(f"{item['pounds']:g} lb {item['name']}" for item in notice['items'])
     message = (f"HarvestNet: {items} at {notice['food_bank']}, {notice['window']['start']} to "
@@ -245,7 +251,7 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     args = parser.parse_args()
     store = ApprovalStore(os.getenv('APPROVALS_DB', 'runtime/approvals.sqlite'))
-    core = CoreAPI(os.getenv('CORE_API_URL'), os.getenv('CORE_API_TOKEN'))
+    core = CoreAPI(os.getenv('CORE_API_URL'), os.getenv('CORE_API_TOKEN'), os.getenv('N8N_DECISION_WEBHOOK_URL'), os.getenv('N8N_WEBHOOK_TOKEN'))
     public_url = os.getenv('APPROVAL_PUBLIC_URL', f'http://127.0.0.1:{args.port}')
     serve(handler_for(store, core, os.getenv('API_EVENTS_TOKEN'), public_url), args.port, args.host)
 

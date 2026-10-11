@@ -21,6 +21,8 @@ services:
       APPROVAL_PUBLIC_URL: ${APPROVAL_PUBLIC_URL:?set APPROVAL_PUBLIC_URL}
       CORE_API_URL: ${CORE_API_URL:-}
       CORE_API_TOKEN: ${CORE_API_TOKEN:-}
+      N8N_DECISION_WEBHOOK_URL: ${N8N_DECISION_WEBHOOK_URL:-}
+      N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:-}
       ALLOW_INTERNAL_HTTP: '1'
       APPROVALS_DB: /app/runtime/approvals.sqlite
     volumes: [approvals-data:/app/runtime]
@@ -50,6 +52,9 @@ services:
       API_EVENTS_TOKEN: ${API_EVENTS_TOKEN}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
       CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes: [budget-data:/app/budget]
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,3 +80,4 @@ volumes:
   postgres-data:
   caddy-data:
   caddy-config:
+  budget-data:
