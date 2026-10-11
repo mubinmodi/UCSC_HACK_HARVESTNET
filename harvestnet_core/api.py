@@ -213,6 +213,12 @@ class API:
         d,pid=lot['draft'],item['produce_id']
         movers={t['food_bank_id']:t['mover'] for t in d['transports']}
         split=[{"food_bank_id":a['food_bank_id'],"pounds":a['pounds'],"mover":movers.get(a['food_bank_id'])} for a in d['allocations'] if a['produce_id']==pid and a['pounds']>0]
+        if lot.get('change_version'):
+            # A committed change (a cooler failure) amended the commitments, not the draft: follow the commitments.
+            # Produce a change moved goes by the proposing food bank's own truck, so it is a food bank mover.
+            split=[{"food_bank_id":a['food_bank_id'],"pounds":a['pounds'],
+                    "mover":'food_bank' if a.get('version')==lot['change_version'] and a.get('pathway') is None else movers.get(a['food_bank_id'])}
+                   for a in lot['commitments'] if a['produce_id']==pid and a['pounds']>0]
         committed=sum(a['pounds'] for a in lot['commitments'] if a['produce_id']==pid)
         settled=lot['status'] in ('committed','unclaimed','preserved_disagreement')
         reached={p['request_code'] for p in self.records.all('pickup') if p['lot_id']==d['lot_id'] and p['status']=='collected' and any(x['produce_id']==pid for x in p['items'])}

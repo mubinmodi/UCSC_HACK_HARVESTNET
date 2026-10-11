@@ -208,6 +208,14 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertEqual(romaine, [('city', 50.0, 'same_day_offer'), ('eastside', 150.0, None)])
         self.assertIn({'produce_id': 'apples', 'food_bank_id': 'city', 'pounds': 50.0}, lot['commitments'])
 
+        # The donor's lot view follows the committed change: its split is the amended commitments (found live, #23).
+        status, view = call('GET', f'{self.core_url}/lots/{LOT}', token=TOKENS['market'])
+        self.assertEqual(status, 200)
+        splits = {i['produce_id']: {(s['food_bank_id'], s['pounds']) for s in i['split']} for i in view['items']}
+        self.assertEqual(splits['romaine'], {('eastside', 150.0), ('city', 50.0)})
+        self.assertEqual(splits['apples'], {(a['food_bank_id'], a['pounds']) for a in lot['draft']['allocations'] if a['produce_id'] == 'apples'})
+        self.assertEqual(sum(s['pounds'] for s in next(i for i in view['items'] if i['produce_id'] == 'romaine')['split']), 200.0)
+
         # A decision on the superseded version is refused once the change is committed (found live,
         # #18): the lot's draft stays at that version, so it was still accepted before.
         old = lot_before['approvals']['eastside']
