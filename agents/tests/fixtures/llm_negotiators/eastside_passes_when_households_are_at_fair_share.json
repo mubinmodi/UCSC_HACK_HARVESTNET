@@ -24,7 +24,7 @@
           "name": "submit_move",
           "input": {
             "kind": "pass",
-            "reason": "Our 20 households already have their fair share this week, so we ask for nothing.",
+            "reason": "Our 20 households already have their fair share this week, and with 0 lb of dry space free nothing unclaimed fits beyond it, so we ask for nothing.",
             "amendment": null,
             "holds": null
           }

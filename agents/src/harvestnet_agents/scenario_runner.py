@@ -699,18 +699,20 @@ class _Run:
         items = []
         source = committed
         reason_unclaimed = why
+        fair_share = []
         if committed is not None:
+            # Fair-share accounting from the pooled counts: pounds beyond a food bank's gap are
+            # recorded as beyond fair share and never count toward it.
             advocate = next((o for o in self.scenario.turn_order if self.scenario.role_of(o) is Role.ADVOCATE), None)
-            remaining = []
-            if advocate is not None:
-                gaps = self._facts[advocate][1].gaps
-                remaining = [calc.gap_after_plan(g.below_fair_share_lb, committed.planned_lb(g.food_bank_id)).remaining_gap_lb for g in gaps]
-            if remaining and all(r <= 0 for r in remaining):
-                reason_unclaimed = (f"No bid under version {committed.version}: it is beyond every food bank's households' "
-                                    "fair-share gap this week.")
-            else:
-                reason_unclaimed = (f"No food bank still below fair share could store it, move it, or hand it out before it spoils "
-                                    f"under version {committed.version}.")
+            gaps = self._facts[advocate][1].gaps if advocate is not None else ()
+            for g in gaps:
+                planned = committed.planned_lb(g.food_bank_id)
+                after = calc.gap_after_plan(g.below_fair_share_lb, planned)
+                fair_share.append({"food_bank_id": g.food_bank_id, "below_fair_share_lb": g.below_fair_share_lb,
+                                   "planned_lb": planned, "remaining_gap_lb": after.remaining_gap_lb,
+                                   "beyond_fair_share_lb": after.above_gap_lb})
+            reason_unclaimed = (f"No food bank could store it, move it, or hand it out before it spoils under version "
+                                f"{committed.version}, toward its households' fair share or beyond it.")
         lot_items = draft.items if draft is not None else ()
         for item in lot_items:
             allocations = [] if source is None else [
@@ -722,6 +724,6 @@ class _Run:
             items.append({"produce_id": item.produce_id, "pounds": item.pounds, "allocations": allocations,
                           "unclaimed_lb": unclaimed, "unclaimed_reason": reason_unclaimed if unclaimed else None})
         log.add("outcome", self.clock["now"], lot_id=self.offer.lot_id, status=status, reason=why,
-                committed_version=None if committed is None else committed.version, items=items,
+                committed_version=None if committed is None else committed.version, items=items, fair_share=fair_share,
                 not_offered=[{"produce_id": n.produce_id, "reason": n.reason} for n in skipped],
                 pathways_after_commitment="pickup notices, confirmations, and releases are Lane A's harness (#7)")
