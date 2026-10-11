@@ -9,6 +9,10 @@ description = "HarvestNet Lane B: negotiators, produce profiles, fair-share tabl
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+# Only the live front-desk extractor needs the Claude SDK; tests never call the API.
+claude = ["anthropic>=1.13"]
+
 [dependency-groups]
 dev = ["pytest>=8"]
 

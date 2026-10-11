@@ -1,0 +1,44 @@
+{
+  "transcript": {
+    "language": "en",
+    "turns": [
+      {"speaker": "assistant", "text": "Hi, this is HarvestNet. How many people are in your household?"},
+      {"speaker": "household", "text": "It's me and my two kids."},
+      {"speaker": "assistant", "text": "When can you pick up?"},
+      {"speaker": "household", "text": "Any day after 5."},
+      {"speaker": "assistant", "text": "Is your fridge space limited?"},
+      {"speaker": "household", "text": "We share a kitchen with another family."},
+      {"speaker": "assistant", "text": "What neighborhood are you near?"},
+      {"speaker": "household", "text": "The east side, by the school."},
+      {"speaker": "assistant", "text": "Is there anything you can't eat?"},
+      {"speaker": "household", "text": "No tomatoes, and no peppers."},
+      {"speaker": "assistant", "text": "If you'd like, you can tell me whether you receive CalFresh, or skip that question."},
+      {"speaker": "household", "text": "Can I ask what you do with that?"}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 3, "evidence": "me and my two kids"},
+    "pickup_windows": {"value": [{"days": [], "start": "17:00", "end": null}], "evidence": "Any day after 5"},
+    "limited_fridge": {"value": true, "evidence": null},
+    "neighborhood": {"value": "Salinas", "evidence": "near Salinas"},
+    "cant_eat": {"value": ["tomatoes", "peppers", "onions"], "evidence": "No tomatoes, and no peppers"},
+    "snap": {"value": "yes", "evidence": "you receive CalFresh"}
+  },
+  "expected_draft": {
+    "language": "en",
+    "household_size": null,
+    "pickup_windows": [{"days": [], "start": "17:00", "end": null}],
+    "limited_fridge": null,
+    "neighborhood": null,
+    "cant_eat": ["tomatoes", "peppers"],
+    "snap": "not_said",
+    "missing": ["household_size", "limited_fridge", "neighborhood"],
+    "dropped": [
+      ["household_size", "number_not_in_evidence"],
+      ["limited_fridge", "no_evidence"],
+      ["neighborhood", "evidence_not_in_transcript"],
+      ["cant_eat", "value_not_in_evidence"],
+      ["snap", "evidence_not_in_transcript"]
+    ]
+  }
+}

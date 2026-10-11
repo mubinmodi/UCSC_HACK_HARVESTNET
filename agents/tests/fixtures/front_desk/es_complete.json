@@ -1,0 +1,38 @@
+{
+  "transcript": {
+    "language": "es",
+    "turns": [
+      {"speaker": "assistant", "text": "Hola, habla HarvestNet. Puedo ayudar a su hogar a recibir frutas y verduras frescas gratis. ¿Cuántas personas hay en su hogar?"},
+      {"speaker": "household", "text": "Somos cuatro."},
+      {"speaker": "assistant", "text": "¿Cuándo puede recoger?"},
+      {"speaker": "household", "text": "Entre semana, después de las seis de la tarde."},
+      {"speaker": "assistant", "text": "¿Tiene poco espacio en el refrigerador?"},
+      {"speaker": "household", "text": "Sí, el refri es pequeño."},
+      {"speaker": "assistant", "text": "¿Cerca de qué vecindario está?"},
+      {"speaker": "household", "text": "Cerca de Watsonville."},
+      {"speaker": "assistant", "text": "¿Hay algo que no puedan comer?"},
+      {"speaker": "household", "text": "No, comemos de todo."},
+      {"speaker": "assistant", "text": "Si quiere, puede decirme si recibe CalFresh, o saltar esa pregunta."},
+      {"speaker": "household", "text": "Sí, recibimos CalFresh."}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 4, "evidence": "Somos cuatro"},
+    "pickup_windows": {"value": [{"days": ["mon", "tue", "wed", "thu", "fri"], "start": "18:00", "end": null}], "evidence": "Entre semana, después de las seis de la tarde"},
+    "limited_fridge": {"value": true, "evidence": "el refri es pequeño"},
+    "neighborhood": {"value": "Watsonville", "evidence": "Cerca de Watsonville"},
+    "cant_eat": {"value": [], "evidence": "comemos de todo"},
+    "snap": {"value": "yes", "evidence": "recibimos CalFresh"}
+  },
+  "expected_draft": {
+    "language": "es",
+    "household_size": 4,
+    "pickup_windows": [{"days": ["mon", "tue", "wed", "thu", "fri"], "start": "18:00", "end": null}],
+    "limited_fridge": true,
+    "neighborhood": "Watsonville",
+    "cant_eat": [],
+    "snap": "yes",
+    "missing": [],
+    "dropped": []
+  }
+}

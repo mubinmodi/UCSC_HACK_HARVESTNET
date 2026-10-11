@@ -1,0 +1,38 @@
+{
+  "transcript": {
+    "language": "en",
+    "turns": [
+      {"speaker": "assistant", "text": "Hi, this is HarvestNet. I can help your household get free fresh fruit and vegetables. How many people are in your household?"},
+      {"speaker": "household", "text": "We're a family of 4."},
+      {"speaker": "assistant", "text": "When can you pick up?"},
+      {"speaker": "household", "text": "Weekdays after 6 pm. I work until 5:30."},
+      {"speaker": "assistant", "text": "Is your fridge space limited?"},
+      {"speaker": "household", "text": "Yeah, it's a small fridge."},
+      {"speaker": "assistant", "text": "What neighborhood are you near?"},
+      {"speaker": "household", "text": "Near Watsonville."},
+      {"speaker": "assistant", "text": "Is there anything you can't eat?"},
+      {"speaker": "household", "text": "No eggplant, my son is allergic."},
+      {"speaker": "assistant", "text": "If you'd like, you can tell me whether you receive CalFresh, or skip that question."},
+      {"speaker": "household", "text": "Yes, we get CalFresh."}
+    ]
+  },
+  "extractor_output": {
+    "household_size": {"value": 4, "evidence": "a family of 4"},
+    "pickup_windows": {"value": [{"days": ["mon", "tue", "wed", "thu", "fri"], "start": "18:00", "end": null}], "evidence": "Weekdays after 6 pm"},
+    "limited_fridge": {"value": true, "evidence": "it's a small fridge"},
+    "neighborhood": {"value": "Watsonville", "evidence": "Near Watsonville"},
+    "cant_eat": {"value": ["eggplant"], "evidence": "No eggplant"},
+    "snap": {"value": "yes", "evidence": "we get CalFresh"}
+  },
+  "expected_draft": {
+    "language": "en",
+    "household_size": 4,
+    "pickup_windows": [{"days": ["mon", "tue", "wed", "thu", "fri"], "start": "18:00", "end": null}],
+    "limited_fridge": true,
+    "neighborhood": "Watsonville",
+    "cant_eat": ["eggplant"],
+    "snap": "yes",
+    "missing": [],
+    "dropped": []
+  }
+}
