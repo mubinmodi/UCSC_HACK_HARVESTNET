@@ -1,9 +1,11 @@
 """Run a scenario fixture with the real negotiators, and log every step (ticket #20).
 
-Lane A owns the real scenario harness (#7) and calculators (#8). This is the Lane B side
-of the join: it runs a contract fixture (``scenario.py``) through the real rules-based
-negotiators and produce profiles, behind the agreed agent move interface, so that
-plugging into Lane A's harness is wiring only.
+Lane A owns the scenario harness (#7, ``harvestnet_core.engine``) and the real
+calculators (#8, ``harvestnet_core.calculators``). This is Lane B's runner: it runs a
+contract fixture (``scenario.py``) through the real rules-based negotiators and produce
+profiles, behind the agreed agent move interface. The join (``harvestnet_core.join``)
+runs every fixture through Lane A's harness and through this runner, both with Lane A's
+real calculators, and reads both rule-check sets from the harness run.
 
 **What the runner does, and only that.** It publishes turns in the fixture's turn order
 and applies each organization's move to the shared draft. It never decides for anyone
@@ -28,11 +30,13 @@ a food bank holding committed cold-dependent produce runs Lane B's cooler-failur
 (#15), which proposes a new version awaiting the receiving food bank's own decision and
 fresh approvals. The runner commits nothing after that.
 
-**Calculators are a parameter.** ``run_scenario(..., calculators=...)`` takes any
-``Calculators`` implementation: the stand-ins now, Lane A's real ones at the join.
-Every call goes through ``RecordedCalculators``, which logs its inputs and output and,
-when the calculators aren't the stand-ins, also asks the stand-ins and records any
-difference (``difference_from_stand_in``), so the join can explain each one.
+**Calculators are a required parameter.** ``run_scenario(scenario, calculators)`` takes
+any ``Calculators`` implementation. The harness passes Lane A's real ones
+(``harvestnet_core.calculators.Calculators``); only unit tests pass the stand-ins, and
+nothing picks them silently. Every call goes through ``RecordedCalculators``, which logs
+its inputs and output and, when the calculators aren't the stand-ins, also asks the
+stand-ins and records any difference (``difference_from_stand_in``) with a sentence
+saying why, so each difference is explained in the log.
 
 **Negotiators are a parameter.** ``negotiator_factory(role, organization_id,
 calculators)`` builds each organization's negotiator: rules-based by default, or an
@@ -80,6 +84,7 @@ from .rules_negotiators import TurnError, _Negotiator, rules_negotiator
 from .scenario import Fault, Scenario, SurplusOffer, draft_to_dict, facts_for, jsonable, offer_draft
 
 __all__ = [
+    "FIXTURE_CHECKS_IN_HARNESS",
     "LANE_A_PENDING",
     "EventLog",
     "Negotiation",
@@ -89,10 +94,14 @@ __all__ = [
     "draft_terms",
     "llm_negotiators_for",
     "negotiate",
+    "negotiator_label",
     "run_scenario",
 ]
 
-LANE_A_PENDING = "pending: Lane A rule check (#7), not run here"
+# The fixture's own rule checks read Lane A's records (holds, pickups, pathways), which
+# this runner doesn't keep. Lane A's harness runs them, and the join reports the results.
+FIXTURE_CHECKS_IN_HARNESS = "not run by Lane B's runner: Lane A's harness runs this check (see harvestnet_core.join)"
+LANE_A_PENDING = FIXTURE_CHECKS_IN_HARNESS  # the name #38 used, kept for old imports
 
 
 class Negotiator(Protocol):
@@ -127,6 +136,8 @@ def draft_terms(draft: DraftVersion) -> dict[str, Any]:
 # --- Calculators, recorded ----------------------------------------------------------------
 
 _INPUT_NAMES = {
+    "fair_share": ("household_size",),
+    "household_portions": ("pounds_available", "households"),
     "fair_share_gap": ("households",),
     "gap_after_plan": ("gap_lb", "planned_lb"),
     "storage_at": ("storage", "at"),
@@ -157,11 +168,17 @@ class RecordedCalculators:
     ``reference`` is the stand-in to compare with, or ``None`` when ``primary`` is the
     stand-in. A call's ``difference_from_stand_in`` is ``None`` when both agree (or no
     comparison was made), else the differing fields with both outputs and a sentence.
+    When the stand-ins have no such calculator (``fair_share``, ``household_portions``),
+    the call says so in ``not_compared``. ``explanations`` maps a calculator name to why
+    the primary's answers can differ from the stand-in's, and is added to the sentence;
+    it defaults to the primary's own ``stand_in_differences``, if it has any.
     """
 
-    def __init__(self, primary: Calculators, log: EventLog, clock: Callable[[], datetime], *, reference: Calculators | None = None):
+    def __init__(self, primary: Calculators, log: EventLog, clock: Callable[[], datetime], *, reference: Calculators | None = None,
+                 explanations: Mapping[str, str] | None = None):
         self.primary = primary
         self.reference = reference
+        self.explanations = dict(explanations if explanations is not None else getattr(primary, "stand_in_differences", None) or {})
         self.log = log
         self.clock = clock
         self.profiles: ProfileSet = primary.profiles
@@ -178,6 +195,12 @@ class RecordedCalculators:
         """Attribute the following calls to ``actor`` and collect their event numbers."""
         self.actor, self.purpose, self._seqs = actor, purpose, []
         return self._seqs
+
+    def fair_share(self, household_size):
+        return self._call("fair_share", household_size)
+
+    def household_portions(self, pounds_available, households):
+        return self._call("household_portions", pounds_available, households)
 
     def fair_share_gap(self, households):
         return self._call("fair_share_gap", households)
@@ -213,6 +236,8 @@ class RecordedCalculators:
                                       difference_from_stand_in=None))
             raise
         output = _contract_output(name, result)
+        if self.reference is not None and not hasattr(self.reference, name):
+            base["not_compared"] = f"the stand-ins have no {name} calculator, so this call isn't compared"
         event = self.log.add("calculator_call", self.clock(), **base, output=output,
                              difference_from_stand_in=self._difference(name, args, output))
         self._record(event)
@@ -224,7 +249,7 @@ class RecordedCalculators:
             self._seqs.append(event["seq"])
 
     def _difference(self, name: str, args: Sequence[Any], output: dict[str, Any]) -> dict[str, Any] | None:
-        if self.reference is None:
+        if self.reference is None or not hasattr(self.reference, name):
             return None
         try:
             ref = _contract_output(name, getattr(self.reference, name)(*args))
@@ -234,9 +259,10 @@ class RecordedCalculators:
         fields = [k for k in ref if not _same(output.get(k), ref[k])]
         if not fields:
             return None
+        why = f" Why: {self.explanations[name]}" if name in self.explanations else ""
         return {"fields": fields, "output": output, "stand_in_output": ref,
                 "explanation": f"{self.label} gave a different {', '.join(fields)} than the stand-in for the same input; "
-                               f"the run used {self.label}'s answer."}
+                               f"the run used {self.label}'s answer.{why}"}
 
 
 def _same(a: Any, b: Any) -> bool:
@@ -382,12 +408,16 @@ def _move_problem(move: Move, org: str, role: Role, draft: DraftVersion) -> str 
     return None
 
 
-def _negotiator_label(negotiator: Any) -> str:
+def negotiator_label(negotiator: Any) -> str:
+    """``rules``, ``llm``, or the class name: which kind of negotiator made a move."""
     if isinstance(negotiator, LLMNegotiator):
         return "llm"
     if isinstance(negotiator, _Negotiator):
         return "rules"
     return type(negotiator).__name__
+
+
+_negotiator_label = negotiator_label
 
 
 def _llm_record(negotiator: Any) -> dict[str, Any] | None:
@@ -455,7 +485,7 @@ class ScenarioRun:
 
 def run_scenario(
     scenario: Scenario,
-    calculators: Calculators | None = None,
+    calculators: Calculators,
     *,
     negotiator_factory: NegotiatorFactory = rules_negotiator,
     compare_with_stand_in: bool | None = None,
@@ -464,11 +494,14 @@ def run_scenario(
 ) -> ScenarioRun:
     """Run one fixture's negotiation, approvals, and faults, and check Lane B's rules.
 
-    ``compare_with_stand_in`` defaults to comparing whenever ``calculators`` aren't the
-    stand-ins themselves. ``minutes_per_turn`` is how far the harness clock moves per turn
-    (the contract doesn't say; **proposed** default 0).
+    ``calculators`` is required: Lane A's real ones in the harness, the stand-ins only in
+    unit tests. ``compare_with_stand_in`` defaults to comparing whenever ``calculators``
+    aren't the stand-ins themselves. ``minutes_per_turn`` is how far the harness clock
+    moves per turn (the contract doesn't say; **proposed** default 0).
     """
-    primary = calculators if calculators is not None else StandInCalculators()
+    if calculators is None:
+        raise TypeError("run_scenario needs calculators: Lane A's real ones, or the stand-ins in a unit test")
+    primary = calculators
     if compare_with_stand_in is None:
         compare_with_stand_in = type(primary) is not StandInCalculators
     log = EventLog()
@@ -507,7 +540,7 @@ def run_scenario(
         committed_draft=committed,
         outcome=next((e for e in reversed(events) if e["kind"] == "outcome"), {}),
         lane_b_rule_checks=checks,
-        fixture_rule_checks={name: LANE_A_PENDING for name in scenario.rule_checks},
+        fixture_rule_checks={name: FIXTURE_CHECKS_IN_HARNESS for name in scenario.rule_checks},
         number_check_failures=llm_failures,
         calculator_differences=[e for e in events if e["kind"] == "calculator_call" and e.get("difference_from_stand_in")],
     )
