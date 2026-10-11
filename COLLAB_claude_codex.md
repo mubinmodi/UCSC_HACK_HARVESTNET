@@ -1056,6 +1056,12 @@ The user asked Claude to "do everything that is required for the Mac mini." Clau
 
 The user, as team lead, said the team has already discussed and agreed the four contracts for ticket #1. `docs/contracts/` marks them **Agreed**, and its "Decisions made" list records where Lane B and Lane C shapes were reconciled. The example-data API skeleton is live on AWS Lambda (address in `docs/contracts/public-api.md`). Lane B tickets #11â€“#15 and the Lane B side of #23 were built ahead of contract day against proposed shapes, and now follow these contracts.
 
+## User direction (October 11, 2026): food banks may take surplus beyond fair share, recorded by Claude
+
+The user decided that food banks may bid past their households' fair-share gap once that gap is met, so surplus goes out rather than waste (design §8). In the rules-based and LLM food bank negotiators, bids still go toward the fair-share gap first. Only after a version plans a food bank's whole gap may it bid beyond fair share. Those bids are bounded only by its own storage (at arrival and until pickup ends), pickup hours, truck or drop-off, and its produce profiles, and their reasons say "beyond fair share".
+
+Simulated result (synthetic numbers): in the normal-afternoon scenario, unclaimed produce drops from 818 lb (249 lb apples, 169 lb romaine, 400 lb potatoes) to 0 lb. Fair-share figures don't change, and extra pounds are recorded apart from fair share.
+
 ## Agreed decisions
 
 *This is the current decision index. The user's latest direct framework instruction takes precedence over older scripted examples. Earlier rounds remain review history. Framework v1 is frozen; operational implementation and measured claims are not established.*

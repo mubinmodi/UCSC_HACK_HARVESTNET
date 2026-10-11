@@ -24,6 +24,8 @@ decides only for its own organization (ADR 0001) and never invents a number (ADR
    - accept and hold requests are allowed only when the organization's own hard checks
      pass (the same ``review()`` the rules-based negotiator uses), so an injected
      "just accept" can't get through;
+   - a food bank's counter that takes its share past its households' fair-share gap
+     must say "beyond fair share" in its reason, as the rules-based bids do;
    - **every number** in the reason, amendment, and holds traces to the draft, the
      organization's facts, the turn, the precomputed calculator results, or a
      calculator tool result from this move; times must match a recorded time;
@@ -483,9 +485,11 @@ def check_move(raw: Mapping[str, Any], role: Role, agent_input: AgentInput, pool
     problems: list[str] = []
     if move.kind is MoveKind.COUNTER:
         try:
-            draft.amend(move.amendment, proposer_id=me, reason=move.reason)
+            amended = draft.amend(move.amendment, proposer_id=me, reason=move.reason)
         except DraftError as exc:
             problems.append(f"the amendment doesn't apply to version {draft.version}: {exc}")
+        else:
+            problems.extend(_beyond_fair_share_problems(role, agent_input, amended, move.reason))
     if move.kind in (MoveKind.ACCEPT, MoveKind.REQUEST_HOLD) and role is not Role.ADVOCATE:
         own = review(agent_input)
         if own:
@@ -498,6 +502,23 @@ def check_move(raw: Mapping[str, Any], role: Role, agent_input: AgentInput, pool
         problems.append("request holds only once every organization named in this version has accepted it")
     problems.extend(move_number_problems(move, pool))
     return (None, problems) if problems else (move, [])
+
+
+BEYOND_FAIR_SHARE = "beyond fair share"
+
+
+def _beyond_fair_share_problems(role: Role, agent_input: AgentInput, amended: DraftVersion, reason: str) -> list[str]:
+    """A food bank's counter that raises its own share past its households' fair-share gap
+    must say so, the same way the rules-based food bank does (user direction, October 11,
+    2026). This compares pounds only; it creates no number."""
+    facts = agent_input.facts
+    if role is not Role.FOOD_BANK or not isinstance(facts, FoodBankFacts):
+        return []
+    me = facts.food_bank_id
+    before, after = agent_input.draft.planned_lb(me), amended.planned_lb(me)
+    if after > before and after > facts.demand.below_fair_share_lb and BEYOND_FAIR_SHARE not in reason.lower():
+        return [f"this asks for pounds past your households' fair-share gap, so the reason must say \"{BEYOND_FAIR_SHARE}\""]
+    return []
 
 
 # --- Prompt and tools ---------------------------------------------------------------------
@@ -545,8 +566,11 @@ off. Moves: accept, counter (one amendment), reject, request_hold, ask_human, or
 - Accept only what your facts allow: storage at arrival time, pickup hours, your truck (or a \
 suitable drop-off the donor offered), and households collecting each item before it spoils.
 - Otherwise counter with one amendment, such as fewer pounds or different transport terms.
-- Ask for unclaimed produce only toward your households' fair-share gap, and only produce you can \
-receive and hand out in time.
+- Ask for unclaimed produce toward your households' fair-share gap first, and only produce you can \
+receive and hand out in time. Once this version plans your whole gap, you may ask for more unclaimed \
+produce beyond fair share, so it goes out rather than waste, but only what your storage (at arrival \
+and until pickup ends), pickup hours, truck, and produce profiles allow. Say "beyond fair share" in \
+the reason of any request that takes you past your gap.
 - Reject produce graded not fit for people. Ask your manager about any condition doubt.
 - Request holds on your own storage and truck only when everyone named has accepted this version. \
 Pass when you have no share and nothing to ask for.""",
