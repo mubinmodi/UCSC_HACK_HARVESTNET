@@ -8,13 +8,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Work on idea development and Markdown design documents. Do not write application code or begin implementation unless the user explicitly requests it. Creating a plan or marking a ticket ready does not authorize implementation.
 
-**Exception (user direction, October 11, 2026): Lane B implementation is authorized** for mubinmodi's tickets (#11–#15, #20, #23), following `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`. A ticket starts only when all its GitHub blockers are closed and it is claimed with a `claimed: macbook` or `claimed: mac-mini` label. Default split: the MacBook Air takes #11, #13, #20, #23; the Mac mini takes #12, #14, #15. Teammates' tickets stay read-only.
+**Exception (user direction, October 11, 2026): Lane B implementation is authorized** for mubinmodi's tickets (#11–#15, #20, #23), following `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`. A ticket starts only when all its GitHub blockers are closed and it is claimed with a `claimed: macbook` or `claimed: mac-mini` label. Default split: the MacBook Air takes #11, #13, #20, #23; the Mac mini takes #12, #14, #15. Later the same day the lead (mubinmodi) also authorized reviewing, fixing, and merging teammates' PRs, completing their remaining tickets, and deploying to AWS (cost kept minimal).
 
 Read `docs/MVP_DESIGN.md` for the current design, with `CONTEXT.md` (vocabulary), `docs/adr/` (decisions), and `docs/CHALLENGE.md` (the Cisco rules). Everything outside the MVP is in `future scope/`. Use it for reference, never as current behavior. Use `COLLAB_claude_codex.md` for shared review, preserving existing contributor rounds and adding your own response. The original conversation transcripts are historical references in `future scope/history/`. Distinguish candidate outcomes, simulated results, and externally verified facts; agent agreement alone is not user approval.
 
 ## Repository shape
 
-`main` now has Lane B code in `agents/` (the Python package `harvestnet_agents`; see `agents/README.md`). Run its tests with `cd agents && uv run pytest`, or one test with `uv run pytest tests/<file>::<test>`. There are no build or lint commands yet. Lane C code exists on the unmerged `calebdbur/16`–`19` branches; each ticket's PR should add its own commands here. Everything else in the repo is design documents for a hackathon entry (Cisco "When AI Agents Disagree", Level 3).
+A hackathon entry (Cisco "When AI Agents Disagree", Level 3). Code on `main`:
+
+- `agents/`: Lane B negotiators, profiles, front desk, cooler-failure logic (`harvestnet_agents`). `cd agents && uv run pytest` (one test: `uv run pytest tests/<file>::<test>`).
+- `harvestnet_core/` + `core_tests/` + `core_fixtures/`: Lane A records, calculators, harness, public API, evaluation. `cd agents && uv sync && cd .. && PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=. agents/.venv/bin/python -m unittest discover -s core_tests`. See `docs/core/README.md`.
+- `harvestnet_platform/` + `tests/`: Lane C organization systems, A2A/Directory transport, approvals, n8n. `uv run --with pytest pytest -q` at the root. See `docs/platform/`.
+- `api_skeleton/`: the example-data API (Lambda). `cd api_skeleton && uv run pytest`.
+- `frontend/<app>/` (household, donor-dashboard, results-strip): Vite + React apps. `npm ci && npm run typecheck && npm test && npm run build`.
+- `deploy/aws/`: `setup.sh` / `teardown.sh` for the live stack (profile `incubator`, us-east-2). See `deploy/aws/README.md`.
+- Agreed interfaces: `docs/contracts/`.
 
 - **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0009`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP. If any other file disagrees with these, these win.
 - **Derived copies:** `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` are styled renderings of `docs/MVP_DESIGN.md`. When the Markdown changes materially, the copies go stale; say so, or regenerate them if asked.
