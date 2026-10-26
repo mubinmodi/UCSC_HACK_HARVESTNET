@@ -165,11 +165,14 @@ The additive authenticated `POST /lots/{lot_id}/condition-checks` takes
 this creates a new version and invalidates old approvals. This operation needs
 frontend contract review; it does not change existing route shapes.
 
-Staff auth binds each token to one organization. The legacy Lane C approval
-payload is accepted by normalizing `event_id` to `lot_id`, the donor role alias
-to the actual donor ID, and the raw SHA-256 digest to the agreed prefixed form.
-The decision and exact terms are never changed. The actual platform approval
-store/HTTP client is tested against the core with separate owner credentials.
+Staff auth binds each token to one organization. `POST /approvals` takes only the
+agreed payload: `lot_id`, the organization's own ID (the donor is `market`, not a
+role) and the `sha256:`-prefixed terms hash (README decision 8). Lane C's bridge has
+sent exactly that since PR #56, so the core no longer translates `event_id`, the
+donor role alias or a bare hex digest; an older payload is refused (400) and records
+nothing. The one place a bare hex hash is still accepted is the platform's own
+`ApprovalStore.decide`, where a human's page or n8n sends it. The actual platform
+approval store/HTTP client is tested against the core with separate owner credentials.
 
 ## #10: baselines and evaluation runner
 
