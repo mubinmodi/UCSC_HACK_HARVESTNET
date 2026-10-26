@@ -347,7 +347,11 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
             elif action=="request_hold":
                 if move.get("resource_owner")!=org:
                     raise ValueError("resource owner mismatch")
-                engine.protocol.hold(lot_id,draft["version"],org,move["holds"],engine.now,engine.capacities(org,draft))
+                try:
+                    engine.protocol.hold(lot_id,draft["version"],org,move["holds"],engine.now,engine.capacities(org,draft))
+                except Conflict as exc:
+                    # A hold that is already over (or double booked) is a refused move, not a crash.
+                    engine.records.event(lot_id,engine.now,"hold_refused",{"organization_id":org,"version":draft["version"],"reason":str(exc)})
             elif action not in ("reject","pass","ask_human"):
                 raise ValueError("unknown move")
             lot=engine.records.get("lot",lot_id)

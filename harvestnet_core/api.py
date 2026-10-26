@@ -11,6 +11,7 @@ from . import changes
 from .protocol import Conflict, dt, terms_hash, named, number
 from .records import NotFound
 from .contact import email_address
+from .workflows import negotiate_pending
 
 
 class Unauthorized(ValueError):
@@ -96,10 +97,16 @@ class API:
     def purge(self):
         with self.records.transaction():
             for lot in self.records.all('lot'):
-                if lot['status'] not in ('committed','unclaimed') and dt(lot['draft']['deadline'])<=dt(self.engine.now):
+                # A preserved disagreement is a result, not an open lot: it survives the deadline
+                # with its options and reasons (design section 8). Only a lot still being negotiated
+                # or awaiting approvals becomes unclaimed.
+                if lot['status'] not in ('committed','unclaimed','preserved_disagreement') and dt(lot['draft']['deadline'])<=dt(self.engine.now):
                     lot.update(status='unclaimed',holds={},stop_reason='Deadline passed without every exact-version approval; nothing auto-committed')
                     self.records.put('lot',lot['draft']['lot_id'],lot)
                     self.records.event(lot['draft']['lot_id'],self.engine.now,'deadline_unclaimed',{'reason':lot['stop_reason']})
+        reopened=[lot['draft']['lot_id'] for lot in self.records.all('lot') if lot['status']=='awaiting_approvals' and self.engine.protocol.expire_holds(lot['draft']['lot_id'],self.engine.now)]
+        for lot_id in reopened:
+            negotiate_pending(self.engine,lot_id)
         expired=[r for r in self.records.all("request") if dt(r["expires_at"])<=dt(self.engine.now)]
         if expired:
             with self.records.transaction():
@@ -225,6 +232,27 @@ class API:
         return {**item,"name":self.engine.calc.profiles.get(pid).name,"status":lot['status'],"split":split,
                 "unclaimed_lb":max(0.0,item['pounds']-committed) if settled else 0,"households_reached":len(reached),
                 "usable_until_basis":lot.get('usable_until_basis',{}).get(pid)}
+
+    def disagreement_view(self, lot):
+        """A preserved disagreement as the involved dashboards show it (design section 8): why the
+        rounds stopped, the plans that were on the table, and each organization's last reason.
+        Any other lot's stop reason is returned as before."""
+        reason=lot.get('stop_reason')
+        if lot['status']!='preserved_disagreement':
+            return reason
+        last={}
+        for e in self.records.events(lot['draft']['lot_id']):
+            if e['kind']=='move':
+                last[e['data']['organization_id']]=e['data']
+        options,seen=[],set()
+        for v in reversed(lot['versions']):
+            plan=[{"produce_id":a['produce_id'],"food_bank_id":a['food_bank_id'],"pounds":a['pounds']} for a in v['allocations'] if a['pounds']>0]
+            key=repr(plan)
+            if key in seen or len(options)>=3:
+                continue
+            seen.add(key)
+            options.append({"version":v['version'],"proposer_id":v['proposer_id'],"reason":v['reason'],"allocations":plan})
+        return {"reason":reason,"options":options,"reasons":[{"organization_id":o,"version":m['version'],"action":m['action'],"reason":m['reason']} for o,m in last.items()]}
 
     def release(self, pid, code):
         with self.records.transaction():
@@ -389,13 +417,12 @@ class API:
                 # This offer's drop-off only; the donor's recorded drop-off stays as it is.
                 offer['drop_off']=self.drop_off(b['drop_off'])
             draft=self.engine.create_offer(offer)
-            from .workflows import negotiate_pending
             negotiate_pending(self.engine,offer['lot_id'])
             return 201,{"lot_id":offer['lot_id'],"version":1,"status":"offered","items":[{"produce_id":i['produce_id'],"name":calc.profiles.get(i['produce_id']).name,"pounds":i['pounds'],"usable_until":i['usable_until'],"usable_until_basis":basis[i['produce_id']]} for i in draft['items']],"needs_human":[i['produce_id'] for i in draft['items'] if i.get('condition_doubt')],"message":"Nothing is promised until every named organization approves."}
         if root=='lots' and len(path)>=2:
             lot=self.records.get('lot',path[1]); d=lot['draft']
             if method=='GET' and len(path)==2:
-                return 200,{"lot_id":path[1],"donor_id":d['donor_id'],"status":lot['status'],"current_version":d['version'],"deadline":d['deadline'],"items":[self.lot_item(lot,i) for i in d['items']],"draft":d,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[o for o in named(d) if lot['approvals'].get(o,{}).get('decision')!='approve'],"disagreement":lot.get('stop_reason')}
+                return 200,{"lot_id":path[1],"donor_id":d['donor_id'],"status":lot['status'],"current_version":d['version'],"deadline":d['deadline'],"items":[self.lot_item(lot,i) for i in d['items']],"draft":d,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[o for o in named(d) if lot['approvals'].get(o,{}).get('decision')!='approve'],"disagreement":self.disagreement_view(lot)}
             if method=='GET' and path[2:]==['versions']:
                 return 200,{"lot_id":path[1],"versions":[{"version":v['version'],"proposer_id":v['proposer_id'],"move":"counter" if v['version']>1 else "offer","reason":v['reason'],"change":next((e['data']['amendment'] for e in self.records.events(path[1]) if e['kind']=='amendment' and e['data']['draft']['version']==v['version']),None)} for v in lot['versions']],"current_version":d['version']}
             if method=='POST' and path[2:]==['counters']:
@@ -407,13 +434,11 @@ class API:
                 move={"organization_id":b['organization_id'],"version":b['version'],"action":"counter","amendment":b['amendment'],"reason":b['reason']}
                 with self.records.transaction():
                     self.records.put('queued_move',path[1]+':'+b['organization_id'],{"lot_id":path[1],**move})
-                from .workflows import negotiate_pending
                 negotiate_pending(self.engine,path[1])
                 return 202,{"lot_id":path[1],"status":"queued_for_turn","based_on_version":d['version'],"move":move,"message":"Counter queued for your organization's next turn."}
             if method=='POST' and path[2:]==['condition-checks']:
                 self.authorize(b['organization_id'],token)
                 updated=self.engine.protocol.condition_check(path[1],b['version'],b['organization_id'],b['produce_id'],b['condition_grade'],b['usable_until'],b['reason'],self.engine.now)
-                from .workflows import negotiate_pending
                 negotiate_pending(self.engine,path[1])
                 return 200,{'lot_id':path[1],'version':updated['version'],'status':'condition_recorded','committed':False}
             # Proposed (#23): a food bank's holding and its changed version after a disruption.
@@ -450,7 +475,11 @@ class API:
                         raise Conflict(f"version {receipt['version']} was superseded by committed version {max(newer)}; decide on the current version")
                 result=self.engine.protocol.approve(receipt,owner,self.engine.now,self.engine.validate)
                 self.engine.distribute(b['lot_id'])
-                return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
+                reason=result.get('returned_to_negotiation')
+                if reason and self.records.get('lot',b['lot_id'])['status']=='negotiating':
+                    # A decline or an expired hold: the owners' next turns run (design section 8).
+                    negotiate_pending(self.engine,b['lot_id'])
+                return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"returned_to_negotiation" if reason else "approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for'],**({"returned_to_negotiation":reason} if reason else {})}
         if root=='food-banks':
             if len(path)==1 and method=='GET':
                 banks=[]
@@ -483,11 +512,15 @@ class API:
                     disagreements=[]
                     for lot in self.records.all('lot'):
                         d=lot['draft']; allocations=[a for a in d['allocations'] if a['food_bank_id']==bid]
+                        if lot['status']=='preserved_disagreement' and any(a['food_bank_id']==bid for v in lot['versions'] for a in v['allocations']):
+                            # Involved if it was ever on the table, even when the last plan left this food bank out.
+                            view=self.disagreement_view(lot)
+                            disagreements.append({"lot_id":d['lot_id'],"reason":view['reason'],"options":view['options'],"reasons":view['reasons']})
                         if not allocations: continue
                         transport=next((t for t in d['transports'] if t['food_bank_id']==bid),None)
                         incoming.append({"lot_id":d['lot_id'],"version":d['version'],"donor_id":d['donor_id'],"donor_name":self.engine.names[d['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":None,"agent_reason":d['reason'],"needs_your_approval":lot['status']!='committed'})
                         if transport: arrivals.append({"lot_id":d['lot_id'],"version":d['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
-                        if lot.get('stop_reason'): disagreements.append({"lot_id":d['lot_id'],"reason":lot['stop_reason']})
+                        if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":d['lot_id'],"reason":lot['stop_reason']})
                     return 200,{"food_bank_id":bid,"name":self.engine.names[bid],"capacity":{k:bank.get(k) for k in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bid),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bid)}
         if root=='results' and method=='GET':
             try:

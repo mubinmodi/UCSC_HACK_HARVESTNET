@@ -1,7 +1,7 @@
 """Schedule real owner moves for public offers, without scripted human decisions."""
 from harvestnet_agents.negotiation import parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
-from .protocol import named
+from .protocol import Conflict,named
 
 TEMPLATE_REASON='Validated deterministic owner fallback; human approval is still required.'
 
@@ -31,6 +31,11 @@ def checked_move(engine,lot_id,org,move,pool,reask,fallback):
     move['reason']=TEMPLATE_REASON
     engine.records.event(lot_id,engine.now,'template_fallback',{'organization_id':org,'after_failures':2})
     return move
+
+
+def declined_by(lot):
+    """Organizations whose human declined the lot's current version (approvals reset with each new version)."""
+    return sorted(o for o,r in lot['approvals'].items() if r['decision']=='decline')
 
 
 def negotiate_pending(engine,lot_id,provider=None):
@@ -71,10 +76,15 @@ def negotiate_pending(engine,lot_id,provider=None):
         elif move['action']=='accept': accepts.add(org)
         elif move['action']=='request_hold':
             if move.get('resource_owner')!=org: raise ValueError('hold belongs to another owner')
-            engine.protocol.hold(lot_id,d['version'],org,move['holds'],engine.now,engine.capacities(org,d))
+            try:
+                engine.protocol.hold(lot_id,d['version'],org,move['holds'],engine.now,engine.capacities(org,d))
+            except Conflict as exc:
+                # A hold that is already over (or double booked) is a refused move, not a crash.
+                engine.records.event(lot_id,engine.now,'hold_refused',{'organization_id':org,'version':d['version'],'reason':str(exc)})
         lot=engine.records.get('lot',lot_id)
         queued=any(m['lot_id']==lot_id for m in engine.records.all('queued_move'))
-        if not queued and lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
+        # A human's decline stays on the version: these exact terms never go back for approval.
+        if not queued and not declined_by(lot) and lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
             lot['status']='awaiting_approvals'
             with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
             return lot
@@ -83,7 +93,9 @@ def negotiate_pending(engine,lot_id,provider=None):
             if no_change>=engine.fixture['policies']['rounds_without_new_terms_before_disagreement']: break
     lot=engine.records.get('lot',lot_id)
     lot['status']='preserved_disagreement'
-    lot['stop_reason']='No approved feasible pathway after published negotiation rounds'
+    declined=declined_by(lot)
+    lot['stop_reason']=(f"{', '.join(declined)} declined version {lot['draft']['version']} and the rounds that followed produced no new terms; no automatic commitment"
+                        if declined else 'No approved feasible pathway after published negotiation rounds')
     with engine.records.transaction():
         engine.records.put('lot',lot_id,lot)
         engine.records.event(lot_id,engine.now,'preserved_disagreement',{'reason':lot['stop_reason']})

@@ -139,6 +139,30 @@ class Protocol:
             self.records.event(lot_id,now,'human_condition_check',{'organization_id':owner,'produce_id':produce_id,'version':draft['version'],'grade':grade,'reason':reason})
             return draft
 
+    def _expire_holds(self, lot, now):
+        """Design section 8, Held to Negotiating: a hold ran out before every approval was in.
+
+        The stale holds go, the exact terms need fresh holds and fresh approvals, and the owners'
+        next turns run. Nothing commits (ADR 0004). Returns whether the lot went back."""
+        draft = lot["draft"]
+        expired = sorted(o for o in named(draft) if any(dt(now) >= dt(h["end"]) for h in lot["holds"].get(o, [])))
+        if not expired or lot["status"] == "committed":
+            return False
+        for o in expired:
+            lot["holds"].pop(o, None)
+        lot.update(approvals={}, status="negotiating")
+        self.records.event(draft["lot_id"], now, "hold_expired", {"version": draft["version"], "organizations": expired})
+        return True
+
+    def expire_holds(self, lot_id, now):
+        """Send a lot whose holds ran out back to negotiation. Returns whether it went back."""
+        with self.records.transaction():
+            lot = self.records.get("lot", lot_id)
+            if not self._expire_holds(lot, now):
+                return False
+            self.records.put("lot", lot_id, lot)
+            return True
+
     def approve(self, receipt, owner, now, validate):
         lot_id = receipt["lot_id"]
         if type(receipt['version']) is not int or receipt['version']<1:
@@ -166,9 +190,24 @@ class Protocol:
                 raise Conflict("stale version or changed terms")
             if owner not in named(draft) or dt(now) >= dt(draft["deadline"]):
                 raise Conflict("unnamed organization or deadline passed")
+            if receipt["decision"] == "approve" and self._expire_holds(lot, now):
+                self.records.put("lot", lot_id, lot)
+                result = {"lot_id": lot_id, "version": draft["version"], "decision_recorded": False, "returned_to_negotiation": "hold_expired",
+                          "approved_by": [], "waiting_for": named(draft), "committed": False}
+                if rid:
+                    self.records.put("receipt", rid, {"receipt": receipt, "result": result})
+                return result
             lot["approvals"][owner] = copy.deepcopy(receipt)
             self.records.event(lot_id, now, "human_decision", receipt)
             waiting = [o for o in named(draft) if lot["approvals"].get(o, {}).get("decision") != "approve"]
+            returned = None
+            if receipt["decision"] == "decline" and lot["status"] != "committed":
+                # A human's decline ends this version's chance to commit. The lot goes back to
+                # negotiation: the holds are released and the owners' next turns run. The decline
+                # stays on the version, so these exact terms are never sent for approval again.
+                lot.update(holds={}, status="negotiating")
+                self.records.event(lot_id, now, "returned_to_negotiation", {"version": draft["version"], "reason": "human_declined", "organization_id": owner})
+                returned = "human_declined"
             holds_valid = all(lot["holds"].get(o) and all(dt(now) < dt(h["end"]) for h in lot["holds"][o]) for o in named(draft))
             if not waiting and holds_valid and lot["status"] != "committed":
                 validate(draft, lot["holds"])
@@ -177,6 +216,8 @@ class Protocol:
                 self.records.event(lot_id, now, "commitment", {"version": draft["version"], "terms_hash": terms_hash(draft), "allocations": lot["commitments"], "approvals": lot["approvals"], "holds": lot["holds"]})
             self.records.put("lot", lot_id, lot)
             result = {"lot_id": lot_id, "version": draft["version"], "decision_recorded": True, "approved_by": sorted(o for o, r in lot["approvals"].items() if r["decision"] == "approve"), "waiting_for": waiting, "committed": lot["status"] == "committed"}
+            if returned:
+                result["returned_to_negotiation"] = returned
             if rid:
                 self.records.put("receipt", rid, {"receipt": receipt, "result": result})
             return result
