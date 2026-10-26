@@ -82,7 +82,7 @@ class CoolerWatch(unittest.TestCase):
         # The approval bridge got exactly this version's request and issued a link per organization.
         self.request.assert_called_once()
         [(sent, issued)] = self.issued
-        self.assertEqual((sent['event_id'], sent['version'], sorted(sent['organizations'])), (LOT, self.new, ['city', 'eastside']))
+        self.assertEqual((sent['lot_id'], sent['version'], sorted(sent['organizations'])), (LOT, self.new, ['city', 'eastside']))
         self.assertEqual(sorted(r['organization_id'] for r in issued['requests']), ['city', 'eastside'])
         # Never auto-commits: the plan is still on the committed version and nobody has decided.
         lot = self.engine.records.get('lot', LOT)

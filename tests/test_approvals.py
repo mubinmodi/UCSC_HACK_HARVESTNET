@@ -138,7 +138,7 @@ class ApprovalTests(unittest.TestCase):
             receipt = request_json(base+'/human/decision',{'token':token,'decision':'approve','version':1,'terms_hash':link['terms_hash'],'human_confirmed':True})
             self.assertFalse(receipt['committed'])
             self.assertEqual(receipt['mode'],'local_approval_fallback')
-            request_json(base+'/approval-requests',{'event_id':'lot','version':2,'terms':{'lb':7},'organizations':['market']},token='events-token')  # the core's change requests still say event_id
+            request_json(base+'/approval-requests',{'lot_id':'lot','version':2,'terms':{'lb':7},'organizations':['market']},token='events-token')
             with self.assertRaises(HTTPError) as stale:
                 request_json(base+'/human/decision',{'token':token,'decision':'approve','version':1,'terms_hash':link['terms_hash'],'human_confirmed':True})
             self.assertEqual(stale.exception.code,409)

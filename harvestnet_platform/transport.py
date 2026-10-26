@@ -12,9 +12,7 @@ import uuid
 from pathlib import Path
 from .http import JsonHandler, request_json, seconds, serve
 
-# Organization IDs are names, not roles (docs/contracts/README.md decision 1).
-ORGANIZATIONS = ('market', 'city', 'rural', 'eastside', 'advocate')
-ROLES = {'market': 'donor', 'city': 'food_bank', 'rural': 'food_bank', 'eastside': 'food_bank', 'advocate': 'advocate'}
+from .roster import BANKS, ORGANIZATIONS, ROLES  # the one roster; re-exported for callers of this module
 ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human', 'pass'}
 # docs/contracts/agent-moves.md: amendment kinds and their fields, and hold resources.
 AMENDMENTS = {'set_pounds': ('produce_id', 'food_bank_id', 'pounds'),
@@ -184,7 +182,7 @@ class Receiver:
 
 def agent_card(organization, endpoint, capabilities=None):
     tags = ['negotiation', organization]
-    if organization in ('city', 'rural', 'eastside'):
+    if organization in BANKS:
         tags += ['cold_space', 'pickup_hours']
     return {'name': f'HarvestNet {organization}', 'description': 'HarvestNet organization proposals; no external commitment authority',
             'url': endpoint.rstrip('/') + '/', 'version': '1.0.0', 'protocolVersion': '0.3.0',

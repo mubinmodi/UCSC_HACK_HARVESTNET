@@ -87,14 +87,6 @@ class SystemsTests(unittest.TestCase):
             self.assertEqual(ours['pickup-hours']['windows'], bank['pickup_windows'])
             self.assertEqual(ours['storage']['cold_available_lb'], bank['storage'][0]['cold_free_lb'])
 
-    def test_older_exports_keyed_by_role_still_read_as_market(self):
-        systems = Systems()
-        legacy = copy.deepcopy(systems.fixture)
-        legacy['donor'] = legacy.pop('market')
-        systems.fixture = legacy
-        self.assertEqual(systems.read('market', 'truck')['data']['capacity_lb'], 700)
-        self.assertIn('/systems/market/inventory', systems.openapi()['paths'])
-
     def test_agent_hosts_read_the_switched_state_from_the_systems_service(self):
         service = Systems()
         server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(service, 'switch'))

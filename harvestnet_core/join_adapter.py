@@ -13,17 +13,16 @@ def owner_policy(session,role,organization):
 
 def policy(organization,data):
     context=data['turn_context']
-    # Lane C's transport IDs are now the organization IDs ('market'); older ones used 'donor'.
-    donor=organization in ('donor',data['draft']['donor_id'])
-    domain_org=data['draft']['donor_id'] if donor else organization
-    if data.get('turn')!=organization or context['organization_id']!=domain_org:
+    # The transport's IDs are organization IDs (contract decision 1): the donor is the lot's donor.
+    donor=organization==data['draft']['donor_id']
+    if data.get('turn')!=organization or context['organization_id']!=organization:
         raise ValueError('transport identity does not match core turn')
     role='donor' if donor else 'advocate' if organization=='advocate' else 'food_bank'
     role,typed=parse_agent_input({'role':role,'draft':data['draft'],'facts':data['facts'],'turn':context})
     session=data['policy_session']
     if not isinstance(session,str) or not session:
         raise ValueError('core policy session is required')
-    move=owner_policy(session,role,domain_org).move(typed).to_dict()
+    move=owner_policy(session,role,organization).move(typed).to_dict()
     move['organization_id']=organization
     if 'resource_owner' in move: move['resource_owner']=organization
     return move

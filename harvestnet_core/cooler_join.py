@@ -95,7 +95,8 @@ def organization_systems(engine, at, faults=(), recorded=None):
     from the core's calculators and records. Cooler readings are Lane C's synthetic sensor
     copies; a fixture fault's reading replaces the failing food bank's failed reading.
     """
-    from harvestnet_platform.systems import BANKS, Systems
+    from harvestnet_platform.roster import BANKS, DONOR
+    from harvestnet_platform.systems import Systems
     recorded = copy.deepcopy(recorded or Systems().fixture)
     f, records, now = engine.fixture, engine.records, dt(at)
     if set(engine.banks) != set(BANKS):
@@ -103,7 +104,7 @@ def organization_systems(engine, at, faults=(), recorded=None):
     offer = f['surplus_offers'][0]
     lot = records.get('lot', offer['lot_id'])
     out = {'fixture_version': f"{f['scenario_id']}/{f['contract_version']}", 'observed_at': _utc(at),
-           'donor': {'inventory': {'lot_id': offer['lot_id'], 'recall': bool(offer['recall_notice']), 'deadline': offer['deadline'],
+           DONOR: {'inventory': {'lot_id': offer['lot_id'], 'recall': bool(offer['recall_notice']), 'deadline': offer['deadline'],
                                    'items': [{'profile_id': i['produce_id'], 'quantity': i['quantity'], 'unit': i['unit'],
                                               'condition': i['condition_grade']} for i in offer['items']]},
                      'truck': _truck(engine.drop_off(offer['lot_id']))}}
@@ -211,7 +212,7 @@ def apply_fault(engine, lot_id, fault):
     Returns a summary for the run's metrics. Synthetic, like the fixture.
     """
     from harvestnet_platform.directory import LocalDirectory, record_info
-    from harvestnet_platform.transport import ORGANIZATIONS
+    from harvestnet_platform.roster import ORGANIZATIONS
     from datetime import timedelta
     from .protocol import Conflict
     records, bid = engine.records, fault['food_bank_id']
@@ -334,7 +335,7 @@ def _core_api_class():
             self.tokens = dict(tokens)
 
         def decision(self, record):
-            payload = {k: record[k] for k in ('event_id', 'version', 'organization_id', 'terms_hash', 'decision', 'receipt_id')}
+            payload = {k: record[k] for k in ('lot_id', 'version', 'organization_id', 'terms_hash', 'decision', 'receipt_id')}
             from harvestnet_platform.http import request_json
             return request_json(self.base_url + '/approvals', payload, token=self.tokens[record['organization_id']])
     return OrganizationCoreAPI

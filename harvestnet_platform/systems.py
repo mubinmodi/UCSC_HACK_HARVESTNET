@@ -11,13 +11,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.error import URLError
 from .http import JsonHandler, request_json, serve
+from .roster import BANKS, DONOR, SYSTEM_ORGANIZATIONS
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'systems.json'
-DONOR = 'market'
-BANKS = ('city', 'rural', 'eastside')
-SYSTEM_ORGANIZATIONS = (DONOR, *BANKS)
-# Older exports (the core's cooler_join) key the donor's systems by role; still read them.
-LEGACY_DONOR_KEY = 'donor'
 UPSTREAMS = ('beeceptor', 'harvestnet_systems')
 
 
@@ -61,8 +57,6 @@ class Systems:
     def systems_of(self, organization):
         if organization not in SYSTEM_ORGANIZATIONS:
             raise ValueError('Unknown organization system')
-        if organization == DONOR and DONOR not in self.fixture and LEGACY_DONOR_KEY in self.fixture:
-            return self.fixture[LEGACY_DONOR_KEY]
         return self.fixture[organization]
 
     def recorded(self, organization, resource):

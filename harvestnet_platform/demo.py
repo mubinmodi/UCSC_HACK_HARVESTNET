@@ -8,9 +8,12 @@ from urllib.parse import urlsplit
 from .approvals import ApprovalStore, CoreAPI, handler_for as approvals_handler
 from .directory import LocalDirectory
 from .http import serve
+from .roster import BANKS, DONOR
 from .systems import Systems
 from .transport import InProcess, Receiver, ORGANIZATIONS, role_of
 from .voice import text_intake
+
+DEMO_BANK = BANKS[0]  # the city food bank: the demo fails its cooler and asks it to approve
 
 PAGE = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>HarvestNet platform rehearsal</title><style>body{font:17px system-ui;color:#18372c;background:#f4f8f3;max-width:980px;margin:2rem auto;padding:1rem}section{background:white;border:1px solid #cbd9cd;border-radius:12px;padding:1.2rem;margin:1rem 0}button,a.button{font:inherit;background:#235e43;color:white;border:0;border-radius:6px;padding:.7rem 1rem;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}.label{color:#795400}a{color:#235e43}input,select{font:inherit;padding:.4rem}</style>
@@ -49,7 +52,7 @@ def handler_for(systems, store, token, base):
             try:
                 data = self.read_json()
                 if path == '/demo/cooler':
-                    reading = systems.switch('city',data['failed'])
+                    reading = systems.switch(DEMO_BANK,data['failed'])
                     result = {'reading':reading,'candidates':directory.search(min_cold_lb=100,pickup_at='2026-10-13T19:00:00-07:00')}
                 elif path == '/demo/transport':
                     event = str(uuid.uuid4())
@@ -61,8 +64,8 @@ def handler_for(systems, store, token, base):
                     result = {'mode':transport.mode,'policy':'synthetic_stand_in','receipts':receipts,'committed':False}
                 elif path == '/demo/approvals':
                     event = 'synthetic-'+str(uuid.uuid4())
-                    links = store.request(event,1,{'items':[{'profile_id':'romaine','pounds':200,'food_bank':'city','mover':'city'}],
-                                                 'synthetic':True},['market','city'])
+                    links = store.request(event,1,{'items':[{'profile_id':'romaine','pounds':200,'food_bank':DEMO_BANK,'mover':DEMO_BANK}],
+                                                 'synthetic':True},[DONOR,DEMO_BANK])
                     for link in links:
                         link['decision_url'] = base+'/human/review?token='+link.pop('token')
                     result = {'mode':'local_approval_fallback','requests':links,'committed':False}

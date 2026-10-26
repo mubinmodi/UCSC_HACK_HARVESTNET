@@ -274,29 +274,44 @@ class EveryOperationShapeTests(unittest.TestCase):
         self.assertEqual(done, {p.stem for p in Path('docs/contracts/examples/public-api').glob('*.json')})
 
 
-class LaneCApprovalPayloadTests(unittest.TestCase):
-    """The approval relay works with Lane C's old payload and its new agreed one."""
+class ApprovalPayloadTests(unittest.TestCase):
+    """The approval relay takes the agreed payload (README decision 8) and nothing older.
 
-    def test_old_and_new_payloads_record_the_same_decision(self):
+    Lane C's bridge has sent ``lot_id``, the donor's organization ID and the ``sha256:`` hash
+    since PR #56, so the core no longer translates ``event_id``, the role ``donor`` or a bare hex
+    hash. The one place that still accepts a bare hex hash is the platform's own inbound
+    ``ApprovalStore.decide`` (tests/test_approvals.py)."""
+
+    def offer(self):
         from harvestnet_core.protocol import terms_hash
-        for style in ('old', 'new'):
-            with self.subTest(style):
-                engine = Engine(fixture())
-                api = API(engine, clock=lambda: NOW, staff_tokens=TOKENS)
-                status, created = api.call('POST', '/surplus-offers', copy.deepcopy(engine.fixture['surplus_offers'][0]), token='donor-test')
-                self.assertEqual(status, 201, created)
-                d = engine.records.get('lot', created['lot_id'])['draft']
-                digest = terms_hash(d)
-                if style == 'old':
-                    body = {'event_id': d['lot_id'], 'version': d['version'], 'organization_id': 'donor',
-                            'terms_hash': digest.removeprefix('sha256:'), 'decision': 'approve', 'receipt_id': 'r-old'}
-                else:
-                    body = {'lot_id': d['lot_id'], 'version': d['version'], 'organization_id': 'market',
-                            'terms_hash': digest, 'decision': 'approve', 'receipt_id': 'r-new'}
+        engine = Engine(fixture())
+        api = API(engine, clock=lambda: NOW, staff_tokens=TOKENS)
+        status, created = api.call('POST', '/surplus-offers', copy.deepcopy(engine.fixture['surplus_offers'][0]), token='donor-test')
+        self.assertEqual(status, 201, created)
+        d = engine.records.get('lot', created['lot_id'])['draft']
+        return engine, api, d, terms_hash(d)
+
+    def test_the_agreed_payload_records_the_decision(self):
+        engine, api, d, digest = self.offer()
+        body = {'lot_id': d['lot_id'], 'version': d['version'], 'organization_id': 'market', 'terms_hash': digest,
+                'decision': 'approve', 'receipt_id': 'r-new'}
+        status, result = api.call('POST', '/approvals', body, token='donor-test')
+        self.assertEqual(status, 200, result)
+        self.assertEqual((result['lot_id'], result['organization_id'], result['terms_hash']), (d['lot_id'], 'market', digest))
+        self.assertEqual(result['approved_by'], ['market'])
+
+    def test_older_payload_shapes_are_refused_and_record_nothing(self):
+        engine, api, d, digest = self.offer()
+        older = {
+            'event_id instead of lot_id': {'event_id': d['lot_id'], 'version': d['version'], 'organization_id': 'market', 'terms_hash': digest, 'decision': 'approve'},
+            'the role donor instead of the donor id': {'lot_id': d['lot_id'], 'version': d['version'], 'organization_id': 'donor', 'terms_hash': digest, 'decision': 'approve'},
+            'a bare hex hash': {'lot_id': d['lot_id'], 'version': d['version'], 'organization_id': 'market', 'terms_hash': digest.removeprefix('sha256:'), 'decision': 'approve'},
+        }
+        for name, body in older.items():
+            with self.subTest(name):
                 status, result = api.call('POST', '/approvals', body, token='donor-test')
-                self.assertEqual(status, 200, result)
-                self.assertEqual((result['lot_id'], result['organization_id'], result['terms_hash']), (d['lot_id'], 'market', digest))
-                self.assertEqual(result['approved_by'], ['market'])
+                self.assertIn(status, (400, 401, 409), result)
+        self.assertEqual(engine.records.get('lot', d['lot_id'])['approvals'], {})
 
 
 class ResultsTests(unittest.TestCase):

@@ -164,7 +164,7 @@ def propose(engine, lot_id, body, owner):
                       'proposer_id': owner, 'organizations': expected, 'terms_hash': change['terms_hash'], 'change': terms['change']})
     return {'lot_id': lot_id, 'version': version, 'based_on_version': latest, 'status': 'awaiting_approvals',
             'committed': False, 'terms_hash': change['terms_hash'], 'needs_approval_from': expected,
-            'approval_request': {'event_id': lot_id, 'version': version, 'terms': terms, 'organizations': expected}}
+            'approval_request': {'lot_id': lot_id, 'version': version, 'terms': terms, 'organizations': expected}}
 
 
 def _deadline(change):

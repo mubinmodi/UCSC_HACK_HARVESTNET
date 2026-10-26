@@ -45,10 +45,10 @@ class HTTPTests(unittest.TestCase):
         run_fixture(f,records=self.e.records)
         lot=self.e.records.all('lot')[0];d=lot['draft']
         store=ApprovalStore()
-        links=store.request(d['lot_id'],d['version'],d,['donor','city'])
+        links=store.request(d['lot_id'],d['version'],d,['market','city'])
         for link in links:
             record=store.decide(link['token'],'approve',link['version'],link['terms_hash'],True)
-            client=CoreAPI(self.base,'test-market' if link['organization_id']=='donor' else 'test-city')
+            client=CoreAPI(self.base,'test-market' if link['organization_id']=='market' else 'test-city')
             result=client.decision(record)
             self.assertEqual(result['committed'],link['organization_id']=='city')
         self.assertTrue(self.e.records.all('pickup'))

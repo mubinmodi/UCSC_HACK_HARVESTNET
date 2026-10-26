@@ -266,7 +266,7 @@ class CoolerWatcher:
 def directory_from_env(organization, systems, environ=None):
     """The AGNTCY Directory when configured, with the labeled local registry as the fallback."""
     from harvestnet_platform.directory import AgntcyDirectory, LocalDirectory
-    from harvestnet_platform.transport import ORGANIZATIONS
+    from harvestnet_platform.roster import ORGANIZATIONS
     environ = os.environ if environ is None else environ
     endpoints = {org: f'http://{"donor" if org == "market" else org}:8020' for org in ORGANIZATIONS}
     local = LocalDirectory(systems, endpoints)
@@ -282,7 +282,8 @@ def directory_from_env(organization, systems, environ=None):
 
 def watcher_from_env(organization, environ=None):
     """The watcher for ``organization``, or ``None`` (with the reason logged) if it is not configured."""
-    from harvestnet_platform.systems import BANKS, organization_systems
+    from harvestnet_platform.roster import BANKS
+    from harvestnet_platform.systems import organization_systems
     environ = os.environ if environ is None else environ
     if organization not in BANKS:
         log(f'{organization} is not a food bank; no cooler watcher')

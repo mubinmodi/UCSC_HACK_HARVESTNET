@@ -15,10 +15,8 @@ from urllib.parse import urlsplit, parse_qs
 from urllib.error import HTTPError, URLError
 from .transport import canonical, terms_hash
 from .http import JsonHandler, request_json, serve
+from .roster import APPROVERS
 
-APPROVERS = ('market', 'city', 'rural', 'eastside')
-# The core's tests still invite the donor by role; the core maps it to the lot's donor.
-LEGACY_APPROVERS = ('donor',)
 MAX_LINK_TTL_SECONDS = 86400
 
 
@@ -75,8 +73,7 @@ class ApprovalStore:
         expires = self.clock() + ttl
         self.db.execute('INSERT INTO links VALUES (?,?,?,?,?,?,NULL,NULL)',
                         (self.token_hash(token), event, version, org, digest, expires))
-        # event_id is Lane C's name for the same lot (README decision 7).
-        return {'organization_id': org, 'lot_id': event, 'event_id': event, 'version': version,
+        return {'organization_id': org, 'lot_id': event, 'version': version,
                 'terms_hash': digest, 'terms': terms, 'token': token, 'expires_at': iso(expires)}
 
     def request(self, event, version, terms, organizations, ttl=None, reissue=False):
@@ -90,7 +87,7 @@ class ApprovalStore:
             raise ValueError('Lot and positive draft version required')
         if not isinstance(terms, dict) or not terms or not organizations or len(set(organizations)) != len(organizations):
             raise ValueError('Exact complete terms and distinct approving organizations required')
-        if any(org not in APPROVERS + LEGACY_APPROVERS for org in organizations):
+        if any(org not in APPROVERS for org in organizations):
             raise ValueError('Only named donor/food bank humans may approve')
         ttl = link_ttl(ttl)
         digest = terms_hash(terms)
@@ -132,7 +129,7 @@ class ApprovalStore:
             raise StaleApproval('Decision link expired; ask the organization for a new request')
         if (version, digest) != (current_version, current_hash):
             raise StaleApproval('Old version rejected; approve the new complete terms')
-        return {'lot_id': event, 'event_id': event, 'version': version, 'organization_id': org,
+        return {'lot_id': event, 'version': version, 'organization_id': org,
                 'terms_hash': digest, 'terms': json.loads(terms), 'decision': decision,
                 'receipt_id': receipt, 'expires_at': iso(expires)}
 
@@ -474,9 +471,7 @@ def handler_for(store, core, events_token, public_url, *, approver_emails=None,
             try:
                 data = self.read_json()
                 if path == '/approval-requests':
-                    # The core names the lot `lot_id`; its earlier change requests say `event_id`.
-                    lot = data.get('lot_id', data.get('event_id'))
-                    links = store.request(lot, data['version'], data['terms'], data['organizations'],
+                    links = store.request(data['lot_id'], data['version'], data['terms'], data['organizations'],
                                           ttl=data.get('ttl_seconds'), reissue=data.get('reissue') is True)
                     for link in links:
                         link['decision_url'] = public_url.rstrip('/') + '/human/review?token=' + link.pop('token')

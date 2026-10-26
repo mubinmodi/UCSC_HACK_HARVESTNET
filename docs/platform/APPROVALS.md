@@ -6,8 +6,7 @@ SQLite stores drafts and opaque organization decision capabilities. Household
 addresses live only in the core's expiring request contact record; they are not
 stored by this adapter.
 
-An authenticated core posts to `/approval-requests` with `lot_id` (the core's
-change requests still say `event_id`, which is read too), `version`, the complete
+An authenticated core posts to `/approval-requests` with `lot_id`, `version`, the complete
 `terms`, and named approving `organizations` (`market`, `city`, `rural`,
 `eastside`). Each organization gets a separate random review URL, the exact
 `sha256:` terms hash, an `expires_at` in ISO 8601, and a message. Links last
