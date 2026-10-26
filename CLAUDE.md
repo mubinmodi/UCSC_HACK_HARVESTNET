@@ -4,49 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # HarvestNet
 
-## Current working scope
+A Cisco "When AI Agents Disagree" (Level 3) hackathon entry: each donor and food bank has its own agent, and they negotiate how surplus produce reaches low-income households, with no central decider.
 
-Work on idea development and Markdown design documents. Do not write application code or begin implementation unless the user explicitly requests it. Creating a plan or marking a ticket ready does not authorize implementation.
+## Working scope
 
-**Exception (user direction, October 11, 2026): Lane B implementation is authorized** for mubinmodi's tickets (#11–#15, #20, #23), following `.scratch/harvestnet-mvp/HANDOFF_parallel_lane_b.md`. A ticket starts only when all its GitHub blockers are closed and it is claimed with a `claimed: macbook` or `claimed: mac-mini` label. Default split: the MacBook Air takes #11, #13, #20, #23; the Mac mini takes #12, #14, #15. Later the same day the lead (mubinmodi) also authorized reviewing, fixing, and merging teammates' PRs, completing their remaining tickets, and deploying to AWS (cost kept minimal).
+The lead (mubinmodi) has authorized implementation, reviewing and merging teammates' PRs, completing their tickets, and deploying to AWS (October 11, 2026). Work in this checkout on `main`: pull first, test, commit, push.
 
-Read `docs/MVP_DESIGN.md` for the current design, with `CONTEXT.md` (vocabulary), `docs/adr/` (decisions), and `docs/CHALLENGE.md` (the Cisco rules). Everything outside the MVP is in `future scope/`. Use it for reference, never as current behavior. Use `COLLAB_claude_codex.md` for shared review, preserving existing contributor rounds and adding your own response. The original conversation transcripts are historical references in `future scope/history/`. Distinguish candidate outcomes, simulated results, and externally verified facts; agent agreement alone is not user approval.
+- **Money:** stay inside the caps. AWS: only resources tagged `project=harvestnet`; the account also runs the lead's unrelated `clinical-trials-viz` stack, which stays untouched. Claude: `CLAUDE_RUN_CAP_USD` per run and `CLAUDE_TOTAL_CAP_USD` overall (`deploy/aws/.env`). Ask the lead before raising a cap or creating new paid resources.
+- **Secrets:** they live in `deploy/aws/.env` (gitignored) and the Secrets Manager secret `harvestnet/platform`. Read them inside scripts; keep their values out of chat, logs and commits.
+- **Results:** every number is synthetic unless a source says otherwise. Keep candidate, simulated and externally verified results distinct; agent agreement alone is not the lead's approval.
 
-## Repository shape
+## Sources of truth
 
-A hackathon entry (Cisco "When AI Agents Disagree", Level 3). Code on `main`:
+- **Design:** `docs/MVP_DESIGN.md` (Decided vs Proposed), `CONTEXT.md` (glossary), `docs/adr/0001`–`0012` (0001–0005 frozen framework, 0006–0009 MVP scope cuts, 0010–0012 build decisions), `docs/CHALLENGE.md` (Cisco rules). These win over any other file.
+- **Interfaces:** `docs/contracts/` (agreed; contract-v0.2).
+- **Tickets:** GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`; `.scratch/harvestnet-mvp/` holds the spec, lane plan and the original ticket snapshot.
+- **Cut scope:** `future scope/`, reference only, never current behavior.
 
-- `agents/`: Lane B negotiators, profiles, front desk, cooler-failure logic (`harvestnet_agents`). `cd agents && uv run pytest` (one test: `uv run pytest tests/<file>::<test>`).
-- `harvestnet_core/` + `core_tests/` + `core_fixtures/`: Lane A records, calculators, harness, public API, evaluation. `cd agents && uv sync && cd .. && PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=. agents/.venv/bin/python -m unittest discover -s core_tests`. See `docs/core/README.md`.
-- `harvestnet_platform/` + `tests/`: Lane C organization systems, A2A/Directory transport, approvals, n8n. `uv run --with pytest pytest -q` at the root. See `docs/platform/`.
-- `api_skeleton/`: the example-data API (Lambda). `cd api_skeleton && uv run pytest`.
-- `frontend/<app>/` (household, donor-dashboard, results-strip): Vite + React apps. `npm ci && npm run typecheck && npm test && npm run build`.
-- `deploy/aws/`: `setup.sh` / `teardown.sh` for the live stack (profile `incubator`, us-east-2). See `deploy/aws/README.md`.
-- Agreed interfaces: `docs/contracts/`.
+## Code and commands
 
-- **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0012`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP; 0010–0012 are the October 11 build decisions (email via SES, committed produce is not waste, one small instance with SQLite). If any other file disagrees with these, these win.
-- **Derived copies:** `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` are styled renderings of `docs/MVP_DESIGN.md`. When the Markdown changes materially, the copies go stale; say so, or regenerate them if asked.
-- **Work plan:** `.scratch/harvestnet-mvp/spec.md`, `lanes.md` (four lanes, with integration only in join tickets 20–24), and 25 tickets in `issues/`. The live tickets are GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`; the local `issues/` files are the original snapshot.
-- **`learning/`:** a short course teaching the user the design (HTML lessons, PDFs, glossary). Follow `learning/NOTES.md`: plain, short English, and no quizzes or exercises.
+- `agents/` (`harvestnet_agents`): negotiators, produce profiles, fair share, front desk, cooler-failure logic, scenario runner. `cd agents && uv run pytest` (one test: `uv run pytest tests/<file>::<test>`).
+- `harvestnet_core/` + `core_tests/` + `core_fixtures/`: records, calculators, harness, public API, evaluation. `cd agents && uv sync && cd .. && PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=. agents/.venv/bin/python -m unittest discover -s core_tests`. Guide: `docs/core/README.md`.
+- `harvestnet_platform/` + `tests/`: organization systems, A2A and Directory transport, approvals, n8n. `uv run --with pytest pytest -q` at the root. Guide: `docs/platform/`.
+- `api_skeleton/`: the example-data API on Lambda. `cd api_skeleton && uv run pytest`.
+- `frontend/<app>/` (household, donor-dashboard, results-strip): Vite + React. `npm ci && npm run typecheck && npm test && npm run build`.
+- `deploy/aws/`: `setup.sh`, `teardown.sh`, `reset_data.sh`, `logs.sh` for the live stack at https://18-217-110-223.sslip.io. Guide: `deploy/aws/README.md`.
+- `docs/demo/`: run sheet, script, slides, offline replay (`python -m harvestnet_core.demo_replay --check` keeps it current), recording scripts.
+
+Run every suite before pushing.
 
 ## Writing conventions
 
-- In `docs/MVP_DESIGN.md`, label statements **Decided** (the user confirmed it) or **Proposed** (Claude's design, open for review). All example numbers are synthetic and must be marked that way. Never present an invented figure as real (ADR-0002).
-- Use `CONTEXT.md` terms (Organization, Specialist, Negotiator, and so on) and avoid the synonyms it lists.
-- If a change contradicts an ADR, flag it explicitly instead of silently overriding it.
-- Record user decisions in `COLLAB_claude_codex.md` as a new dated section ("User direction (date): …, recorded by Claude"). Append; never rewrite earlier rounds.
-- `AGENTS.md` mirrors this file for Codex (without the Claude header). Keep the two in sync when either changes.
+- Label statements in `docs/MVP_DESIGN.md` **Decided** (the lead confirmed it) or **Proposed** (open for review), and mark every example number synthetic (ADR 0002).
+- Use `CONTEXT.md` terms (Organization, Staff approver, Surplus lot, Produce profile, and the rest) instead of the synonyms it lists.
+- When a change contradicts an ADR, say so explicitly and get the lead's decision.
+- Record the lead's decisions in `COLLAB_claude_codex.md` as a new dated section ("User direction (date): …, recorded by Claude"), appended after earlier rounds.
+- `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` render `docs/MVP_DESIGN.md`; after a material edit, flag them as stale or regenerate them.
+- `learning/` teaches the lead the design: plain, short English, explanations only (`learning/NOTES.md`).
+- `AGENTS.md` mirrors this file for Codex, without the Claude header. Edit both together.
 
 ## Agent skills
 
-### Issue tracker
-
-Issues are GitHub issues on `mubinmodi/UCSC_HACK_HARVESTNET`, managed with `gh`. The spec and lane plan stay in `.scratch/<feature-slug>/`; its `issues/` files are the original snapshot, not the live copy. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, applied as GitHub labels. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- **Issue tracker:** GitHub issues via `gh` (`docs/agents/issue-tracker.md`).
+- **Triage labels:** `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` (`docs/agents/triage-labels.md`).
+- **Domain docs:** single context, one `CONTEXT.md` and `docs/adr/` at the root (`docs/agents/domain.md`).
