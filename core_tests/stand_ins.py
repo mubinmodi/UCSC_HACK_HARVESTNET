@@ -1,8 +1,10 @@
-"""Lane A's replaceable stand-in agents, explicitly separate from real Lane B rules."""
+"""Lane A's replaceable stand-in agents, explicitly separate from real Lane B rules.
+
+Test support only: the harness tests use them to show that a different move provider plugs in.
+The product runs the real rules-based negotiators."""
 from harvestnet_agents.negotiation import parse_agent_input
 from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
-from .calculators import Calculators
-from .engine import jsonable
+from harvestnet_core.calculators import Calculators
 
 
 class StandInAgents:

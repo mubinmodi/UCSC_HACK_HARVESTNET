@@ -33,7 +33,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime
 from typing import Any, Mapping, Sequence
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -47,6 +47,7 @@ from .cooler_failure import (
     Truck,
     assess_cooler_failure,
 )
+from .serialize import utc_iso
 from .terms import terms_hash
 from .front_desk import AgreementStatus, Language, PickupFacts, ProducePortion, pickup_wording
 from .profiles import ProfileSet, load_profiles
@@ -110,7 +111,7 @@ class SystemReading:
             "mode": self.mode,
             "source": self.source,
             "fixture_version": self.fixture_version,
-            "observed_at": _iso(self.observed_at),
+            "observed_at": utc_iso(self.observed_at),
         }
 
 
@@ -558,8 +559,8 @@ def _new_version(event_id: str, failure: CoolerFailure, d: CoolerFailureDecision
                 "from_food_bank_id": failure.food_bank_id,
                 "to_food_bank_id": p.receiving_food_bank_id,
                 "mover": p.mover,
-                "departs_at": _iso(p.departs_at),
-                "arrives_at": _iso(p.arrives_at),
+                "departs_at": utc_iso(p.departs_at),
+                "arrives_at": utc_iso(p.arrives_at),
                 "households_collect": _window_view(p.households_collect),
             }
             for i in p.items
@@ -806,12 +807,8 @@ def _windows(raw: Any, tz: ZoneInfo, what: str) -> tuple[PickupWindow, ...]:
     return tuple(_window(w, tz, what) for w in raw)
 
 
-def _iso(t: datetime) -> str:
-    return t.astimezone(dt_timezone.utc).isoformat().replace("+00:00", "Z")
-
-
 def _window_view(w: PickupWindow) -> dict[str, str]:
-    return {"start": _iso(w.start), "end": _iso(w.end)}
+    return {"start": utc_iso(w.start), "end": utc_iso(w.end)}
 
 
 def _plain(x: float) -> float | int:
@@ -820,7 +817,7 @@ def _plain(x: float) -> float | int:
 
 def _jsonable(value: Any) -> Any:
     if isinstance(value, datetime):
-        return _iso(value)
+        return utc_iso(value)
     if isinstance(value, PickupWindow):
         return _window_view(value)
     if isinstance(value, Mapping):

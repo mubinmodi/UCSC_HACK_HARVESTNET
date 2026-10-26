@@ -30,7 +30,7 @@ def fixture():
 
 class HarnessTests(unittest.TestCase):
     def test_replaceable_lane_a_stand_ins(self):
-        from harvestnet_core.stand_ins import StandInAgents
+        from stand_ins import StandInAgents
         r=run_fixture(fixture(),StandInAgents())
         self.assertTrue(r['commitments'])
         self.assertIn('stand-in',r['policy_label'])

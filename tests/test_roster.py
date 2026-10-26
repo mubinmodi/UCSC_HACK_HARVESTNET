@@ -14,7 +14,7 @@ class OneRoster(unittest.TestCase):
         self.assertIs(transport.ROLES, roster.ROLES)
         self.assertIs(approvals.APPROVERS, roster.APPROVERS)
         self.assertIs(systems.SYSTEM_ORGANIZATIONS, roster.SYSTEM_ORGANIZATIONS)
-        self.assertEqual((systems.DONOR, systems.BANKS), (roster.DONOR, roster.BANKS))
+        self.assertIs(systems.BANKS, roster.BANKS)
 
     def test_roster_matches_the_contract_scenarios_organizations_and_roles(self):
         for path in [CONTRACT_SCENARIO, *sorted(CORE_FIXTURES.glob('*.json'))]:

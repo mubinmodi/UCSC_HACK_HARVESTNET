@@ -25,7 +25,6 @@ Interfaces added here are **proposed**, pending ticket #1.
 import argparse
 import copy
 import json
-from datetime import timezone
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import quote
@@ -33,6 +32,7 @@ from zoneinfo import ZoneInfo
 
 from harvestnet_agents.cooler_failure import PickupWindow
 from harvestnet_agents.cooler_failure_flow import NewVersion, household_change_notices, read_cooler_signal, run_cooler_failure_flow
+from harvestnet_agents.serialize import utc_iso
 from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
 from harvestnet_agents.terms import terms_hash
 from harvestnet_agents.negotiation import parse_facts
@@ -85,10 +85,6 @@ def _truck(truck):
     return {'available': True, 'capacity_lb': truck['capacity_lb'], 'refrigerated': truck['refrigerated'], 'windows': [truck['window']]}
 
 
-def _utc(value):
-    return dt(value).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
-
-
 def organization_systems(engine, at, faults=(), recorded=None):
     """Lane C's ``systems.json`` shape for the core scenario at time ``at``.
 
@@ -104,7 +100,7 @@ def organization_systems(engine, at, faults=(), recorded=None):
         raise ValueError(f'Lane C organization systems cover {sorted(BANKS)}; the scenario has {sorted(engine.banks)}')
     offer = f['surplus_offers'][0]
     lot = records.get('lot', offer['lot_id'])
-    out = {'fixture_version': f"{f['scenario_id']}/{f['contract_version']}", 'observed_at': _utc(at),
+    out = {'fixture_version': f"{f['scenario_id']}/{f['contract_version']}", 'observed_at': utc_iso(at),
            DONOR: {'inventory': {'lot_id': offer['lot_id'], 'recall': bool(offer['recall_notice']), 'deadline': offer['deadline'],
                                    'items': [{'profile_id': i['produce_id'], 'quantity': i['quantity'], 'unit': i['unit'],
                                               'condition': i['condition_grade']} for i in offer['items']]},

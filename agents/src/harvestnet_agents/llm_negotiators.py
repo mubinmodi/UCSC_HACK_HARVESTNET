@@ -60,7 +60,6 @@ import os
 import re
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime
-from enum import Enum
 from importlib import resources
 from typing import Any, Callable, Literal, Mapping, Sequence
 
@@ -82,6 +81,7 @@ from .negotiation import (
     amendment_from_dict,
 )
 from .rules_negotiators import TurnError, rules_negotiator
+from .serialize import jsonable
 
 __all__ = [
     "FALLBACK_BETA",
@@ -250,17 +250,7 @@ def worst_case_cost_usd(model: str, request: Mapping[str, Any], max_tokens: int)
 
 
 def _jsonable(value: Any) -> Any:
-    if is_dataclass(value) and not isinstance(value, type):
-        return {k: _jsonable(v) for k, v in asdict(value).items()}
-    if isinstance(value, Mapping):
-        return {str(k): _jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable(v) for v in value]
-    if isinstance(value, datetime):
-        return value.isoformat(timespec="minutes")
-    if isinstance(value, Enum):
-        return value.value
-    return value
+    return jsonable(value, timespec="minutes")
 
 
 def draft_terms(draft: DraftVersion) -> dict[str, Any]:

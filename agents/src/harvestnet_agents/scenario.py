@@ -25,9 +25,8 @@ Readings of the contract that it had to make, listed as contract gaps in the PR 
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta
-from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -49,6 +48,7 @@ from .negotiation import (
     Truck,
 )
 from .profiles import load_profiles
+from .serialize import jsonable
 from .rules_negotiators import _clock, _join, _lb  # wording helpers: they format facts, never add any
 
 __all__ = [
@@ -65,7 +65,6 @@ __all__ = [
     "draft_to_dict",
     "facts_for",
     "initial_draft",
-    "jsonable",
     "load_scenario",
     "offer_draft",
 ]
@@ -422,21 +421,6 @@ def offer_draft(scenario: Scenario, offer: SurplusOffer, calculators: Calculator
 
 
 # --- JSON ---------------------------------------------------------------------------------
-
-
-def jsonable(value: Any) -> Any:
-    """Dataclasses, enums, tuples, and datetimes as plain JSON-ready data."""
-    if is_dataclass(value) and not isinstance(value, type):
-        return {k: jsonable(v) for k, v in asdict(value).items()}
-    if isinstance(value, Mapping):
-        return {str(k): jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [jsonable(v) for v in value]
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, Enum):
-        return value.value
-    return value
 
 
 def draft_to_dict(draft: DraftVersion) -> dict[str, Any]:

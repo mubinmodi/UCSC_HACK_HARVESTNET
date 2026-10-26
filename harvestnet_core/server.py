@@ -2,7 +2,8 @@
 import json
 import os
 from pathlib import Path
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
+from harvestnet_platform.http import JsonHandler
 from .api import API
 from .email_delivery import EmailDispatcher
 from .engine import Engine
@@ -10,16 +11,15 @@ from .records import Records
 
 
 def make_server(api, host='127.0.0.1',port=8050):
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self,*args): pass
-        def do_OPTIONS(self):
-            self.send_response(204)
-            self.cors()
-            self.end_headers()
-        def cors(self):
+    class Handler(JsonHandler):
+        def extra_headers(self):
             self.send_header('Access-Control-Allow-Origin',os.environ.get('HARVESTNET_ALLOWED_ORIGIN','http://127.0.0.1:8040'))
             self.send_header('Access-Control-Allow-Headers','Content-Type, Authorization')
             self.send_header('Access-Control-Allow-Methods','GET, POST, PUT, OPTIONS')
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.extra_headers()
+            self.end_headers()
         def handle_json(self):
             try:
                 size=int(self.headers.get('Content-Length',0))
@@ -31,13 +31,7 @@ def make_server(api, host='127.0.0.1',port=8050):
                 status,data=api.call(self.command,self.path,body,token)
             except (ValueError,UnicodeDecodeError):
                 status,data=400,{'error':{'code':'bad_request','message':'JSON object within size limit required'}}
-            raw=json.dumps(data,allow_nan=False,ensure_ascii=False).encode()
-            self.send_response(status); self.cors()
-            self.send_header('Content-Type','application/json; charset=utf-8')
-            self.send_header('Content-Length',str(len(raw)))
-            self.send_header('Cache-Control','no-store')
-            self.send_header('X-Content-Type-Options','nosniff')
-            self.end_headers(); self.wfile.write(raw)
+            self.send_json(status,data)
         do_GET=handle_json
         do_POST=handle_json
         do_PUT=handle_json

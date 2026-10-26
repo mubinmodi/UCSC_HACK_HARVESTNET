@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.error import URLError
 from .http import JsonHandler, request_json, serve
-from .roster import BANKS, DONOR, SYSTEM_ORGANIZATIONS
+from .roster import BANKS, SYSTEM_ORGANIZATIONS
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'systems.json'
 UPSTREAMS = ('beeceptor', 'harvestnet_systems')

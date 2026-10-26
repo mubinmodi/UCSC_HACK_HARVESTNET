@@ -8,7 +8,7 @@ from urllib.parse import urlsplit, parse_qs
 from harvestnet_agents import front_desk as desk
 from harvestnet_agents.negotiation import MoveKind, parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
-from .engine import Engine, jsonable
+from .engine import Engine
 from . import changes
 from harvestnet_agents.terms import terms_hash
 from .protocol import Conflict, dt, named, number

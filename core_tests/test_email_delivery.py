@@ -123,6 +123,16 @@ class EmailDeliveryTests(unittest.TestCase):
         self.assertEqual(api.records.all('email_outbox')[0]['status'],'uncertain')
         api.records.close()
 
+    def test_webhook_goes_through_the_one_json_client_and_needs_a_sent_confirmation(self):
+        from unittest import mock
+        notice={'to':'test@example.org'}
+        with mock.patch('harvestnet_core.email_delivery.request_json',return_value={'sent':True}) as client:
+            post_webhook('https://n8n.example/pickup','test-token',notice)
+        client.assert_called_once_with('https://n8n.example/pickup',notice,token='test-token',timeout=10,method='POST')
+        with mock.patch('harvestnet_core.email_delivery.request_json',return_value={'sent':False}):
+            with self.assertRaises(ValueError):
+                post_webhook('https://n8n.example/pickup','test-token',notice)
+
     def test_webhook_rejects_insecure_public_url_before_network(self):
         with self.assertRaises(ValueError):
             post_webhook('http://n8n.example/pickup','test-token',{'to':'test@example.org'})

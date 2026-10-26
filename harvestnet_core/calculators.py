@@ -1,6 +1,5 @@
 """Real deterministic calculators; no stand-in inheritance or model arithmetic."""
 from dataclasses import asdict
-import math
 from datetime import timedelta
 from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt
 from harvestnet_agents.calculators import CalculatorError as AgentsCalculatorError
@@ -33,9 +32,10 @@ def number(value):
 
 def finite(value):
     """A finite number of either sign (a change, or a free space that may be negative)."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise CalculatorError("a finite number is required")
-    return float(value)
+    try:
+        return protocol.number(value, signed=True)
+    except ValueError as exc:
+        raise CalculatorError(str(exc)) from exc
 
 
 class Calculators:

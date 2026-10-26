@@ -16,18 +16,6 @@ from .checks import rule_checks
 from .workflows import checked_move
 
 
-def jsonable(value):
-    if is_dataclass(value):
-        value = asdict(value)
-    if isinstance(value, dict):
-        return {k: jsonable(v) for k, v in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [jsonable(v) for v in value]
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
-    return value
-
-
 class Engine:
     def __init__(self, fixture, records=None, calculators=None):
         self.fixture = copy.deepcopy(fixture)

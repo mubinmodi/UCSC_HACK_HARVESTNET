@@ -5,6 +5,7 @@ Scheduling and recording are shared. Decisions remain with each organization.
 import copy
 from datetime import datetime
 import math
+from harvestnet_agents.serialize import jsonable
 from harvestnet_agents.terms import terms_hash
 
 
@@ -19,9 +20,10 @@ def dt(value):
     return result
 
 
-def number(value):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
-        raise ValueError("a finite nonnegative number is required")
+def number(value, *, signed=False):
+    """A finite number as a float: nonnegative, or of either sign with ``signed=True``. Else ``ValueError``."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or (value < 0 and not signed):
+        raise ValueError("a finite number is required" if signed else "a finite nonnegative number is required")
     return float(value)
 
 
@@ -66,8 +68,6 @@ class Protocol:
                 raise ValueError("a reason is required")
             # The typed amendment validates conservation and legal transport values.
             updated = parse_draft(draft).amend(amendment_from_dict(amendment), proposer_id=organization_id, reason=reason)
-            from dataclasses import asdict
-            from .engine import jsonable
             draft = jsonable(updated)
             # Enum subclasses serialize as strings.
             lot.update(draft=draft, approvals={}, holds={},status='negotiating')

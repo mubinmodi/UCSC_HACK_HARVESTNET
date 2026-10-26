@@ -3,7 +3,7 @@ import unittest
 from harvestnet_core.api import API
 from harvestnet_core.engine import Engine,run_fixture
 from harvestnet_core.records import Records
-from harvestnet_core.stand_ins import StandInAgents
+from stand_ins import StandInAgents
 from harvestnet_agents.llm_negotiators import CostEntry,SpendingCap
 
 from test_core import fixture

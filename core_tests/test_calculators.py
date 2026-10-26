@@ -95,7 +95,7 @@ class CalculatorTests(unittest.TestCase):
 
 class MatchingProtocolTests(unittest.TestCase):
     def test_two_number_failures_then_template_fallback(self):
-        from harvestnet_core.stand_ins import StandInAgents
+        from stand_ins import StandInAgents
         stand=StandInAgents()
         def bad(org,wire):
             return {**stand(org,wire),'reason':'Owner claims 999999 lb'}

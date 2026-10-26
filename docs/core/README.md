@@ -47,9 +47,11 @@ Codex session; no resources were provisioned here.
 
 ## #7: scenario harness and records
 
-`records.py`, `protocol.py`, `engine.py`, `checks.py`, and `stand_ins.py` provide
-transactional records, ordered events, replaceable Lane A stand-ins, real Lane B
-rules and a shared seeded clock. The small normal fixture produces a commitment,
+`records.py`, `protocol.py`, `engine.py` and `checks.py` provide
+transactional records, ordered events, real Lane B
+rules and a shared seeded clock. (`core_tests/stand_ins.py` holds a replaceable
+stand-in move provider that the harness tests use; it is test support, not product
+code.) The small normal fixture produces a commitment,
 pickup notice and confirmation. Every named human must explicitly approve the
 exact terms hash/version while owner holds remain valid. No missing reply or
 deadline can create a commitment. Fixture humans are always labeled scripted.

@@ -81,7 +81,8 @@ from .lane_b_rule_checks import RuleCheckResult, run_lane_b_rule_checks
 from .llm_negotiators import LLMNegotiator, SpendingCap
 from .profiles import ProfileSet
 from .rules_negotiators import TurnError, _Negotiator, rules_negotiator
-from .scenario import Fault, Scenario, SurplusOffer, draft_to_dict, facts_for, jsonable, offer_draft
+from .serialize import jsonable
+from .scenario import Fault, Scenario, SurplusOffer, draft_to_dict, facts_for, offer_draft
 
 __all__ = [
     "FIXTURE_CHECKS_IN_HARNESS",

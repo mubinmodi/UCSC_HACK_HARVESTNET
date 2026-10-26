@@ -57,8 +57,12 @@ class JsonHandler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(raw)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
+        self.extra_headers()
         self.end_headers()
         self.wfile.write(raw)
+
+    def extra_headers(self):
+        """A subclass adds its own response headers here (the core adds CORS)."""
 
     def authorized(self, token):
         return bool(token) and hmac.compare_digest(self.headers.get('Authorization', ''), f'Bearer {token}')

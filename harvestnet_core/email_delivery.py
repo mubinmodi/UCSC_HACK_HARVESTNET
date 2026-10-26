@@ -4,10 +4,10 @@ The event and outbox entry commit together for new pickup events. Each entry is
 claimed before a network call, so a restart never silently sends a second copy after
 an ambiguous timeout. An uncertain entry needs an operator to inspect/reissue it.
 """
-import json
 import threading
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+
+from harvestnet_platform.http import request_json
 
 from .notices import pickup_notice, released_notice
 from .records import NotFound
@@ -15,10 +15,7 @@ from .records import NotFound
 
 def post_webhook(url, token, notice):
     validate_webhook_url(url)
-    raw=json.dumps(notice,allow_nan=False).encode('utf-8')
-    request=Request(url,raw,{'Authorization':f'Bearer {token}', 'Content-Type':'application/json'},method='POST')
-    with urlopen(request,timeout=10) as response:
-        result=json.load(response)
+    result=request_json(url,notice,token=token,timeout=10,method='POST')
     if not isinstance(result,dict) or result.get('sent') is not True:
         raise ValueError('notification webhook did not confirm sending')
 
