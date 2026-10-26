@@ -126,6 +126,22 @@ describe('lot and item status words', () => {
     }
   });
 
+  it('shows unclaimed pounds with the reason, and how many households an item reached', async () => {
+    const lot = exampleBody<Lot>('get_lot');
+    lot.status = 'unclaimed';
+    lot.items[0] = { ...lot.items[0], status: 'unclaimed', unclaimed_lb: 40, unclaimed_reason: 'Deadline passed without every exact-version approval; nothing auto-committed' };
+    lot.items[1] = { ...lot.items[1], status: 'collected', households_reached: 7 };
+    mockApi({ get_lot: lot });
+    openPage('lots');
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Lot ID'), lot.lot_id);
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    await screen.findByText('Apples · 300 lb');
+    expect(screen.getByText(/40 lb unclaimed: Deadline passed without every exact-version approval/)).toBeInTheDocument();
+    expect(screen.getByText('Collected by households')).toBeInTheDocument();
+    expect(screen.getByText('Households reached: 7')).toBeInTheDocument();
+  });
+
   it('says what an item that is held, committed or unclaimed means', () => {
     expect(statusLabel('held')).toBe('Held, waiting for approvals');
     expect(statusLabel('committed')).toBe('Agreed and committed');
