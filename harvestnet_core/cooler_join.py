@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 
 from harvestnet_agents.cooler_failure import PickupWindow
 from harvestnet_agents.cooler_failure_flow import NewVersion, household_change_notices, read_cooler_signal, run_cooler_failure_flow
+from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
 from harvestnet_agents.terms import terms_hash
 from harvestnet_agents.negotiation import parse_facts
 
@@ -123,8 +124,8 @@ def organization_systems(engine, at, faults=(), recorded=None):
                 if fault['reading'].get('status') != 'failed':
                     raise ValueError('a cooler-failure fault must read failed')
                 failed.update(status='failed', temperature_c=fault['reading']['temperature_c'], cold_available=False)
-        out[bid] = {'storage': {'cold_available_lb': max(0, free.cold_free_lb - held.get((bid, 'storage_cold'), 0)),
-                                'dry_available_lb': max(0, free.dry_free_lb - held.get((bid, 'storage_dry'), 0)),
+        out[bid] = {'storage': {'cold_available_lb': max(0, free.cold_free_lb - held.get((bid, STORAGE_COLD), 0)),
+                                'dry_available_lb': max(0, free.dry_free_lb - held.get((bid, STORAGE_DRY), 0)),
                                 'windows': [s['window'] for s in bank['storage']]},
                     'cooler': copy.deepcopy(recorded[bid]['cooler']), 'cooler-failed': failed,
                     'pickup-hours': {'windows': copy.deepcopy(bank['pickup_windows'])}, 'truck': _truck(bank.get('truck'))}
@@ -302,7 +303,7 @@ def hold_for_human(engine, lot_id, food_bank_id):
         for p in records.all('pickup'):
             if p['lot_id'] != lot_id or p['food_bank_id'] != food_bank_id or p['status'] != 'committed':
                 continue
-            if any(profiles.get(i['produce_id']).needs_cold for i in p['items']):
+            if any(profiles.must_move(i['produce_id']) for i in p['items']):
                 p.update(status='held_for_human', hold_reason='cooler failed and no change was approved; a human decides')
                 records.put('pickup', p['pickup_id'], p)
                 records.event(lot_id, engine.now, 'pickup_held_for_human', {'pickup_id': p['pickup_id'], 'pounds': p['pounds'], 'reason': p['hold_reason']})
@@ -311,7 +312,7 @@ def hold_for_human(engine, lot_id, food_bank_id):
         labels = [{'food_bank_id': food_bank_id, 'produce_id': a['produce_id'], 'pounds': a['pounds'], 'at': engine.now,
                    'reason': 'cooler failed and no change was approved; a human decides whether this produce is still safe'}
                   for a in lot['commitments'] if a['food_bank_id'] == food_bank_id and a['pounds'] > 0 and a.get('pathway') is None
-                  and profiles.get(a['produce_id']).needs_cold]
+                  and profiles.must_move(a['produce_id'])]
         if labels:
             lot['held_for_human'] = [h for h in lot.get('held_for_human', []) if h['food_bank_id'] != food_bank_id] + labels
             records.put('lot', lot_id, lot)

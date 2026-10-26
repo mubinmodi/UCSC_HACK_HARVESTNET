@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from statistics import mean, pstdev
 from harvestnet_agents.negotiation import parse_agent_input, Move, MoveKind, TimeWindow
+from harvestnet_agents.profiles import STORAGE_COLD
 from harvestnet_agents.rules_negotiators import RulesFoodBank, rules_negotiator
 from .calculators import Calculators
 from .engine import Engine, run_fixture
@@ -138,8 +139,8 @@ def _can_hand_out(lot, commitment, item, bank, calc):
         if commitment['pathway']!='same_day_offer' or failed is None or room is None:
             return False
         return calc.pickup_feasibility(failed,hours,min(usable,failed+timedelta(days=room.min))).feasible
-    cold=profile.needs_cold
-    resource='storage_cold' if cold else 'storage_dry'
+    resource=profile.storage_resource
+    cold=resource==STORAGE_COLD
     bid=commitment['food_bank_id']
     arrival=next((dt(t['arrives_at']) for t in lot['draft'].get('transports',[]) if t['food_bank_id']==bid),None) if commitment.get('version') is None else None
     for hold in lot.get('holds',{}).get(bid,[]):

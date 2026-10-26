@@ -500,8 +500,8 @@ class CoolerFailureFlow:
         moving_ids = set(moved) | set(fallback)
         card_ids = [c.food_bank_id for c in d.reason_cards]
         return {
-            "only_cold_dependent_items_move": all(p in profiles and profiles.get(p).needs_cold for p in moving_ids)
-            and all(p in profiles and not profiles.get(p).needs_cold for p in staying),
+            "only_cold_dependent_items_move": all(profiles.must_move(p) for p in moving_ids)
+            and all(profiles.can_stay(p) for p in staying),
             "every_candidate_has_reason_card": (not to_move and not card_ids)
             or sorted(card_ids) == sorted(c.food_bank_id for c in self.candidates),
             "pounds_conserved": _same(held, _add(moved, fallback, staying, human)),

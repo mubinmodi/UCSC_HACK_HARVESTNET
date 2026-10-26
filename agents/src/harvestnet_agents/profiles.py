@@ -43,6 +43,10 @@ PROFILE_FIELDS = (
 )
 
 
+STORAGE_COLD = "storage_cold"  # hold resources a food bank reserves, by what the profile says the item needs
+STORAGE_DRY = "storage_dry"
+
+
 class ProfileDataError(ValueError):
     """Profile data is malformed or a field is neither sourced nor labeled an assumption."""
 
@@ -119,6 +123,16 @@ class ProduceProfile:
         """True when the profile says the item depends on cold storage or a cold chain."""
         return self.needs_fridge or self.transport.cold_required
 
+    @property
+    def storage_resource(self) -> str:
+        """The hold resource this item sits in at a food bank: ``storage_cold`` or ``storage_dry``."""
+        return STORAGE_COLD if self.needs_cold else STORAGE_DRY
+
+    @property
+    def moves_when_cooler_fails(self) -> bool:
+        """After a cooler failure only cold-dependent produce has to move; the rest keeps (ADR 0003)."""
+        return self.needs_cold
+
 
 @dataclass(frozen=True)
 class ProfileSet:
@@ -133,6 +147,15 @@ class ProfileSet:
 
     def __contains__(self, produce_id: object) -> bool:
         return produce_id in self.profiles
+
+    def must_move(self, produce_id: str) -> bool:
+        """A known item the profile says must leave a failed cooler. An unknown item is neither
+        this nor ``can_stay``: a human decides."""
+        return produce_id in self.profiles and self.profiles[produce_id].moves_when_cooler_fails
+
+    def can_stay(self, produce_id: str) -> bool:
+        """A known item the profile says keeps in a failed cooler's food bank."""
+        return produce_id in self.profiles and not self.profiles[produce_id].moves_when_cooler_fails
 
     def __iter__(self) -> Iterator[ProduceProfile]:
         return iter(self.profiles.values())

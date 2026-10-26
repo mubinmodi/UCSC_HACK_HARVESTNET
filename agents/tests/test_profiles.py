@@ -141,3 +141,16 @@ def test_missing_version_is_rejected():
     data.pop("version")
     with pytest.raises(ProfileDataError):
         load_profiles(data)
+
+
+def test_one_storage_resource_and_one_must_move_rule_come_from_the_profile():
+    profiles = load_profiles()
+    for profile in profiles:
+        assert profile.storage_resource == ("storage_cold" if profile.needs_cold else "storage_dry")
+        assert profile.moves_when_cooler_fails is profile.needs_cold
+        assert profiles.must_move(profile.id) is profile.needs_cold
+        assert profiles.can_stay(profile.id) is (not profile.needs_cold)
+    assert profiles.get("romaine").storage_resource == "storage_cold"
+    assert profiles.get("apples").storage_resource == "storage_dry"
+    # An item with no profile neither must move nor may stay: a human decides.
+    assert not profiles.must_move("mystery") and not profiles.can_stay("mystery")

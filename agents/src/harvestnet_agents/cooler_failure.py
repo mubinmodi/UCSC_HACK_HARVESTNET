@@ -230,7 +230,7 @@ def _sort_items(items: Sequence[HeldItem], profiles: ProfileSet):
             continue
         profile = profiles.get(item.produce_id)
         cite = f"(produce profiles v{profiles.version})"
-        if profile.needs_cold:
+        if profile.moves_when_cooler_fails:
             what = "needs a fridge" if profile.needs_fridge else "needs a cold chain"
             to_move.append(ItemDecision(item.produce_id, item.pounds, f"{profile.name}: profile says it {what} {cite}, and the cooler failed, so it must move"))
         else:

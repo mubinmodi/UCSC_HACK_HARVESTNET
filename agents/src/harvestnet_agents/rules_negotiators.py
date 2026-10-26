@@ -58,7 +58,7 @@ from .negotiation import (
     ShiftPounds,
     Transport,
 )
-from .profiles import ProduceProfile, ProfileSet
+from .profiles import STORAGE_COLD, STORAGE_DRY, ProduceProfile, ProfileSet
 
 __all__ = [
     "Problem",
@@ -692,7 +692,7 @@ class RulesFoodBank(_Negotiator):
             for a in draft.allocations_to(me)
         ]
         holds = []
-        for cold, resource in ((True, "storage_cold"), (False, "storage_dry")):
+        for cold, resource in ((True, STORAGE_COLD), (False, STORAGE_DRY)):
             lb = sum(a.pounds for a in draft.allocations_to(me) if self._needs_cold_storage(a.produce_id) == cold)
             if lb:
                 holds.append(HoldRequest(resource, me, lb, tr.arrives_at, max(ends)))

@@ -8,6 +8,7 @@ from harvestnet_agents.negotiation import parse_agent_input, parse_draft, parse_
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.calculators import HouseholdBalance
 from .calculators import Calculators
+from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
 from harvestnet_agents.terms import terms_hash
 from .protocol import Protocol, Conflict, dt, number, named
 from .records import Records
@@ -140,7 +141,7 @@ class Engine:
             drop = self.drop_off(draft["lot_id"])
             return {"lot":sum(i["pounds"] for i in draft["items"]), "drop_off": drop["capacity_lb"] if drop else 0}
         bank = self.records.get("bank", owner)
-        return {"storage_cold": min((s["cold_free_lb"] for s in bank["storage"]),default=0), "storage_dry":min((s["dry_free_lb"] for s in bank["storage"]),default=0), "truck":bank["truck"]["capacity_lb"] if bank.get("truck") else 0}
+        return {STORAGE_COLD: min((s["cold_free_lb"] for s in bank["storage"]),default=0), STORAGE_DRY:min((s["dry_free_lb"] for s in bank["storage"]),default=0), "truck":bank["truck"]["capacity_lb"] if bank.get("truck") else 0}
 
     def validate(self, draft, holds):
         parse_draft(draft)
@@ -174,10 +175,10 @@ class Engine:
                 if item["condition_grade"]=="not_for_people" or item.get("condition_doubt"):
                     raise Conflict("condition needs an explicit cleared check")
                 profile = self.calc.profiles.get(item["produce_id"])
-                cold += a["pounds"] if profile.needs_cold else 0
-                dry += a["pounds"] if not profile.needs_cold else 0
+                cold += a["pounds"] if profile.storage_resource==STORAGE_COLD else 0
+                dry += a["pounds"] if profile.storage_resource==STORAGE_DRY else 0
                 total += a["pounds"]
-                resource='storage_cold' if profile.needs_cold else 'storage_dry'
+                resource=profile.storage_resource
                 held=[h for h in holds.get(bid,[]) if h['resource']==resource and dt(h['start'])<=arrival<dt(h['end'])]
                 if not held:
                     raise Conflict('missing storage reservation through collection')
@@ -187,7 +188,7 @@ class Engine:
                     raise Conflict("no eligible household pickup before spoilage")
             if cold > capacity.cold_free_lb+1e-8 or dry > capacity.dry_free_lb+1e-8:
                 raise Conflict("storage capacity exceeded")
-            for resource, needed in (("storage_cold",cold),("storage_dry",dry)):
+            for resource, needed in ((STORAGE_COLD,cold),(STORAGE_DRY,dry)):
                 if needed and sum(h.get("pounds") or 0 for h in holds.get(bid,[]) if h["resource"]==resource and dt(h["start"]) <= arrival < dt(h["end"]))+1e-8 < needed:
                     raise Conflict("storage hold does not cover allocation at arrival")
             mover = bank.get("truck") if t["mover"]=="food_bank" else drop
@@ -212,7 +213,7 @@ class Engine:
                 bank=self.records.get("bank",a["food_bank_id"])
                 item=next(i for i in d["items"] if i["produce_id"]==a["produce_id"])
                 arrival=dt(next(t["arrives_at"] for t in d["transports"] if t["food_bank_id"]==a["food_bank_id"]))
-                resource='storage_cold' if self.calc.profiles.get(item['produce_id']).needs_cold else 'storage_dry'
+                resource=self.calc.profiles.get(item['produce_id']).storage_resource
                 last=min(dt(h['end']) for h in lot['holds'][a['food_bank_id']] if h['resource']==resource and dt(h['start'])<=arrival<dt(h['end']))
                 bank={**bank,'pickup_windows':[{'start':w['start'],'end':min(dt(w['end']),last).isoformat()} for w in bank['pickup_windows'] if dt(w['start'])<last]}
                 rs=[r for r in self.records.all("request") if self.eligible(r,bank,item,arrival)]

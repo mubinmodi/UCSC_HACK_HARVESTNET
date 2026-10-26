@@ -1,5 +1,6 @@
 """Lane A's replaceable stand-in agents, explicitly separate from real Lane B rules."""
 from harvestnet_agents.negotiation import parse_agent_input
+from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
 from .calculators import Calculators
 from .engine import jsonable
 
@@ -34,8 +35,8 @@ class StandInAgents:
             if all_accepted:
                 end=max(w.end for w in facts.pickup_windows)
                 holds=[]
-                for resource,cold in (('storage_cold',True),('storage_dry',False)):
-                    pounds=sum(a.pounds for a in own if self.calc.profiles.get(a.produce_id).needs_cold==cold)
+                for resource in (STORAGE_COLD,STORAGE_DRY):
+                    pounds=sum(a.pounds for a in own if self.calc.profiles.get(a.produce_id).storage_resource==resource)
                     if pounds: holds.append({'resource':resource,'pounds':pounds,'start':transport.arrives_at.isoformat(),'end':end.isoformat()})
                 if transport.mover.value=='food_bank': holds.append({'resource':'truck','pounds':sum(a.pounds for a in own),'start':transport.departs_at.isoformat(),'end':transport.arrives_at.isoformat()})
                 return {**base,'action':'request_hold','resource_owner':org,'holds':holds}
@@ -44,7 +45,7 @@ class StandInAgents:
         arrival=self.calc.arrival_time(facts.truck.window.start,facts.travel_minutes_from_donor)
         space=self.calc.storage_at(facts.storage,arrival)
         for item in d.items:
-            cold=self.calc.profiles.get(item.produce_id).needs_cold
+            cold=self.calc.profiles.get(item.produce_id).storage_resource==STORAGE_COLD
             available=d.unallocated_lb(item.produce_id)
             pounds=min(available,facts.demand.below_fair_share_lb,facts.truck.capacity_lb,space.cold_free_lb if cold else space.dry_free_lb)
             if pounds>0 and (not cold or facts.truck.refrigerated) and self.calc.pickup_feasibility(arrival,facts.pickup_windows,item.usable_until).feasible:

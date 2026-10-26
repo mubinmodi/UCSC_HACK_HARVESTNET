@@ -17,6 +17,7 @@ import copy
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 from harvestnet_agents.negotiation import parse_facts
+from harvestnet_agents.profiles import STORAGE_COLD
 from harvestnet_agents.terms import terms_hash
 from .protocol import Conflict, dt, named, number
 
@@ -130,9 +131,9 @@ def propose(engine, lot_id, body, owner):
         if set(accounted) != set(held) or any(abs(accounted[p] - held[p]) > 1e-6 for p in held):
             raise Conflict('the change does not account for every committed pound at this food bank')
         profiles = calc.profiles
-        if any(x['produce_id'] not in profiles or not profiles.get(x['produce_id']).needs_cold for x in moves + fallback):
+        if not all(profiles.must_move(x['produce_id']) for x in moves + fallback):
             raise Conflict('only cold-dependent produce moves after a cooler failure')
-        if any(x['produce_id'] not in profiles or profiles.get(x['produce_id']).needs_cold for x in staying):
+        if not all(profiles.can_stay(x['produce_id']) for x in staying):
             raise Conflict('cold-dependent produce cannot stay in a failed cooler')
         receivers = {m['to_food_bank_id'] for m in moves}
         if any(m['from_food_bank_id'] != owner for m in moves) or len(receivers) > 1 or owner in receivers or not receivers <= set(engine.banks):
@@ -250,11 +251,11 @@ def _commit(engine, change):
         arrive = max(_local(engine, m['arrives_at']) for m in moves)
         collect_end = max(_local(engine, m['households_collect']['end']) for m in moves)
         pounds = sum(number(m['pounds']) for m in moves)
-        cold = sum(number(m['pounds']) for m in moves if profiles.get(m['produce_id']).needs_cold)
+        cold = sum(number(m['pounds']) for m in moves if profiles.get(m['produce_id']).storage_resource == STORAGE_COLD)
         # The receiver's recorded cold space at arrival, rechecked now, not the agent's answer.
         facts = parse_facts('food_bank', engine.facts(receiver, lot['draft']))
         storage = calc.storage_at(facts.storage, arrive)
-        hold = {'resource': 'storage_cold', 'pounds': cold, 'start': arrive.isoformat(), 'end': collect_end.isoformat(), 'version': version}
+        hold = {'resource': STORAGE_COLD, 'pounds': cold, 'start': arrive.isoformat(), 'end': collect_end.isoformat(), 'version': version}
         _check_free(records, receiver, hold, storage.cold_free_lb)
         truck = records.get('bank', owner).get('truck')
         if not truck or pounds > truck['capacity_lb'] + 1e-8 or not (dt(truck['window']['start']) <= depart < arrive <= dt(truck['window']['end'])):
@@ -269,7 +270,7 @@ def _commit(engine, change):
     failure = _local(engine, change['failure_at'])
     kept = []
     for h in lot['holds'].get(owner, []):
-        if h['resource'] != 'storage_cold':
+        if h['resource'] != STORAGE_COLD:
             kept.append(h)
         elif dt(h['start']) < failure:
             kept.append({**h, 'end': min(dt(h['end']), failure).isoformat()})
@@ -374,8 +375,8 @@ def change_checks(engine, lot_id):
         terms, digest, v = c['terms'], terms_hash(c['terms']), c['version']
         moves = terms['moves']
         commit_events = [e for e in events if e['kind'] == 'change_commitment' and e['data']['version'] == v]
-        cold &= all(x['produce_id'] in profiles and profiles.get(x['produce_id']).needs_cold for x in moves + terms['fallback'])
-        cold &= all(x['produce_id'] in profiles and not profiles.get(x['produce_id']).needs_cold for x in terms['staying'])
+        cold &= all(profiles.must_move(x['produce_id']) for x in moves + terms['fallback'])
+        cold &= all(profiles.can_stay(x['produce_id']) for x in terms['staying'])
         if c['status'] != 'committed':
             commits &= not commit_events
             continue
@@ -390,7 +391,7 @@ def change_checks(engine, lot_id):
             and all(e['sequence'] < commit_events[0]['sequence'] for e in decisions) \
             and all(commit_events[0]['data']['holds'].get(o) for o in holders)
         failure = dt(c['failure_at'])
-        failed &= all(dt(h['end']) <= failure for h in lot['holds'].get(c['proposer_id'], []) if h['resource'] == 'storage_cold')
+        failed &= all(dt(h['end']) <= failure for h in lot['holds'].get(c['proposer_id'], []) if h['resource'] == STORAGE_COLD)
         for pid in c.get('moved_pickups', []):
             p = records.get('pickup', pid)
             m = next(m for m in moves if m['produce_id'] == p['items'][0]['produce_id'])
@@ -419,11 +420,11 @@ def cold_left_in_failed_cooler(engine, lot_id):
     problems = []
     for bid in failed_coolers(engine):
         scheduled = [p for p in records.all('pickup') if p['lot_id'] == lot_id and p['food_bank_id'] == bid and p['status'] == 'committed'
-                     and any(profiles.get(i['produce_id']).needs_cold for i in p['items'])]
+                     and any(profiles.must_move(i['produce_id']) for i in p['items'])]
         if scheduled:
             problems.append(f"cold pickups still scheduled at {bid}'s failed cooler: {sorted(p['pickup_id'] for p in scheduled)}")
         for a in lot['commitments']:
-            if a['food_bank_id'] != bid or a['pounds'] <= 0 or a.get('pathway') is not None or not profiles.get(a['produce_id']).needs_cold:
+            if a['food_bank_id'] != bid or a['pounds'] <= 0 or a.get('pathway') is not None or not profiles.must_move(a['produce_id']):
                 continue
             labeled = sum(h['pounds'] for h in lot.get('held_for_human', []) if h['food_bank_id'] == bid and h['produce_id'] == a['produce_id'] and h.get('reason'))
             if labeled + 1e-6 < a['pounds']:
