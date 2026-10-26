@@ -30,8 +30,8 @@ export function Photo({ produceId, small = false }: { produceId: string; small?:
   );
 }
 
-export function Badge({ text, tone }: { text: string; tone?: string }) {
-  return <span className={`badge ${tone ?? text.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{humanize(text)}</span>;
+export function Badge({ text, tone, label }: { text: string; tone?: string; label?: string }) {
+  return <span className={`badge ${tone ?? text.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{label ?? humanize(text)}</span>;
 }
 
 /** Says where the data came from, from the response's own `mode` and `synthetic` fields. */

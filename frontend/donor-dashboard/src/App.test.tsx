@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import App from './App';
 import { sessionValue, staffToken } from './session';
+import { statusLabel } from './format';
 import { example, exampleBody, mockApi } from './test/contract';
 import coolerBoard from './test/fixtures/dashboard-cooler-failure.json';
 import type { ApprovalList, FoodBankDashboard, Lot } from './types';
@@ -100,6 +101,36 @@ describe('donor page', () => {
     expect(screen.getByText(/advocate · Counter/)).toBeInTheDocument();
     expect(screen.getByText(/Rural food bank's 42 households are furthest below fair share/)).toBeInTheDocument();
     expect(screen.getByText('Set Apples for Rural food bank to 250 lb.')).toBeInTheDocument();
+  });
+});
+
+describe('lot and item status words', () => {
+  it('shows plain labels for each item and the lot, never the raw status codes', async () => {
+    const lot = exampleBody<Lot>('get_lot');
+    lot.status = 'awaiting_approvals';
+    lot.items[0].status = 'at_food_bank';
+    lot.items[1].status = 'moving';
+    lot.items[2].status = 'preserved_disagreement';
+    mockApi({ get_lot: lot });
+    openPage('lots');
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Lot ID'), lot.lot_id);
+    await user.click(screen.getByRole('button', { name: 'Show' }));
+    await screen.findByText('Apples · 300 lb');
+    expect(screen.getByText('At the food bank')).toBeInTheDocument();
+    expect(screen.getByText('On its way')).toBeInTheDocument();
+    expect(screen.getByText('Disagreement kept')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for approvals')).toBeInTheDocument();
+    for (const code of ['at_food_bank', 'awaiting_approvals', 'preserved_disagreement']) {
+      expect(screen.queryByText(code)).not.toBeInTheDocument();
+    }
+  });
+
+  it('says what an item that is held, committed or unclaimed means', () => {
+    expect(statusLabel('held')).toBe('Held, waiting for approvals');
+    expect(statusLabel('committed')).toBe('Agreed and committed');
+    expect(statusLabel('unclaimed')).toBe('Unclaimed');
+    expect(statusLabel('something_new')).toBe('Something new');
   });
 });
 

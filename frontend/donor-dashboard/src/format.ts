@@ -46,6 +46,25 @@ export function humanize(value: string | null | undefined): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** What a lot or item status code means, in plain words, for the donor and food bank pages. */
+const STATUS_WORDS: Record<string, string> = {
+  offered: 'Offered, no food bank has answered yet',
+  negotiating: 'Being negotiated',
+  held: 'Held, waiting for approvals',
+  awaiting_approvals: 'Waiting for approvals',
+  committed: 'Agreed and committed',
+  moving: 'On its way',
+  at_food_bank: 'At the food bank',
+  collected: 'Collected by households',
+  disagreement: 'Disagreement kept',
+  preserved_disagreement: 'Disagreement kept',
+  unclaimed: 'Unclaimed',
+};
+
+export function statusLabel(code: string | null | undefined): string {
+  return code ? STATUS_WORDS[code] ?? humanize(code) : '';
+}
+
 export type Names = Record<string, string>;
 
 export const nameOf = (names: Names | undefined, id: string | undefined) => (id ? names?.[id] ?? id : 'unknown');

@@ -125,7 +125,14 @@ proposed routes), with `contract_version`. A contract test calls all 20 agreed
 operations for real and checks each status and field against its example, one
 level into nested objects and list items (`core_tests/test_followups.py`).
 `get_lot` items carry `split` (food bank, pounds, mover), `unclaimed_lb` once the
-lot is settled, and `households_reached`. A missing body field, an unknown
+lot is settled, and `households_reached`. Each item also has its own `status`, derived from the records and not copied
+from the lot: `offered` (no food bank has planned any), `negotiating`, `held` (the
+owners of its pounds have placed their holds), `committed`, `moving` and
+`at_food_bank` (its transports, or a committed change's trip, against the clock),
+`collected` (every live pickup of it was collected), `disagreement` (the lot kept a
+preserved disagreement) and `unclaimed`, with `unclaimed_reason` when pounds are
+left over. A preserved disagreement survives the deadline and `disagreement` carries
+its reason, the plans that were on the table and each organization's last reason. A missing body field, an unknown
 `produce_id` or another bad input returns the contract's 400; only unknown
 records return 404.
 

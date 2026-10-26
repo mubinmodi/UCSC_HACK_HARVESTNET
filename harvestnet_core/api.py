@@ -229,9 +229,48 @@ class API:
         committed=sum(a['pounds'] for a in lot['commitments'] if a['produce_id']==pid)
         settled=lot['status'] in ('committed','unclaimed','preserved_disagreement')
         reached={p['request_code'] for p in self.records.all('pickup') if p['lot_id']==d['lot_id'] and p['status']=='collected' and any(x['produce_id']==pid for x in p['items'])}
-        return {**item,"name":self.engine.calc.profiles.get(pid).name,"status":lot['status'],"split":split,
-                "unclaimed_lb":max(0.0,item['pounds']-committed) if settled else 0,"households_reached":len(reached),
+        unclaimed=max(0.0,item['pounds']-committed) if settled else 0
+        reason={"unclaimed_reason":lot.get('stop_reason') or "No food bank took these pounds in the approved plan"} if unclaimed>1e-8 else {}
+        return {**item,"name":self.engine.calc.profiles.get(pid).name,"status":self.item_status(lot,pid),"split":split,
+                "unclaimed_lb":unclaimed,**reason,"households_reached":len(reached),
                 "usable_until_basis":lot.get('usable_until_basis',{}).get(pid)}
+
+    def item_status(self, lot, pid):
+        """One item's own status (contract get_lot): offered, negotiating, held, committed, moving,
+        at_food_bank, collected, disagreement or unclaimed. Derived from the lot's records: its
+        holds, its commitments, its transports (or a committed change's trip) against the
+        clock, and its pickups. The lot's status is not copied."""
+        d,status=lot['draft'],lot['status']
+        if status=='unclaimed':
+            return 'unclaimed'
+        if status=='preserved_disagreement':
+            return 'disagreement'
+        if status=='committed':
+            committed=[a for a in lot['commitments'] if a['produce_id']==pid and a['pounds']>0]
+            return self.item_progress(lot,pid,committed) if committed else 'unclaimed'
+        planned=[a for a in d['allocations'] if a['produce_id']==pid and a['pounds']>0]
+        if not planned:
+            return 'offered' if d['version']==1 else 'negotiating'
+        owners={d['donor_id']}|{a['food_bank_id'] for a in planned}
+        return 'held' if all(lot['holds'].get(o) for o in owners) else 'negotiating'
+
+    def item_progress(self, lot, pid, committed):
+        """A committed item: collected once every live pickup of it was, else by how far its trips have got."""
+        lot_id=lot['draft']['lot_id']
+        live=[p for p in self.records.all('pickup') if p['lot_id']==lot_id and p['status']!='released' and any(i['produce_id']==pid for i in p['items'])]
+        if live and all(p['status']=='collected' for p in live):
+            return 'collected'
+        now=dt(self.engine.now)
+        trips=[]
+        for a in committed:
+            trip=changes.trip(self.records,lot,a)
+            if trip:
+                trips.append(trip)
+        if trips and all(now>=arrives for _,arrives in trips):
+            return 'at_food_bank'
+        if any(now>=departs for departs,_ in trips):
+            return 'moving'
+        return 'committed'
 
     def disagreement_view(self, lot):
         """A preserved disagreement as the involved dashboards show it (design section 8): why the

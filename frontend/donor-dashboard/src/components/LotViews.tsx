@@ -1,6 +1,6 @@
 import { History, MessageSquareWarning } from 'lucide-react';
 import { api } from '../api';
-import { describeChange, formatDateTime, humanize, lb, moverText, nameOf, type Names } from '../format';
+import { describeChange, formatDateTime, humanize, lb, moverText, nameOf, statusLabel, type Names } from '../format';
 import type { Lot, LotItem, LotVersion } from '../types';
 import { useLoad } from '../useLoad';
 import { Badge, DataLabel, ErrorNote, Photo } from './ui';
@@ -90,7 +90,7 @@ export function LotStatus({ lot }: { lot: Lot }) {
             Version {lot.current_version} · leave by {formatDateTime(lot.deadline)}
           </p>
         </div>
-        <Badge text={lot.status} />
+        <Badge text={lot.status} label={statusLabel(lot.status)} />
       </div>
       <ul className="item-status-list">
         {lot.items.map((item) => (
@@ -101,7 +101,7 @@ export function LotStatus({ lot }: { lot: Lot }) {
                 <strong>
                   {item.name} · {lb(item.pounds)}
                 </strong>
-                <Badge text={item.status} />
+                <Badge text={item.status} label={statusLabel(item.status)} />
               </div>
               {splitOf(lot, item.produce_id, item.split).length > 0 ? (
                 <ul className="split">

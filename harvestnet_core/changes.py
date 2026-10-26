@@ -51,6 +51,21 @@ def _held(lot, food_bank_id):
     return dict(held)
 
 
+def trip(records, lot, commitment):
+    """When this committed pound's trip leaves and arrives, as datetimes, or ``None``.
+
+    A pound a committed change moved travels on that change's own trip; everything else on its
+    draft transport to the food bank."""
+    if lot.get('change_version') and commitment.get('version') == lot['change_version'] and commitment.get('pathway') is None:
+        change = find(records, lot['draft']['lot_id'], lot['change_version'])
+        move = next((m for m in change['terms']['moves'] if m['produce_id'] == commitment['produce_id']
+                     and m['to_food_bank_id'] == commitment['food_bank_id']), None) if change else None
+        if move:
+            return dt(move['departs_at']), dt(move['arrives_at'])
+    transport = next((t for t in lot['draft']['transports'] if t['food_bank_id'] == commitment['food_bank_id']), None)
+    return (dt(transport['departs_at']), dt(transport['arrives_at'])) if transport else None
+
+
 def holding(engine, lot_id, food_bank_id):
     """The food bank's share of the committed plan, in Lane B's ``holding`` shape. No household data."""
     records = engine.records
