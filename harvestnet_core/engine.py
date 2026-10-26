@@ -407,7 +407,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                         engine.records.put("request",r["request_code"],r)
                         engine.records.event(lot_id,p["window"]["start"],"pickup_confirmation",{"pickup_id":p["pickup_id"],"pounds":p["pounds"]})
         pathways=changes.pathways(engine,lot_id)
-        if changes.changes_for(engine.records,lot_id):
+        if changes.changes_for(engine.records,lot_id) or changes.failed_coolers(engine):
             checks.append(changes.rule_checks(engine,lot_id))
         else:
             caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}

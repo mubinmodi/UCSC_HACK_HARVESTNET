@@ -381,8 +381,38 @@ def change_checks(engine, lot_id):
             w = m['households_collect']
             pickups &= p['version'] >= v and p['food_bank_id'] == m['to_food_bank_id'] \
                 and dt(w['start']) <= dt(p['window']['start']) < dt(p['window']['end']) <= dt(w['end'])
+    failed &= not cold_left_in_failed_cooler(engine, lot_id)
     return {'versioned_approvals': versioned, 'no_auto_commit': commits, 'only_cold_dependent_items_move': cold,
             'failed_cooler_holds_nothing_cold': failed, 'household_pickups_follow_new_version': pickups}
+
+
+def failed_coolers(engine):
+    """Food banks whose own recorded status says the cooler failed."""
+    return [bid for bid in engine.banks if (engine.records.get('bank', bid).get('cooler') or {}).get('status') == 'failed']
+
+
+def cold_left_in_failed_cooler(engine, lot_id):
+    """Cold produce still committed to a food bank whose cooler failed, and not accounted for.
+
+    Recomputed from the lot's current commitments, not from any change's status. A committed
+    pound there is accepted only when a human holds it and it is labeled: the lot's
+    ``held_for_human`` covers its pounds, and no cold pickup there is still scheduled. Produce an
+    approved change moved is no longer a commitment at that food bank. Returns the problems."""
+    records, profiles = engine.records, engine.calc.profiles
+    lot = records.get('lot', lot_id)
+    problems = []
+    for bid in failed_coolers(engine):
+        scheduled = [p for p in records.all('pickup') if p['lot_id'] == lot_id and p['food_bank_id'] == bid and p['status'] == 'committed'
+                     and any(profiles.get(i['produce_id']).needs_cold for i in p['items'])]
+        if scheduled:
+            problems.append(f"cold pickups still scheduled at {bid}'s failed cooler: {sorted(p['pickup_id'] for p in scheduled)}")
+        for a in lot['commitments']:
+            if a['food_bank_id'] != bid or a['pounds'] <= 0 or a.get('pathway') is not None or not profiles.get(a['produce_id']).needs_cold:
+                continue
+            labeled = sum(h['pounds'] for h in lot.get('held_for_human', []) if h['food_bank_id'] == bid and h['produce_id'] == a['produce_id'] and h.get('reason'))
+            if labeled + 1e-6 < a['pounds']:
+                problems.append(f"{a['pounds']} lb of {a['produce_id']} is committed to {bid}'s failed cooler and neither moved nor held for a human")
+    return problems
 
 
 def decision_records(change):

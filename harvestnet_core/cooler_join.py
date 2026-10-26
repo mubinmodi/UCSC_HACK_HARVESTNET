@@ -242,6 +242,7 @@ def apply_fault(engine, lot_id, fault):
         holding = changes.holding(engine, lot_id, bid)
     except Conflict as exc:
         summary['change_status'] = f'not_assessed: {exc}'
+        summary['held_for_human_lb'] = hold_for_human(engine, lot_id, bid)
         return summary
     directory = LocalDirectory(systems, {org: f'local://harvestnet/agents/{org}' for org in ORGANIZATIONS})
     found = directory.search(min_cold_lb=0)  # every food bank, so every one gets a reason card
@@ -258,6 +259,7 @@ def apply_fault(engine, lot_id, fault):
                                    profiles=engine.calc.profiles)
     if flow.new_version is None:
         summary['change_status'] = 'no_change_proposed'
+        summary['held_for_human_lb'] = hold_for_human(engine, lot_id, bid)
         return summary
     proposed = changes.propose(engine, lot_id, {'terms': flow.new_version.terms, 'organizations': list(flow.new_version.organizations),
                                                 'dashboard': flow.dashboard()}, bid)
@@ -287,10 +289,12 @@ def apply_fault(engine, lot_id, fault):
 
 
 def hold_for_human(engine, lot_id, food_bank_id):
-    """Without an approved change, cold-dependent pickups at the failed cooler wait for a human.
+    """Without an approved change, cold produce at the failed cooler waits for a human.
 
-    The harness never counts them as collected: whether that produce is still safe is a
-    human's decision (design section 12, anything uncertain goes to a human). Returns pounds.
+    The harness never counts the pickups as collected: whether that produce is still safe is a
+    human's decision (design section 12, anything uncertain goes to a human). Every committed
+    cold pound at the failed cooler is labeled on the lot (``held_for_human``), which is what
+    ``changes.cold_left_in_failed_cooler`` accepts. Returns the pickup pounds held.
     """
     records, profiles, held = engine.records, engine.calc.profiles, 0.0
     with records.transaction():
@@ -302,6 +306,15 @@ def hold_for_human(engine, lot_id, food_bank_id):
                 records.put('pickup', p['pickup_id'], p)
                 records.event(lot_id, engine.now, 'pickup_held_for_human', {'pickup_id': p['pickup_id'], 'pounds': p['pounds'], 'reason': p['hold_reason']})
                 held += p['pounds']
+        lot = records.get('lot', lot_id)
+        labels = [{'food_bank_id': food_bank_id, 'produce_id': a['produce_id'], 'pounds': a['pounds'], 'at': engine.now,
+                   'reason': 'cooler failed and no change was approved; a human decides whether this produce is still safe'}
+                  for a in lot['commitments'] if a['food_bank_id'] == food_bank_id and a['pounds'] > 0 and a.get('pathway') is None
+                  and profiles.get(a['produce_id']).needs_cold]
+        if labels:
+            lot['held_for_human'] = [h for h in lot.get('held_for_human', []) if h['food_bank_id'] != food_bank_id] + labels
+            records.put('lot', lot_id, lot)
+            records.event(lot_id, engine.now, 'cold_produce_held_for_human', {'food_bank_id': food_bank_id, 'held': labels})
     return held
 
 
