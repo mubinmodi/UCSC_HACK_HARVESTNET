@@ -1,106 +1,53 @@
-# Human approvals and household emails (#18)
+# Human approvals and household emails
 
-`python -m harvestnet_platform.approvals` starts the review/notification adapter on
-localhost:8030. Set `API_EVENTS_TOKEN` (random secret) and `APPROVAL_PUBLIC_URL`.
-SQLite stores drafts and opaque organization decision capabilities. Household
-addresses live only in the core's expiring request contact record; they are not
-stored by this adapter.
+`python -m harvestnet_platform.approvals` (port 8030) is the one service for two jobs: issuing **review links** to Staff approvers, and turning the core's pickup notices into **household emails**. Neither it nor n8n ever decides or commits anything. Only each named organization's Staff approver does, for one exact version; transport acceptance is not approval, and no reply means no approval (ADR 0001, 0004).
 
-An authenticated core posts to `/approval-requests` with `lot_id`, `version`, the complete
-`terms`, and named approving `organizations` (`market`, `city`, `rural`,
-`eastside`). Each organization gets a separate random review URL, the exact
-`sha256:` terms hash, an `expires_at` in ISO 8601, and a message. Links last
-`APPROVAL_LINK_TTL_SECONDS` (default 3600, at most 86400), or `ttl_seconds` in the
-request. A repeat of the same request is refused, so a webhook retry adds no links.
-To replace a lost or expired link for the same version, post the same request
-with `"reissue": true` (and the organizations to reissue): the old link stops
-working. A link that already carries a decision can't be reissued; changed terms
-need a new version.
-Distribute a URL only to that organization's authorized human. These are bearer
-capabilities: possession authenticates the invited human, not their named identity.
-Use HTTPS, don't log links, and never share links with agents. For stronger staff
-identity the core can put this page behind its own staff login.
+It needs `API_EVENTS_TOKEN` (a random secret for trusted callers) and `APPROVAL_PUBLIC_URL` (the HTTPS origin in the links). `APPROVALS_DB` is a SQLite file holding the issued terms and links. Household email addresses are not stored here; they live only in the core's expiring request record.
 
-The review page displays all exact terms and Approve/Decline buttons. GET never
-approves. POST includes the displayed version and hash plus an explicit human
-confirmation. Old versions, altered terms and expired links fail. n8n has no
-auto-approve node and unanswered requests have no effect. Transport acceptance
-does not equal human approval. Issuing a higher version invalidates all old links.
-Keep this mirror up to date with EVERY core amendment. Even with that mirror,
-the core must independently recheck the current version and resource holds.
+## Who approves what, and where
 
-Set `CORE_API_URL` and `CORE_API_TOKENS` for the live core. `CORE_API_TOKENS` is a
-JSON map of each organization to its own core staff token, the same shape as the
-core's `HARVESTNET_STAFF_TOKENS` (which is also read if `CORE_API_TOKENS` is unset);
-each decision is sent with its own organization's token. A single legacy
-`CORE_API_TOKEN` still starts, with a warning, but only commits that one
-organization's decisions. Human decisions POST to `/approvals` as the contract's `record_approval`:
-`lot_id`, `version`, `organization_id`, `terms_hash` (`sha256:...`), `decision`,
-and the idempotent `receipt_id`. With no core, the labeled local fallback records
-a human decision but **does not commit**. A core rejection (401, 409, and so on)
-comes back with the core's own status and error. Only an unreachable core returns
-503; retry the same human decision safely. The core deduplicates receipt IDs and
-enforces the current version, required approvals, holds and deadlines.
+- **Ordinary lots** are approved on the donor page or food bank dashboard. The Staff approver's own page calls the core's `POST /approvals` with that organization's staff token.
+- **A changed version after a cooler failure** is approved through review links. The food bank's cooler watcher asks this service to issue them, one per named organization.
 
-## Import n8n workflows
+## Review links
 
-Run `python integrations/n8n/build_workflows.py`, then import the four JSON files
-into n8n. They start inactive; import does not send anything. Configure:
+`POST /approval-requests` (authenticated with `API_EVENTS_TOKEN`) takes `lot_id`, `version`, the complete `terms` and the named `organizations` (the roster's approvers: `market`, `city`, `rural`, `eastside`). Each organization gets its own random link, the exact `sha256:` terms hash, an ISO 8601 `expires_at` and a message.
 
-- Incoming webhook Header Auth credential (a dedicated incoming secret).
-- Platform HTTP Header Auth: `Authorization: Bearer API_EVENTS_TOKEN`.
-- Amazon SES SMTP credential in n8n Cloud. SES SMTP credentials are regional and
-  separate from AWS access keys. The verified From address is the n8n variable
-  `HARVESTNET_EMAIL_FROM`; set it to `SES_SENDER_EMAIL` from the deployment env.
-- n8n variables `HARVESTNET_PLATFORM_URL` (HTTPS) and `HARVESTNET_CORE_URL`.
-- Disable saved execution payloads, including errors, to avoid retaining email
-  addresses, SNAP status, pickup codes or organization decision links.
+- Links last `APPROVAL_LINK_TTL_SECONDS` (default 3600, at most 86400), or `ttl_seconds` in the request.
+- A repeat of the same request is refused, so a webhook retry adds no links.
+- To replace a lost or expired link for the same version, post the same request with `"reissue": true` (and the organizations to reissue). The old link stops working. A link that already carries a decision cannot be reissued, and changed terms need a new version, which invalidates every older link.
+- A link is a bearer capability. Possession authenticates the invited Staff approver, not a named identity, so send each link only to that organization's person, over HTTPS, and never log it or show it to an agent.
+- The review page shows all exact terms with Approve and Decline. `GET` never approves. `POST /human/decision` carries the displayed version, the hash and an explicit human confirmation. An old version, altered terms or an expired link fails.
 
-Approval workflow receives one issued request `{to, message, decision_url,
-version}`. It carries the review request only. The human opens the page and
-submits the decision there; n8n never approves or changes the terms.
-Set `APPROVER_EMAILS_JSON` to a JSON map from organization ID to its authorized
-human's address, and `N8N_APPROVAL_WEBHOOK_URL` to the published workflow webhook.
-The adapter sends only mapped, allowlisted recipients. Otherwise it returns the
-review link for manual delivery, labeled `manual` or `outside_test_allowlist`.
-An uncertain webhook response is labeled `uncertain`; reissuing a link requires
-an explicit `reissue: true` request and invalidates the old link.
+## Decisions reach the core
 
-For a separately configured n8n decision relay, set `N8N_DECISION_WEBHOOK_URL` to the published
-`human-decisions.json` webhook and `N8N_WEBHOOK_TOKEN` to its Header Auth bearer
-secret. The platform verifies the human capability and exact terms before sending
-the decision receipt. This workflow forwards the receipt unchanged to the core's
-`/approvals`, using `HARVESTNET_CORE_URL` and a separate restricted core approval
-credential. It never creates a receipt or defaults the decision. Without this
-webhook the direct core path serves as the labeled fallback. Missing core is
-still local-only. The core must authenticate this trusted receipt bridge and
-recheck the current version/holds; it must not accept arbitrary public receipts.
-The AWS Compose stack uses the direct core path with per-organization tokens;
-its n8n workflows carry review emails but do not relay decisions.
+The platform checks the capability and exact terms, then sends the receipt (`lot_id`, `version`, `organization_id`, `terms_hash`, `decision`, `receipt_id`) to the core's `POST /approvals`, which deduplicates by `receipt_id` and enforces the current version, required approvals, holds and deadline. Contract: [`public-api.md`](../contracts/public-api.md).
 
-Pickup workflow forwards trusted core notice data to `/notifications/prepare`:
-`committed: true`, `food_bank`, calculator `items: [{name, pounds}]`, `window:
-{start,end}`, `request_code`, `pickup_id`, `version`, `release_url`, and `to`.
-The prepared email names the committed produce and contains a *Can't make it*
-link. The link opens the household page; opening it alone changes nothing.
-The household must tap the release button, which calls the core's
-`POST /pickups/{pickup_id}/release`. A separate workflow sends the thank-you
-only after that household release. A cooler failure release does not send the
-thank-you. The core queues email outbox entries with pickup events in the same
-transaction, without storing an address or request code in the outbox. Once a
-send starts, an ambiguous failure is labeled `uncertain` and never retried
-automatically.
-Optional `snap: yes` and `market` metadata add a tip only if `verified: true`,
-`nearby: true`, source URL exists, and timezone-aware verification is within
-30 days. This is a freshness policy, not proof of current participation; feed
-trusted verified market records. All example market data in tests is synthetic.
-Names, pounds, time and code come from the core, never model arithmetic.
+- **Credentials.** Set `CORE_API_URL` and `CORE_API_TOKENS`, a JSON map of organization to its own core staff token (the shape of the core's `HARVESTNET_STAFF_TOKENS`, which is read if `CORE_API_TOKENS` is unset). Each decision is sent with its own organization's token.
+- **Errors.** A core rejection (401, 409, ...) comes back with the core's own status and error. Only an unreachable core returns 503; retry the same decision.
+- **No core configured.** The labeled local fallback records the decision but does not commit.
+- **Optional n8n relay.** With `N8N_DECISION_WEBHOOK_URL` and `N8N_WEBHOOK_TOKEN`, the receipt goes through the n8n workflow `human-decisions.json`, which forwards it unchanged to the core with a separate restricted credential. The AWS stack does not use it: it sends decisions directly.
 
-The incoming webhooks must use HTTPS and Header Auth. In the SES sandbox, both
-the From identity and every recipient need SES verification. Keep
-`SES_TEST_RECIPIENTS` to verified demo addresses only. These workflow JSON files
-are local inactive drafts. SES identity verification, SMTP credentials, n8n
-publication, and live end-to-end delivery remain unverified.
+## Emails
 
-Sources: [n8n Webhook authentication](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/),
-[workflow import/export](https://docs.n8n.io/workflows/export-import/).
+Everything is sent by n8n Cloud's Send Email node over Amazon SES. The service prepares the subject and text; n8n sends them.
+
+- **Review emails.** `APPROVER_EMAILS_JSON` maps organization ID to its Staff approver's address, and `N8N_APPROVAL_WEBHOOK_URL` is the published workflow's webhook. The service emails only mapped addresses that are in `SES_TEST_RECIPIENTS`. Otherwise the response carries the link for manual delivery, labeled `manual` or `outside_test_allowlist`. A webhook timeout is `uncertain`: the link is already issued, so reissue only deliberately.
+- **Pickup emails.** The core's outbox posts each notice to `N8N_PICKUP_WEBHOOK_URL` (or `N8N_RELEASE_WEBHOOK_URL` for the thank-you). The n8n workflow calls this service's `POST /notifications/prepare`, which returns the email in the household's language (English or Spanish). It names the committed produce, the window and the request code, and it carries a *Can't make it* link to the household page. Opening the link changes nothing; the household must tap the button, which calls `POST /pickups/{pickup_id}/release`. A cooler-failure release sends no thank-you. Names, pounds, times and codes come from the core, never from model arithmetic. Delivery, outbox and privacy rules: [`docs/core/README.md`](../core/README.md).
+- **Market Match tip.** A tip is added only for a household that said it receives SNAP, and only when the market record is `verified`, `nearby`, has a source URL, and was verified (timezone-aware) within 30 days. That is a freshness policy, not proof of current participation. Feed only trusted verified market records; test data is synthetic.
+
+## n8n
+
+`python integrations/n8n/build_workflows.py` generates four inactive, credential-free workflow files in `integrations/n8n/` (CI checks they are current): `approval-requests`, `pickup-emails`, `cannot-make-it` and `human-decisions`. Importing them sends nothing.
+
+The workflows running in n8n Cloud were built by the team (see [`HANDOFF.md`](HANDOFF.md) for which are active). To set one up, configure:
+
+- A Header Auth credential for the incoming webhook (a dedicated secret; it is `N8N_WEBHOOK_TOKEN`).
+- A Header Auth credential for calls to this service: `Authorization: Bearer <API_EVENTS_TOKEN>`.
+- An Amazon SES SMTP credential, created in n8n Cloud. SES SMTP credentials are regional and separate from AWS access keys. The deployment never creates or copies them.
+- The n8n variables `HARVESTNET_PLATFORM_URL` (HTTPS), `HARVESTNET_EMAIL_FROM` (the verified From address, the same as `SES_SENDER_EMAIL` in the deployment settings) and, for the relay only, `HARVESTNET_CORE_URL`.
+- Saved execution data turned off, including errors, so email addresses, SNAP answers, pickup codes and review links are not retained.
+
+Incoming webhooks must use HTTPS and Header Auth. In the SES sandbox, the From identity and every recipient must be verified; keep `SES_TEST_RECIPIENTS` to verified demo addresses. Verifying an address in `.env` alone does nothing.
+
+References: [n8n Webhook authentication](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/), [workflow import/export](https://docs.n8n.io/workflows/export-import/).

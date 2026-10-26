@@ -1,203 +1,41 @@
-# Lane C handoff
+# Platform handoff
 
-## Current state (October 11, contract follow-ups)
+The platform (Lane C) is the organization hosts, the organization systems, the approval and email service, the n8n workflows and the AWS deployment. It is merged on `main` and follows the agreed contracts in [`docs/contracts/`](../contracts/README.md).
 
-The Lane C code is merged into `main` and follows the agreed contracts in
-`docs/contracts/` (ticket #1) and the API skeleton in `api_skeleton/`:
+## What is deployed
 
-- Organization IDs are `market`, `city`, `rural`, `eastside`, `advocate`. The
-  systems fixture is `synthetic-v2`, dated October 13, 2026 at `-07:00`, and
-  follows the core's normal afternoon.
-- The transport wraps Lane B's agent input unchanged, sends `facts` only to the
-  organization whose turn it is, checks moves against `agent-moves.md`, and waits
-  up to `AGENT_TURN_TIMEOUT_SECONDS` (default 60) per turn.
-- The approval bridge posts `record_approval` (`lot_id`, `sha256:` hash) with each
-  organization's own core token (`CORE_API_TOKENS`), passes core rejections
-  through, issues ISO 8601 `expires_at`, has a configurable link lifetime, and can
-  reissue a lost link. SMS replies map from the sending phone to its pickup: YES
-  confirms, CAN'T MAKE IT calls the release operation.
-- Native hosts republish their Directory record when their capabilities change.
-- One setting, `CLAUDE_RUN_CAP_USD` (default 0), caps the LLM negotiators and the
-  voice extractor.
+The last recorded deploy is in `deploy/aws/outputs.json` on the lead's machine (Git-ignored): instance, host name, git SHA and release. The stack is one EC2 instance in us-east-2, described in [`deploy/aws/README.md`](../../deploy/aws/README.md).
 
-An AWS Compose overlay now prepares a private AGNTCY `dirctl daemon` with SQLite,
-the local OCI store, and the search indexer in one container. Each of the five
-organization hosts publishes its own record through the pinned Directory SDK.
-`deploy/aws/check_directory.sh` lists registrations and searches cold capacity
-and pickup time from inside the city host; it reports whether both answers came
-from AGNTCY or from the labeled local fallback. Unit tests and merged Compose
-configuration pass. A local container smoke test registered and found one city
-host through the real daemon using synthetic data. This is a candidate AWS
-deployment: all five hosts, cooler-change republish, and resource use on the
-instance have not been verified. See `docs/platform/TRANSPORT.md` and
-`deploy/aws/README.md`.
+Confirm it is up before relying on it: `curl https://<host>/api/health` and `https://<host>/platform/health`, then `deploy/aws/logs.sh` and `deploy/aws/check_directory.sh`. If it was torn down, `deploy/aws/setup.sh` recreates it.
 
-Still open, because they need deployment or accounts: re-importing the
-`synthetic-v2` Beeceptor mock, live AGNTCY Directory verification, published n8n
-workflows with credentials and a real SMS provider (including Twilio signature
-checking in front of the reply webhook), and Secrets Manager plus HTTPS hosting.
+| Piece | Where it lives |
+|---|---|
+| Core API and frontends | `https://<host>/api/`, `/household/`, `/donor-dashboard/`, `/results-strip/` |
+| Organization hosts, Directory, cooler watchers | Containers on the instance ([`TRANSPORT.md`](TRANSPORT.md)) |
+| Review links and email preparation | `approvals` container ([`APPROVALS.md`](APPROVALS.md)) |
+| Organization systems and the cooler switch | `systems` container ([`CONTRACTS.md`](CONTRACTS.md)) |
+| Emails | n8n Cloud and Amazon SES (team account) |
+| Organization data | Beeceptor, from `BEECEPTOR_BASE_URL`; recorded copies when unset or mismatched |
 
-The sections below are the earlier history.
+## n8n Cloud
 
-## Earlier history
+Three workflows are active and carry all live email: review requests (`x3dsVytciPRThmlX`), committed pickup emails (`9qaAaWdqvIEzn4T4`) and the release thank-you (`g0qO8uMLOBIwpYi4`). Keep any other HarvestNet workflow in that project inactive. The older drafts include an SMS reply workflow, a human-decision relay and a manual Beeceptor check; the SMS path is retired. These are workflow IDs, not credentials. The workflow definitions in `integrations/n8n/` are generated references, not the live copies. Setup: [`APPROVALS.md`](APPROVALS.md).
 
-All five calebdbur branches have implementation work. They form a **review stack**:
-16 -> 17 -> 18 -> 19 -> 21. Each branch contains the earlier branches' platform
-foundation; each pull request uses the previous branch as its base. Review and
-merge in that order (or merge the final aggregate only after team review).
-Nothing was merged to main, and no issue was closed on partial evidence.
+## How to operate it
 
-## What works locally
+- **Redeploy, logs, reset, teardown, keys:** `deploy/aws/README.md`. Team commands and the rehearsal flow: `docs/demo/REHEARSAL.md`, `docs/demo/run-sheet.html`, `docs/demo/team-checklist.html`.
+- **Run the cooler failure live:** flip the switch with the `DEMO_SWITCH_TOKEN` bearer (`docs/demo/REHEARSAL.md`). The food bank's own watcher does the rest and asks the Staff approvers to approve on their review links.
+- **Spending:** every paid Claude call needs a cap above zero ([`DEPLOYMENT.md`](DEPLOYMENT.md)). Keep every shown number labeled synthetic.
+- **Local checks:** `uv run --with pytest pytest -q` at the root; `python -m harvestnet_platform.demo` for the account-free rehearsal.
 
-- #16: donor inventory/truck and three food banks' storage/cooler/hours/trucks,
-  isolated restart-safe cooler switch, synthetic labels, Beeceptor OpenAPI export,
-  recorded fallback on outage or incompatible responses.
-- #17: one organization host per donor/bank/advocate, A2A JSON-RPC and native
-  AGNTCY App SDK hosting, ordered durable receipts and retries, own proposal moves
-  only, capability records/search adapter and labeled in-process/local registry.
-- #18: exact-terms review page, independent human decision capabilities, stale
-  approval rejection, no-answer/no-approval, four inactive n8n imports, committed
-  pickup text formatting, verified SNAP tip filtering and authenticated release
-  adapter. Approval relay carries an explicit human receipt without changing it.
-- #19: one-command local rehearsal with every fallback labeled; shared durable
-  Claude budget guard defaults to zero, Secrets Manager loader, private Postgres
-  and five organization services, HTTPS proxy, redeploy/rollback runbook and CI.
-- #21: adapter for the real core/policies, fail-closed outcome/rule comparisons,
-  partial-outage retries and a synthetic mixed-batch network/in-process seam test.
+## What is open
 
-## Remaining acceptance gates
+Tickets and their checklists are the live list: GitHub issues on `mubinmodi/UCSC_HACK_HARVESTNET`. The platform's open items:
 
-Expanded verification on October 11: all **36 local tests** pass, including
-native App SDK startup and authenticated exchange. Twelve added resilience checks
-cover malformed HTTP data, pending-turn recovery after invalid receipts, receipt
-and approval persistence after restart, simultaneous reservations across twelve
-budget connections, core outage/retry with the same human receipt, every mock
-system resource, isolated failure for each food bank, and inactive authenticated
-n8n workflow graphs. Testing found and fixed nested transport shape crashes,
-premature join-sequence advancement, incomplete pickup text validation, and
-nonfinite Directory capacity queries. The combined Compose configuration and
-regeneration of all four n8n imports pass. Workflow graph checks do not certify an
-actual n8n import/SMS execution, and Compose validation does not run containers.
-
-The agreed contracts (ticket #1) and the API skeleton are on `main`, and the
-platform now follows them (see "Current state" above). The #20 real harness is
-merged. Lane B's rules are in the in-repo `agents/`. The Lane C adapter verifies all 25
-recorded rule scenarios over HTTP with exact direct-policy output equality and
-duplicate retries. It supports nonvoting `pass` and explicit donor ID aliasing.
-The production adapter requires Lane A's real calculators; its recorded-calculator
-test adapter is rejected by the real-join CLI. See `JOIN.md`. Proposed interfaces need review with
-Lane A/B. Real-agent fixture equality and actual core rule checks for #21 cannot
-be certified until those adapters exist. Do not replace them with constant checks.
-With the pinned Lane B package and native SDK available, all **39 tests** pass
-locally. CI has a separate pinned-source compatibility job for the new adapter.
-
-Beeceptor is configured at `https://harvestnet.proxy.beeceptor.com` with the
-OpenAPI contract and fixed synthetic examples. All 17 system routes were tested
-against the live service; city failure returned a failed cooler reading and zero
-cold capacity while rural stayed working. The local ignored `.env` has this URL.
-
-The four application workflows were imported and saved as unpublished drafts in
-`https://harvestnet.app.n8n.cloud`. A fifth manual-only Beeceptor connection check
-ran successfully from n8n Cloud. Application workflows still need their Header
-Auth credentials, public platform/core URLs and SMS provider credentials before
-publication. No real SMS delivery was attempted. No verified Market Match market
-is shipped; test markets are explicitly synthetic.
-
-Cloud workflow IDs (not credentials): review requests `7Qkc7a0X3TuYhwYd`, pickup
-texts `Ez4Sir1ssOKZfjuo`, replies `ESzgVkSoQOjzQeU3`, human receipt relay
-`c2jM64ZyOnRp49tA`, manual connection check `X9bHymRDirw1LDq8`.
-
-The user has an AWS account, but no AWS host, authenticated session, secret ARN,
-domain or core API image is configured. **User hosting budget is $0: prepare only
-until credits are confirmed. Do not provision chargeable resources.** The user
-subsequently deferred AWS work entirely on October 11: skip AWS sign-in, credit
-checks and provisioning until the user resumes that scope. Continue non-AWS
-integration work; n8n application workflows still require a reachable API before
-they can be fully activated. Secrets
-Manager storage and actual HTTPS deployment are not verified. Docker Compose is
-validated, but Docker Engine/container runtime is absent. Native App SDK startup
-and authenticated A2A exchange pass locally; a real Directory daemon push/search
-still needs its runtime. Recorded system capabilities are synthetic snapshots;
-owners must recheck current facts/reservations before any commitment.
-
-No Claude calls or provider credits were spent. Lane B's LLM negotiators and
-front-desk extractor now read their cap from `CLAUDE_RUN_CAP_USD` (default 0).
-
-## Resume work
-
-### n8n Cloud draft refresh (October 11, 2026)
-
-The team created separate live workflows. Read-only n8n API inspection confirmed
-these three are active: review requests `x3dsVytciPRThmlX`, pickup emails
-`9qaAaWdqvIEzn4T4`, and release thank-you emails `g0qO8uMLOBIwpYi4`.
-These are the live notification workflows; do not activate the older drafts
-below alongside them. Issue #18 records the team's live SES/review/pickup/release
-checks and was closed by the team. This Codex session inspected activation state
-only and did not independently send emails or verify inbox delivery.
-
-The four existing application workflows were updated in place from the merged
-email workflow definitions after the team's email decision. Their IDs above are
-unchanged. The three notification workflows now use email; the fourth relays
-explicit human decisions. All four remain inactive and unpublished. The manual
-Beeceptor check was left unchanged, and no message or workflow execution was
-triggered. Previous workflow snapshots are backed up only in ignored local
-`runtime/n8n-before-email-update/`.
-
-n8n rejects the generated `CONFIGURE_IN_N8N` credential IDs as inaccessible.
-Those placeholder references were omitted from the cloud drafts; authentication
-requirements remain in the nodes. Bind the incoming header credential, platform
-event credential and SES SMTP credential before publication. Set the platform
-URL and sender variables, verify the SES sender/recipient requirements, and
-perform an authorized end-to-end check. Saving drafts does not verify delivery.
-The separate live workflows already have their own credential bindings; the
-remaining-binding notes here apply only to the older inactive draft IDs.
-
-1. Fetch latest remote branches and inspect #1/#20 for actual adapter exports.
-2. Use the module interfaces in `JOIN.md`; integrate without rewriting teammate
-   policies or core rules. Test the same deterministic fixture in both transports.
-3. Rerun all tests and Compose validation. Optional SDK tests can be enabled by
-   installing `requirements-agntcy.txt`; Windows `pip --target` installs require
-   `site.addsitedir` to process pywin32 .pth hooks (normal virtualenv install does
-   that automatically).
-4. Configure sponsor/AWS accounts only when their credentials/host are available.
-   Keep secrets in local ignored configuration or Secrets Manager, never Git.
-5. Update the appropriate branch/PR. Keep incomplete acceptance checkboxes open.
-
-The local rehearsal is at `python -m harvestnet_platform.demo`; its URL has an
-ephemeral session fragment in ignored `runtime/demo-url.txt`. The review page
-does not allocate, commit, or create real household records. It can demonstrate
-the integration controls while the full team application is being joined.
-
-## Review submission (October 11)
-
-The user requested submission of the existing PRs for team review. PRs #26-#30
-are ready for review, with dependencies and incomplete acceptance gates retained;
-none were merged or issues closed. All 39 tests were rerun successfully. The
-user-provided n8n API key authenticated successfully and listed all five inactive
-workflows. The key is stored only in ignored local configuration. Live SMS,
-Directory daemon registration and AWS deployment remain unverified. The real
-core comparison has since passed in the takeover stack described below. Review
-readiness is not full issue acceptance.
-
-## Six original takeover branches (October 11)
-
-The user authorized taking over yi36's six issues and explicitly requested
-commits and pushes on each original branch. Those branches now form a review
-stack #7 -> #8 -> #9 -> #10 -> #22 -> #24, with PRs #42 through #47. No teammate
-commits were overwritten or force-pushed. The aggregate PR #40 is superseded.
-Read `docs/core/README.md` on the final branch for requirements and open gates.
-The original five Caleb branches/PRs #26-#30 remain separate and unmerged.
-
-The core stack incorporates newly merged #20 (`bf099b0`). Its actual HTTP tests
-exercise the existing Lane C human capability relay and compare real-agent
-commitments/pathways/core audits over five A2A hosts against in-process execution.
-Run 38127403436 passed all 32 core tests with actual Postgres, no skips, and 601
-existing agent/API skeleton tests. This does not certify native Directory or
-public deployment. Paid repeated LLM runs, live voice/SMS, unexpected cooler
-rediscovery/reapproval and the actual teammate frontend screens remain open.
-The new household frontend currently uses synthetic credits/locations and a
-placeholder adapter; do not silently treat those as the agreed pounds contract.
-
-The existing overnight heartbeat now checks all eleven issues every ten minutes
-and responds to actionable teammate changes. AWS remains deferred; spending is
-zero and no real SMS/messages are authorized. Usage limits cannot be bypassed.
+- **Email end to end.** Send a real pickup email, review email and release thank-you through SES to verified recipients and confirm delivery. SES is sandboxed, so only verified addresses receive mail.
+- **Beeceptor mock on the current fixture.** Re-import it from `python -m harvestnet_platform.systems --export-openapi` if the fixture version changed; until then reads fall back to recorded copies ([`CONTRACTS.md`](CONTRACTS.md)).
+- **Directory on the instance.** Run `deploy/aws/check_directory.sh` after each deploy. Whether all five hosts republish after a cooler change, and the memory use, are checked there, not assumed.
+- **A live lot over A2A.** The deployed core negotiates in process; the A2A hosts are exercised by the join comparison and the Directory ([`JOIN.md`](JOIN.md)). Routing live turns through the hosts is not done.
+- **Voice line.** The ElevenLabs agent and a live call (issues #4 and #22). Voice intake answers 503 until `ANTHROPIC_API_KEY` and a run cap are set.
+- **Paid evaluation runs.** More repeats within the agreed budget (issue #24); see `docs/core/README.md`, Evaluation.
+- **Total Claude cap.** `CLAUDE_TOTAL_CAP_USD` is not enforced in code ([`DEPLOYMENT.md`](DEPLOYMENT.md)).

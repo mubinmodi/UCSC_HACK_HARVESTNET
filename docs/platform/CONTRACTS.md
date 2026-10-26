@@ -1,57 +1,30 @@
-# Lane C integration contracts
+# Organization systems
 
-The team's shared contracts are **agreed** (ticket #1, October 11, 2026) and live in
-[`docs/contracts/`](../contracts/README.md), with machine-readable examples and the
-API skeleton in `api_skeleton/`. Lane C follows them: organization IDs are names
-(`market`, not `donor`), times carry an offset (October 13, 2026, `-07:00`), the
-transport wraps Lane B's agent input unchanged, approvals post `lot_id` and a
-`sha256:` terms hash, and "can't make it" calls `POST /pickups/{pickup_id}/release`.
+The shared interfaces (scenario fixtures, agent moves, calculators, public API) are in [`docs/contracts/`](../contracts/README.md), and the platform follows them. This page covers the platform's own service: the **organization systems**, which stand in for each organization's real systems (inventory, storage, cooler, pickup hours, trucks).
 
-This page covers Lane C's own internal routes: the organization systems below are
-the organizations' *own* systems, so they keep their own field names
-(`cold_available_lb`); specialists translate them into the contract's facts
-(README decision 4). No mock response is a real household outcome.
+An organization's system keeps its own field names (`cold_available_lb`). Its specialist translates them into the contract's facts (`cold_free_lb`, contract decision 4), so no field here is a contract field. Every reading is synthetic and labeled so; none is a real household or food safety outcome.
 
-## Organization systems (#16)
+## Routes
 
-`GET /systems/{organization}/{resource}` returns `organization_id`, `resource`,
-`synthetic: true`, `mode`, `source`, `fixture_version`, `observed_at`, and `data`.
-Organizations: `market` (the donor), `city`, `rural`, `eastside`. Resources: market
-`inventory` and `truck`; food banks `storage`, `cooler`, `cooler-failed`,
-`pickup-hours`, `truck`. The fixture (`fixture_version: synthetic-v2`) is the
-complete example and follows the core's normal afternoon (`core_fixtures/normal-afternoon.json`).
-Units: pounds, degrees Celsius, ISO 8601 timestamps with an offset. An older export
-keyed by `donor` (the core's `cooler_join`) is still read as `market`. Fixture temperature values are synthetic, not safety
-thresholds or guidance. Specialist calculators must assess actual condition.
+`python -m harvestnet_platform.systems` (port 8010; `--host 0.0.0.0` in a container) serves:
 
-`POST /demo/{bank}/cooler` with `{"failed": true}` selects the synthetic failed
-reading and makes cold capacity zero. `false` resets it. Requires bearer
-`DEMO_SWITCH_TOKEN`. It affects one bank only. This is demo control, never a
-real refrigeration control. Set `COOLER_STATE_PATH` to persist it across restarts.
+- `GET /systems/{organization}/{resource}` returns `organization_id`, `resource`, `synthetic: true`, `mode`, `source`, `fixture_version`, `observed_at` and `data`. Organizations come from `harvestnet_platform/roster.py`. Resources: `market` has `inventory` and `truck`; each food bank (`city`, `rural`, `eastside`) has `storage`, `cooler`, `cooler-failed`, `pickup-hours` and `truck`.
+- `POST /demo/{bank}/cooler` with `{"failed": true}` selects the failed reading for that one bank and makes its cold capacity zero. `false` resets it. It needs the `DEMO_SWITCH_TOKEN` bearer. It is demo control and never touches real refrigeration. `COOLER_STATE_PATH` keeps the state across restarts.
+- `GET /openapi.json`, or `--export-openapi FILE`, describes the readings for Beeceptor.
 
-## Beeceptor setup
+The fixture is `harvestnet_platform/fixtures/systems.json`. It follows the core's normal afternoon (`core_fixtures/normal-afternoon.json`): October 13, 2026, `-07:00`. Units are pounds, degrees Celsius and ISO 8601 times with an offset. Temperatures are synthetic and are not safety thresholds; specialists must assess actual condition.
 
-1. Run `python -m harvestnet_platform.systems --export-openapi beeceptor.openapi.json`.
-2. Import that OpenAPI document into a dedicated Beeceptor mock endpoint; use
-   **example responses** (including the explicit `synthetic` label).
-3. Set `BEECEPTOR_BASE_URL=https://YOUR-ENDPOINT.free.beeceptor.com`.
-4. Run `python -m harvestnet_platform.systems`, then use its authenticated demo
-   switch. The adapter reads the matching working/failed Beeceptor mock route;
-   it never changes the organization's real system.
-5. Verify every route against the examples. An unavailable or incompatible
-   response uses its recorded copy and reports `mode: replay` and a fallback reason.
+## Who reads it
 
-The exported schema intentionally describes external organization systems only,
-not HarvestNet's public API. It must not become the authoritative approval store.
-Without a connected Beeceptor account the live import remains a setup step;
-all recorded endpoints and switch behavior run locally now. The fixture moved to
-`synthetic-v2` (the `market` routes and October 13 times), so the live Beeceptor
-mock must be re-imported from a fresh export; until then its responses don't match
-and every read is the labeled recorded copy.
+Agent hosts read their own organization's systems through this service (`SYSTEMS_URL=http://systems:8010`), so the demo switch applies to them. The service's labels (`mode`, `source`, `disruption`) pass through unchanged. Without `SYSTEMS_URL`, a host reads Beeceptor (`BEECEPTOR_BASE_URL`) directly, or the recorded copy.
 
-Agent hosts read their own systems through this service, which applies the demo
-switch: set `SYSTEMS_URL=http://systems:8010`. Its labels (`mode`, `source`,
-`disruption`) are kept as they are.
+## Beeceptor
 
-Reference: [Beeceptor OpenAPI mocking](https://beeceptor.com/docs/),
-[mock rules](https://beeceptor.com/docs/mock-rules/).
+1. `python -m harvestnet_platform.systems --export-openapi beeceptor.openapi.json`
+2. Import it into a dedicated Beeceptor mock endpoint and use the **example responses**, which carry the `synthetic` label.
+3. Set `BEECEPTOR_BASE_URL=https://YOUR-ENDPOINT.free.beeceptor.com` and start the service.
+4. Verify each route against the examples.
+
+The mock must match the fixture exactly: a reading is accepted only if it is labeled synthetic, names the same organization and resource, carries the fixture's `fixture_version`, and has the same fields and field types as the recorded copy. Anything else falls back to the recorded copy with `mode: replay` and a `fallback_reason`. **Re-import the mock from a fresh export whenever the fixture changes**; until then every read is the labeled recorded copy.
+
+The exported schema describes the organizations' external systems only, not HarvestNet's public API, and never becomes an approval store.

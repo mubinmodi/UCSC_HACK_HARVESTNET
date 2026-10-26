@@ -1,88 +1,37 @@
-# Join real agents over A2A (#21)
+# Joining the real agents to the transport
 
-The real core/policy adapters are now available on the original yi36 review stack
-(PRs #42-#47). The core stack includes the merged #20 runner at `bf099b0` and
-real calculators. Its HTTP integration test compares a real mixed-batch fixture
-over five actual A2A hosts against the same in-process policies, requiring
-nonempty identical commitments, pathways and recomputed core checks. Core CI run
-38127403436 passed all 32 tests, including actual Postgres persistence, and 601
-agent/API skeleton regressions. This is local A2A evidence; native Directory,
-container/public HTTPS deployment and unexpected live cooler reapproval remain
-unverified acceptance gates for #21.
-
-Use `harvestnet_core.join_adapter:policy` and
-`harvestnet_core.join_adapter:harness` from the reviewed core stack. Both the
-core and real `harvestnet_agents` package must be available to each organization.
-
-## Plug in teammates' code
-
-Supply two synchronous adapters, without changing their decision logic:
-
-- `real_agents:move(organization_id, input) -> move`: uses the SAME deterministic
-  real rules policy and calculators locally and inside each organization container.
-  Input has current `draft`, owner calculator `facts`, and `turn`. No individual
-  household data goes to agents. Return our documented move shape or adapt once.
-- `real_core:run_fixture(fixture, move_provider) -> run`: Lane A's seeded harness
-  calls `move_provider(organization_id,input)` on each published turn. It owns
-  drafts, stops, owner holds, explicit human approvals and records. Return
-  `commitments`, `pathways` and `rule_checks` with boolean keys:
-  `no_double_booking`, `pounds_conserved`, `versioned_approvals`, `no_auto_commit`,
-  `all_pounds_have_pathway`, `zero_invalid_commitments`. Additional boolean
-  checks are supported and must also pass. Never return constant success checks
-  in the real harness; test checks here are synthetic stand-ins only.
-
-Bake adapters into the reviewed agent image or mount the source read-only. Set
-`AGENT_POLICY` for each organization to the real policy export. Set actual agent
-URLs and `AGNTCY_DIRECTORY_ADDRESS`; each native host registers its own card at
-startup. Re-register capacity changes and verify candidate facts at the owner.
-Use a fresh event namespace for each test. Receipt stores make retries idempotent.
+The join proves that the real negotiators and the real core give the same outcome whether their moves travel in process or over the five organization hosts ([`TRANSPORT.md`](TRANSPORT.md)). It is a comparison. It never creates holds, approves or commits anything.
 
 ```sh
-python -m harvestnet_platform.join --fixture path/to/mixed-batch.json \
-  --harness real_core:run_fixture --policy real_agents:move
+python -m harvestnet_platform.join --fixture core_fixtures/normal-afternoon.json \
+  --harness harvestnet_core.join_adapter:harness --policy harvestnet_core.join_adapter:policy
 ```
 
-`AGENT_ENDPOINTS` is a JSON map with market/city/rural/eastside/advocate URLs and
-`TRANSPORT_TOKEN` authenticates the internal exchange. Native AGNTCY and small
-JSON-RPC hosts use the same wire contract. The CLI deliberately rejects the
-platform stand-in as a real policy. Missing exports fail visibly. Test both
-transports against the same fixture, clock, seed, policy and calculator inputs.
-Verify peers' policy metadata/image before running; do not compare an LLM's
-independent random calls and call differences transport bugs. Use a recorded
-sequence for a nondeterministic policy. No live Claude calls are needed here.
+Run it with `agents/src` on `PYTHONPATH` and the five hosts up (`python -m harvestnet_platform.join --help` lists the flags). `AGENT_ENDPOINTS` is a JSON map of the five organization URLs and `TRANSPORT_TOKEN` authenticates the exchange.
 
-The comparison requires nonempty rule-check definitions, every check passing,
-and exact identical commitments/pathways. It never creates holds, approves or
-commits. Lane A must run the same rule checks over remote results.
+## The two adapters
 
-## Validation so far
+- **Policy**: `module:function(organization_id, input) -> move`. It must be the same deterministic real rules and real calculators locally and inside each host. `input` is Lane B's agent input (`{role, draft, facts, turn}`); no individual household data reaches an agent. The core's export is `harvestnet_core.join_adapter:policy`.
+- **Harness**: `module:function(fixture, move_provider) -> run`. Lane A's seeded harness calls `move_provider(organization_id, input)` on every published turn and owns drafts, stops, holds, human approvals and records. The core's export is `harvestnet_core.join_adapter:harness`.
 
-`harvestnet_platform.lane_b:real_rules` adapts the published typed Lane B rules.
-Install the reviewed `agents` package alongside this platform package. The input
-is Lane B's `AgentInput` unchanged (`{role, draft, facts, turn}`), with the core's
-clock and turn number in `turn`; Lane A's earlier form (`turn_context`) is still
-read. Organization IDs are the same on the wire and in Lane B (`market`), so the
-old `LANE_B_ORGANIZATION_IDS` alias is gone. No donor facts, allocations, clocks
-or decisions are invented or rewritten.
+The run must return `commitments`, `pathways` and `rule_checks`, with these boolean checks: `no_double_booking`, `pounds_conserved`, `versioned_approvals`, `no_auto_commit`, `all_pounds_have_pathway`, `zero_invalid_commitments`. Extra boolean checks must pass too. A real harness computes its checks from records; a constant success flag is not a check.
 
-Set `LANE_B_CALCULATORS=reviewed_core_module:factory` to a callable returning the
-real calculator implementation. The production adapter refuses missing factories
-or Lane B's `StandInCalculators`. Pass those settings into each container and the
-local comparison process when baking the final reviewed image. `pass` is now an
-allowed nonvoting move; the advocate is restricted to counter/pass, consistent
-with Lane B's interface. The extra move remains proposed pending contract day.
+## What the comparison requires
 
-All **26 recorded Lane B scenarios** match direct rule outputs over five actual
-HTTP hosts, including duplicate retries, accept/counter/reject/hold/ask-human/pass
-with Lane B's input unchanged. The test uses `lane_b:recorded_rules`, which is
-explicitly marked as using stand-in calculators and rejected by the real-join CLI.
-CI runs it against the in-repo `agents/`, so it checks the same commit. This proves
-real rules can travel over our transport with recorded calculator inputs; it
-does not prove commitments/pathways or core rule checks for #21.
+The harness runs twice on the same fixture, clock, seed, policy and calculator inputs: in process, and with every turn sent through `A2ATransport`. It passes only if rule checks are present and all true, and commitments and pathways are exactly identical and non-empty. Anything else raises.
 
-Five actual local HTTP endpoints exchanged a synthetic mixed-batch fixture:
-300 lb apples, 200 lb romaine, 400 lb potatoes. Outcomes match the same in-process
-test policies; missing human approvals give zero synthetic commitments. A
-partial outage must retry the identical message. Missing/failing core rule checks
-or differing pathways fail comparison. These results establish the platform seam,
-not real-agent behavior, a native Directory deployment, or Level 3 performance.
+- Bake the policy into the host images, or mount the source read-only, and set `AGENT_POLICY` for each host. Use a fresh event namespace for each run. Receipt stores make retries idempotent, and a partial outage retries the identical envelope.
+- The CLI refuses the platform's stand-in and any policy that uses stand-in calculators. A missing export fails visibly.
+- Verify the peers' policy image before a run. Do not compare an LLM's independent random calls and call the differences transport bugs; use a recorded sequence for a nondeterministic policy. This join needs no Claude call.
+
+## Lane B's rules on the platform
+
+`harvestnet_platform.lane_b` adapts Lane B's typed rules without changing them:
+
+- `real_rules` needs `LANE_B_CALCULATORS=module:factory`, a callable that returns the real calculators. It refuses a missing factory and Lane B's `StandInCalculators`. Set it in each container and in the comparison process.
+- `recorded_rules` uses the stand-in calculators, is marked `uses_stand_in_calculators`, and exists only to prove that Lane B's recorded scenarios travel over HTTP with identical output. The real-join CLI rejects it.
+- Organization IDs are the same on the wire and in Lane B (`market`). `pass` is a valid nonvoting move (contract decision 6), and the advocate may only counter or pass.
+
+## What the tests establish
+
+`tests/test_join.py`, `tests/test_lane_b.py` and `core_tests/test_http_integration.py` cover: every recorded Lane B scenario matches its direct rule output over five actual HTTP hosts, including duplicate retries; a synthetic mixed batch (300 lb apples, 200 lb romaine, 400 lb potatoes; `tests/test_join.py`) and the core's real mixed batch (`core_tests/test_http_integration.py`) give identical, non-empty commitments, pathways and checks in process and over five A2A hosts; and missing human approvals give zero commitments. They establish the platform seam. They do not show Level 3 agent behavior, a live Directory, or public HTTPS deployment.

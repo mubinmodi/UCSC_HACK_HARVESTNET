@@ -1,109 +1,48 @@
-# Deployment and fallbacks (#19)
+# Running and deploying the platform
 
-## Run tonight without accounts
+- **Live deployment:** [`deploy/aws/README.md`](../../deploy/aws/README.md). One small EC2 instance runs the whole stack. That page covers setup, redeploy, rollback, logs, reset and teardown.
+- **Local rehearsal, no accounts:** below.
+- **Fallbacks and the Claude spending cap:** below.
 
-Python 3.12+ is the only requirement. From the repo root:
+## Local rehearsal
 
-```powershell
-python -m unittest discover -s tests -v
-python -m harvestnet_platform.demo
+Python 3.12 or newer. From the repository root:
+
+```sh
+python -m harvestnet_platform.demo     # then open the URL saved in runtime/demo-url.txt
 ```
 
-Open the URL saved in `runtime/demo-url.txt`. Keep the terminal running. The page
-has the cooler switch and capability discovery, five organization turns, explicit
-human review buttons, and text intake read-back. Every mode is labeled. It is a
-**platform rehearsal**, not the whole HarvestNet application. No Claude calls,
-real SMS messages, household saves, or actual produce commitments occur.
+Keep the terminal running. The page has the cooler switch with capability discovery, five organization turns, review links with Approve and Decline, and text intake with a read-back. Every mode is labeled. It is a **platform rehearsal**, not the whole application: it makes no Claude calls, saves no households and commits no produce. Tests: `uv run --with pytest pytest -q` at the root (optional native SDK tests need `requirements-agntcy.txt`).
 
 ## Fallbacks
 
-- Beeceptor outage: recorded synthetic fixtures, timestamp and fallback reason.
-- ElevenLabs outage: validated text draft/read-back, awaiting consent; real core
-  submission belongs to #9/#14. No food is promised by text intake.
-- n8n outage: local review page with exact version and Approve/Decline buttons.
-  A missing core records a decision but cannot commit it.
-- AGNTCY outage: choose `InProcess` before starting a run, visibly labeled.
-  Never switch policies mid-event after a partial network delivery.
-- Claude outage/cap reached: rules or replay. Live calls are off until `CLAUDE_RUN_CAP_USD` is set.
+Each one is labeled on screen. Pick one before a run and do not switch inside a running event.
+
+| If this fails | Use | Note |
+|---|---|---|
+| Beeceptor | The recorded synthetic fixtures (`mode: replay`, with a reason) | [`CONTRACTS.md`](CONTRACTS.md) |
+| ElevenLabs | The text form: a validated draft with read-back, awaiting consent | No food is promised by text intake. |
+| n8n | The local review page with the exact version and Approve and Decline | A missing core records a decision but cannot commit it ([`APPROVALS.md`](APPROVALS.md)). |
+| AGNTCY | `InProcess` transport, visibly labeled | [`TRANSPORT.md`](TRANSPORT.md) |
+| Claude, or its cap reached | Rules-based moves and the recorded replay | Live calls are off until a cap is set. |
+| The whole deployment | `docs/demo/replay.html`, opened from a laptop | `docs/demo/REHEARSAL.md` |
 
 ## Claude spending cap
 
-One setting caps Claude spending per run: **`CLAUDE_RUN_CAP_USD`**, default **0**
-(no live calls). Lane B reads it with `SpendingCap.from_env()`:
+`CLAUDE_RUN_CAP_USD` (default 0, meaning no live calls; above $100 is refused) is the one setting that authorizes paid calls. Lane B reads it with `SpendingCap.from_env()` for the LLM negotiators (one shared cap per run) and the voice line's front-desk extractor. The core's voice intake also reads it, and needs `ANTHROPIC_API_KEY` (`harvestnet_core/voice.py`).
 
-- The LLM negotiators: `llm_negotiators_for(...)` without an explicit `cap` gives
-  every negotiator in the run one shared `SpendingCap.from_env()`.
-- The voice line's front-desk extractor: `ClaudeExtractor()` uses
-  `SpendingCap.from_env()` unless given a cap. Over the cap it makes no call and
-  raises `ExtractionError`, so the caller falls back to the text form.
+Before each call the cap reserves a deliberately high worst case and settles the actual cost. If the reservation does not fit, no call is made and the caller falls back to rules or the text form. The cap is **per process**: a restart starts it from zero again. `python -m harvestnet_core evaluate --llm-cap-usd N --allow-paid` has its own cap, shared across that command.
 
-Before each call the cap reserves a deliberately high worst-case cost (input
-estimate plus the full output cap) and settles the actual cost from the
-response's usage. If the reservation doesn't fit, no call is made and the
-negotiator sends its rules-based move. The cap is per process and per run.
+`CLAUDE_TOTAL_CAP_USD` is read only by `harvestnet_platform.budget.Budget`, a durable SQLite ledger with a run cap and a total cap. No live path uses it yet, so the total cap is a team agreement, not enforced code. To enforce it, reserve through `Budget` as well. Conservative bounds are a prerequisite, and neither mechanism is a provider billing cap.
 
-`harvestnet_platform.budget.Budget` is a separate durable ledger (SQLite) with a
-run cap and a total cap (`CLAUDE_TOTAL_CAP_USD`), for sharing one credit across
-processes. No live path uses it yet; to use it, reserve through it as well.
-Correct conservative bounds are a prerequisite, not a guaranteed provider
-billing cap.
+## Secrets and configuration
 
-## AWS deployment (prepared, not executed)
+`deploy/load_secrets.py --secret-id <arn> --region <region>` reads one Secrets Manager JSON secret into `runtime/deploy.env` (mode 0600, Git-ignored), using the instance role. It accepts only the keys in its `ALLOWED` set and single-line values with no single quote or backslash. The AWS setup script does this on the instance.
 
-There is no configured AWS account, EC2 host, domain, Docker installation, or
-reviewed Lane A API image here. These steps deliberately stop at those missing
-inputs; no fake HTTPS address or deployment claim is produced.
+- Keep secrets in local ignored files or Secrets Manager, never in Git, chat or logs. Do not paste plain `docker compose config`, `docker inspect` or environment dumps; `config --quiet` validates without printing.
+- Rotating a secret means recreating the affected containers.
+- Never log approval links, household emails, transcripts or SNAP answers.
 
-1. On the authorized EC2 host, install Docker Engine with Compose, Git, Python
-   and `boto3`. Set DNS to the host and allow only 80/443 from the internet.
-   Keep Postgres, agent services, mock controls and Directory private. Use SSM
-   or restricted SSH for administration. Back up persistent volumes first.
-2. Create a Secrets Manager JSON secret containing random `TRANSPORT_TOKEN`,
-   `API_EVENTS_TOKEN`, `DEMO_SWITCH_TOKEN`, `POSTGRES_PASSWORD`, `REPLY_BINDING_KEY`,
-   `CORE_API_TOKENS` (a JSON map of each organization to its own core staff token,
-   matching the core's `HARVESTNET_STAFF_TOKENS`), plus configured URLs/domain/API
-   image and any provider keys. Attach an EC2 instance role
-   granting `secretsmanager:GetSecretValue` only for this secret (and KMS decrypt
-   only if its key requires it). No static AWS keys in Git or user data.
-3. Check out the reviewed commit on the host. Run:
+## The generic Compose overlay
 
-```sh
-python deploy/load_secrets.py --secret-id YOUR_SECRET_ARN --region YOUR_REGION
-docker compose --env-file runtime/deploy.env -f compose.platform.yaml -f compose.deployment.yaml config --quiet
-docker compose --env-file runtime/deploy.env -f compose.platform.yaml -f compose.deployment.yaml up --build -d
-```
-
-4. Caddy obtains TLS for `HARVESTNET_DOMAIN`. Set `APPROVAL_PUBLIC_URL` to
-   `https://DOMAIN` (review routes are `/human/*`); platform adapter events are
-   `https://DOMAIN/platform/*`. The real Lane A API is proxied at `/api/*`.
-   `CORE_API_IMAGE` must be the actual reviewed API image listening on 8000,
-   using the proposed env/endpoint contracts or a documented adapter. It is
-   intentionally required: an absent backend must not be disguised as production.
-5. For native App SDK hosts, also pass `-f compose.agntcy.yaml`. Install/run the
-   official Directory daemon using its own repository setup at pinned commit
-   `cbda60bed59008bee3396d12c50485b2a179bf74`. Its Compose stack includes its own
-   registry/Postgres. Configure `AGNTCY_DIRECTORY_ADDRESS` to a reachable private
-   gRPC endpoint, then register the five cards with `harvestnet_platform.directory`.
-   Test push/search before a live demo. Native daemon/container execution remains
-   unverified on this Windows machine; the native App SDK process, authenticated
-   A2A request, base HTTP and SDK message shapes are tested.
-6. Import/configure the inactive n8n workflows and Beeceptor examples. Send only
-   explicit test traffic after confirming credentials and recipient ownership.
-   Verify stale approvals return 409, unsigned callbacks fail, all five agent
-   health endpoints respond internally, and the core never commits absent fresh
-   human approvals/valid holds. Check `/platform/health` and core health over HTTPS.
-
-## Redeploy and rollback
-
-Record the running source commit and immutable API image digest. Run the tests,
-fetch a reviewed commit, reload secrets, then rerun the same Compose command.
-`config --quiet` validates without printing interpolated secrets. Do not paste
-plain `docker compose config`, `docker inspect`, or environment dumps into logs.
-Secret rotation requires recreating affected containers. Roll back by checking
-out the prior reviewed commit/image digest and running `up -d --build` again.
-Do not run `down -v`: volumes contain approvals and core data. Restrict access to
-`runtime/deploy.env` (0600 on Linux); it is ignored by Git and reloadable from
-Secrets Manager. Stop/remove it when the host no longer needs it. Never log
-approval links, household phone numbers, transcripts or SNAP answers.
-
-Source: [AWS Secrets Manager Python retrieval](https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets-python-sdk.html).
+`compose.deployment.yaml` (with `compose.platform.yaml` and `compose.agntcy.yaml`) is a generic overlay: Caddy, a private Postgres and a required `CORE_API_IMAGE`. CI validates its configuration. The live stack does not use it; it uses `deploy/aws/compose.aws.yaml`, with SQLite and no Postgres. Prefer the AWS files. The generic overlay still carries retired settings (`REPLY_BINDING_KEY`, `POSTGRES_PASSWORD`).
