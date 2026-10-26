@@ -1,6 +1,7 @@
 """Real record-backed operations at the agreed public API paths."""
 from collections import deque
 import copy
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import secrets
 import time
@@ -73,6 +74,29 @@ SAVED_MESSAGE = {
     'en': "Your food banks are saved.",
     'es': "Sus bancos de alimentos están guardados.",
 }
+
+
+@dataclass(frozen=True)
+class Call:
+    """One request to an operation: path parameters, query, JSON body and the bearer token."""
+    params: dict
+    query: dict
+    body: dict
+    token: str | None
+
+
+def match_route(template, segments):
+    """The ``{name}`` values of ``template`` if ``segments`` fit it, else ``None``."""
+    pattern=template.strip('/').split('/')
+    if len(pattern)!=len(segments):
+        return None
+    params={}
+    for want,got in zip(pattern,segments):
+        if want.startswith('{') and want.endswith('}'):
+            params[want[1:-1]]=got
+        elif want!=got:
+            return None
+    return params
 
 
 class API:
@@ -168,11 +192,11 @@ class API:
         except KeyError:
             return profile.name
 
-    def wording(self,p,r,language=None):
-        language=desk.Language(language or r["language"])
-        window=p["window"]
-        portions=[desk.ProducePortion(self.item_name(i["produce_id"],language.value).lower(),i["pounds"],"committed") for i in p["items"]]
-        facts=desk.PickupFacts(p["food_bank_name"],dt(window["start"]).time(),dt(window["end"]).time(),r["request_code"],portions,r.get("received_this_week_lb",0),r["fair_share_lb"])
+    def wording(self,pickup,request,language=None):
+        language=desk.Language(language or request["language"])
+        window=pickup["window"]
+        portions=[desk.ProducePortion(self.item_name(item["produce_id"],language.value).lower(),item["pounds"],"committed") for item in pickup["items"]]
+        facts=desk.PickupFacts(pickup["food_bank_name"],dt(window["start"]).time(),dt(window["end"]).time(),request["request_code"],portions,request.get("received_this_week_lb",0),request["fair_share_lb"])
         return desk.pickup_wording(facts,language)
 
     def voice_allowed(self):
@@ -229,9 +253,9 @@ class API:
 
     def lot_item(self, lot, item):
         """One item of ``get_lot``: its split, unclaimed pounds once the lot is settled, and reach."""
-        d,pid=lot['draft'],item['produce_id']
-        movers={t['food_bank_id']:t['mover'] for t in d['transports']}
-        split=[{"food_bank_id":a['food_bank_id'],"pounds":a['pounds'],"mover":movers.get(a['food_bank_id'])} for a in d['allocations'] if a['produce_id']==pid and a['pounds']>0]
+        draft,pid=lot['draft'],item['produce_id']
+        movers={t['food_bank_id']:t['mover'] for t in draft['transports']}
+        split=[{"food_bank_id":a['food_bank_id'],"pounds":a['pounds'],"mover":movers.get(a['food_bank_id'])} for a in draft['allocations'] if a['produce_id']==pid and a['pounds']>0]
         if lot.get('change_version'):
             # A committed change (a cooler failure) amended the commitments, not the draft: follow the commitments.
             # Produce a change moved goes by the proposing food bank's own truck, so it is a food bank mover.
@@ -240,7 +264,7 @@ class API:
                    for a in lot['commitments'] if a['produce_id']==pid and a['pounds']>0]
         committed=sum(a['pounds'] for a in lot['commitments'] if a['produce_id']==pid)
         settled=lot['status'] in ('committed','unclaimed','preserved_disagreement')
-        reached={p['request_code'] for p in self.records.all('pickup') if p['lot_id']==d['lot_id'] and p['status']=='collected' and any(x['produce_id']==pid for x in p['items'])}
+        reached={pickup['request_code'] for pickup in self.records.all('pickup') if pickup['lot_id']==draft['lot_id'] and pickup['status']=='collected' and any(entry['produce_id']==pid for entry in pickup['items'])}
         unclaimed=max(0.0,item['pounds']-committed) if settled else 0
         reason={"unclaimed_reason":lot.get('stop_reason') or "No food bank took these pounds in the approved plan"} if unclaimed>1e-8 else {}
         return {**item,"name":self.engine.calc.profiles.get(pid).name,"status":self.item_status(lot,pid),"split":split,
@@ -322,266 +346,339 @@ class API:
 
     def release(self, pid, code):
         with self.records.transaction():
-            p=self.records.get("pickup",pid)
-            if p["request_code"]!=code:
+            pickup=self.records.get("pickup",pid)
+            if pickup["request_code"]!=code:
                 raise Unauthorized("pickup belongs to a different request")
-            if p["status"]=="collected":
+            if pickup["status"]=="collected":
                 raise Conflict("collected pickup cannot be released")
-            if p["status"]!="released":
-                p["status"]="released"
-                self.records.put("pickup",pid,p)
-                self.records.event(p["lot_id"],self.engine.now,"pickup_released",{"pickup_id":pid,"pounds":p["pounds"],"source":"household"})
-                lot=self.records.get("lot",p["lot_id"])
-                bank=self.records.get("bank",p["food_bank_id"])
-                bank={**bank,'pickup_windows':[p['window']]}
-                for item in p["items"]:
-                    original=next(i for i in lot["draft"]["items"] if i["produce_id"]==item["produce_id"])
-                    rs=[r for r in self.records.all("request") if r["request_code"]!=code and self.engine.eligible(r,bank,original,max(dt(self.engine.now),dt(p["window"]["start"]))) ]
-                    portions=self.engine.calc.household_portions(item["pounds"],[{"request_code":r["request_code"],"household_size":r["household_size"],"received_lb":r.get("received_this_week_lb",0)+self.engine.reserved(r["request_code"])} for r in rs])
+            if pickup["status"]!="released":
+                pickup["status"]="released"
+                self.records.put("pickup",pid,pickup)
+                self.records.event(pickup["lot_id"],self.engine.now,"pickup_released",{"pickup_id":pid,"pounds":pickup["pounds"],"source":"household"})
+                lot=self.records.get("lot",pickup["lot_id"])
+                bank=self.records.get("bank",pickup["food_bank_id"])
+                bank={**bank,'pickup_windows':[pickup['window']]}
+                for item in pickup["items"]:
+                    original=next(offered for offered in lot["draft"]["items"] if offered["produce_id"]==item["produce_id"])
+                    eligible=[request for request in self.records.all("request") if request["request_code"]!=code and self.engine.eligible(request,bank,original,max(dt(self.engine.now),dt(pickup["window"]["start"]))) ]
+                    portions=self.engine.calc.household_portions(item["pounds"],[{"request_code":request["request_code"],"household_size":request["household_size"],"received_lb":request.get("received_this_week_lb",0)+self.engine.reserved(request["request_code"])} for request in eligible])
                     for part in portions["portions"]:
                         if part["pounds"]<=1e-8:
                             continue
-                        r=next(r for r in rs if r["request_code"]==part["request_code"])
+                        household=next(request for request in eligible if request["request_code"]==part["request_code"])
                         new_id=f"pk-{secrets.token_hex(8)}"
-                        new={**p,"pickup_id":new_id,"request_code":r["request_code"],"pounds":part["pounds"],"items":[{**item,"pounds":part["pounds"]}],"window":self.engine.eligible(r,bank,original,max(dt(self.engine.now),dt(p["window"]["start"]))),"status":"committed"}
+                        new={**pickup,"pickup_id":new_id,"request_code":household["request_code"],"pounds":part["pounds"],"items":[{**item,"pounds":part["pounds"]}],"window":self.engine.eligible(household,bank,original,max(dt(self.engine.now),dt(pickup["window"]["start"]))),"status":"committed"}
                         new.pop('moved_from_food_bank_id',None)
                         new.pop('reply_expected',None)
                         self.records.put("pickup",new_id,new)
-                        self.records.event(p["lot_id"],self.engine.now,"pickup_notice",new)
+                        self.records.event(pickup["lot_id"],self.engine.now,"pickup_notice",new)
             try:
                 language=self.records.get("request",code).get("language","en")
             except KeyError:
                 language="en"
-            return {"pickup_id":pid,"status":"released","released":True,"released_lb":p["pounds"],"message":RELEASED_MESSAGE.get(language,RELEASED_MESSAGE["en"])}
+            return {"pickup_id":pid,"status":"released","released":True,"released_lb":pickup["pounds"],"message":RELEASED_MESSAGE.get(language,RELEASED_MESSAGE["en"])}
 
-    def dispatch(self,method,target,b,token):
-        path=urlsplit(target).path.strip('/').split('/')
-        q={k:v[0] for k,v in parse_qs(urlsplit(target).query).items()}
-        root=path[0]
-        calc=self.engine.calc
-        if method=='GET' and path==['']:
-            return 200,{"contract_version":CONTRACT_VERSION,"operations":[{"operation":o,"method":m,"path":p,"status":st} for o,m,p,st in OPERATIONS]}
-        if method=='GET' and root=='health':
-            if self.email_dispatcher_thread is not None and not self.email_dispatcher_thread.is_alive():
-                return 503,{"error":{"code":"email_worker_unavailable","message":"Pickup email delivery is unavailable"}}
-            return 200,{"status":"ok","contract_version":CONTRACT_VERSION}
-        if method=='GET' and root=='fair-share':
-            share=calc.fair_share(int(q.get('household_size',0)))
-            return 200,{"household_size":share.household_size,"fair_share_lb":share.pounds,"period":share.period,"table_version":share.table_version,"is_placeholder":share.is_placeholder,"wording":desk.fair_share_wording(share.pounds,desk.Language(q.get('language','en')))}
-        if method=='POST' and root=='voice-intake':
-            if self.extractor is None:
-                return 503,{"error":{"code":"voice_unavailable","message":"Use the text form; voice extraction is not configured"}}
-            if not self.voice_allowed():
-                return 503,{"error":{"code":"rate_limited","message":"Too many voice calls right now; try again shortly or use the text form"}}
-            from harvestnet_agents.llm_negotiators import SpendingCapReached
-            transcript=desk.Transcript.from_dict(b.get('transcript',b))
-            try:
-                draft=desk.intake_transcript(transcript,self.extractor)
-            except SpendingCapReached:
-                return 503,{"error":{"code":"spending_cap_reached","message":"Voice extraction has reached its spending cap; use the text form"}}
-            except desk.ExtractionError:
-                return 503,{"error":{"code":"voice_unavailable","message":"Voice extraction failed; use the text form"}}
-            return 200,{"call_id":b.get('call_id'),**self.preview(draft),"next":"consent" if draft.is_complete else "ask_missing_questions"}
-        if root=='requests' and method=='POST' and (len(path)==1 or path[1]=='preview'):
-            if any(k in b for k in ('name','address','income')):
-                raise ValueError("names, addresses and income are not collected")
-            if 'phone' in b:
-                # contract-v0.2: pickup messages go by email, not SMS (user decision, October 11, 2026).
-                raise ValueError("phone numbers are no longer collected; give an optional email for pickup messages")
-            draft=desk.draft_from_form(b,desk.Language(b.get('language','en')))
-            if len(path)>1:
-                return 200,self.preview(draft)
-            if not draft.is_complete or b.get('consent') is not True:
-                raise ValueError("complete answers and explicit consent are required")
-            if b.get('channel','web') not in ('web','voice'):
-                raise ValueError("channel must be web or voice")
-            share=calc.fair_share(draft.household_size)
-            # Optional, write-only, for pickup emails only. Checked before anything is saved.
-            email=email_address(b['email']) if b.get('email') not in (None,'') else None
-            with self.records.transaction():
-                code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
-                try:
-                    self.records.get('request',code)
-                except KeyError:
-                    pass
-                else:
-                    raise Conflict("request code collision; retry")
-                r={**draft.to_dict(),"request_code":code,"fair_share_lb":share.pounds,"table_version":share.table_version,"received_this_week_lb":0,"initial_received_lb":0,"chosen_food_bank_ids":[],"expires_at":(dt(self.engine.now)+timedelta(days=7)).isoformat(),"submitted_at":self.engine.now,"channel":b.get('channel','web'),"consent":True}
-                self.records.put('request',code,r)
-                if email:
-                    self.records.put('email',code,{"email":email,"expires_at":r['expires_at']})
-            return 201,{k:r[k] for k in ('request_code','household_size','fair_share_lb','received_this_week_lb','table_version','chosen_food_bank_ids','expires_at')} | {"emails":email is not None,"next":"choose_food_banks"}
-        if root=='requests' and len(path)>=2:
-            r=self.records.get('request',path[1])
-            if method=='PUT' and path[2:]==['food-banks']:
-                ids=b['food_bank_ids'] if 'food_bank_ids' in b else b['chosen_food_bank_ids']
-                if not isinstance(ids,list) or len(ids)!=len(set(ids)) or any(i not in self.engine.banks for i in ids):
-                    raise ValueError("choose known, distinct food banks")
-                with self.records.transaction():
-                    r['chosen_food_bank_ids']=ids
-                    self.records.put('request',path[1],r)
-                return 200,{"request_code":path[1],"chosen_food_bank_ids":ids,"status":"saved","message":SAVED_MESSAGE.get(r.get('language'),SAVED_MESSAGE['en'])}
-            if method=='GET' and len(path)==2:
-                # The page's language when it sends one, else the language the household chose.
-                language=desk.Language(q.get('language') or r['language']).value
-                pickups=[{k:v for k,v in p.items() if k!='request_code'} | {"items":[{**i,"name":self.item_name(i["produce_id"],language)} for i in p["items"]],"wording":self.wording(p,r,language)} for p in self.records.all('pickup') if p['request_code']==path[1] and p['status']=='committed']
-                return 200,{k:r[k] for k in ('request_code','household_size','fair_share_lb','received_this_week_lb','chosen_food_bank_ids','expires_at')} | {"pickups":pickups,"market_match_tip":None}
-        if root=='pickups' and method=='POST' and len(path)==3 and path[2]=='release':
-            return 200,self.release(path[1],b['request_code'])
-        if root=='pickup-confirmations' and method=='POST':
-            owner=b['food_bank_id']
-            self.authorize(owner,token)
-            r=self.records.get('request',b['request_code'])
-            pending=[p for p in self.records.all('pickup') if p['request_code']==b['request_code'] and p['food_bank_id']==owner and p['status']=='committed']
-            if not pending:
-                raise Conflict("no open pickup at this food bank")
-            if any(not (dt(p['window']['start'])<=dt(self.engine.now)<dt(p['window']['end'])) for p in pending):
-                raise Conflict("pickup is outside its confirmed window")
-            with self.records.transaction():
-                for p in pending:
-                    p['status']='collected'
-                    self.records.put('pickup',p['pickup_id'],p)
-                    self.records.event(p['lot_id'],self.engine.now,'pickup_confirmation',{"pickup_id":p['pickup_id'],"pounds":p['pounds']})
-                collected=sum(p['pounds'] for p in pending)
-                r['received_this_week_lb']+=collected
-                self.records.put('request',r['request_code'],r)
-            return 200,{"pickup_id":pending[0]['pickup_id'],"request_code":r['request_code'],"food_bank_id":owner,"status":"collected","collected_lb":collected,"received_this_week_lb":r['received_this_week_lb'],"fair_share_lb":r['fair_share_lb'],"confirmed_at":self.engine.now,"items":[i for p in pending for i in p['items']]}
-        if root=='produce-profiles' and method=='GET':
-            profiles=list(calc.profiles.profiles.values())
-            return 200,{"profile_set_version":calc.profiles.version,"profiles":[{"produce_id":p.id,"name":p.name,"units":list(p.units),"needs_fridge":p.needs_fridge,"needs_cold":p.needs_cold} for p in profiles],"units_needing_pack_weight":{p.id:[u for u,w in p.units.items() if w is None] for p in profiles}}
-        if root=='surplus-offers' and method=='POST':
-            owner=b['donor_id']
-            self.authorize(owner,token)
-            if owner not in self.engine.donors:
-                raise ValueError("unknown donor")
-            offer=copy.deepcopy(b)
-            offer['lot_id']='lot-'+secrets.token_hex(8)
-            offer['reported_at']=self.engine.now
-            if dt(offer['deadline'])<=dt(self.engine.now):
-                raise ValueError("deadline already passed")
-            if not isinstance(offer['items'],list) or not offer['items'] or not all(isinstance(i,dict) for i in offer['items']):
-                raise ValueError("an offer needs a list of items")
-            basis={}
-            for i in offer['items']:
-                if i.get('produce_id') not in calc.profiles:
-                    raise ValueError(f"unknown produce_id {i.get('produce_id')!r}; GET /produce-profiles lists them")
-                if i['condition_grade'] not in ('good','use_soon','not_for_people'):
-                    raise ValueError("condition_grade must be good, use_soon or not_for_people")
-                i['usable_until'],basis[i['produce_id']]=self.usable_life(i,owner)
-            offer['usable_until_basis']=basis
-            if 'drop_off' in b:
-                # This offer's drop-off only; the donor's recorded drop-off stays as it is.
-                offer['drop_off']=self.drop_off(b['drop_off'])
-            draft=self.engine.create_offer(offer)
-            negotiate_pending(self.engine,offer['lot_id'])
-            return 201,{"lot_id":offer['lot_id'],"version":1,"status":"offered","items":[{"produce_id":i['produce_id'],"name":calc.profiles.get(i['produce_id']).name,"pounds":i['pounds'],"usable_until":i['usable_until'],"usable_until_basis":basis[i['produce_id']]} for i in draft['items']],"needs_human":[i['produce_id'] for i in draft['items'] if i.get('condition_doubt')],"message":"Nothing is promised until every named organization approves."}
-        if root=='lots' and len(path)>=2:
-            lot=self.records.get('lot',path[1]); d=lot['draft']
-            if method=='GET' and len(path)==2:
-                return 200,{"lot_id":path[1],"donor_id":d['donor_id'],"status":lot['status'],"current_version":d['version'],"deadline":d['deadline'],"items":[self.lot_item(lot,i) for i in d['items']],"draft":d,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[o for o in named(d) if lot['approvals'].get(o,{}).get('decision')!='approve'],"disagreement":self.disagreement_view(lot)}
-            if method=='GET' and path[2:]==['versions']:
-                return 200,{"lot_id":path[1],"versions":[{"version":v['version'],"proposer_id":v['proposer_id'],"move":"counter" if v['version']>1 else "offer","reason":v['reason'],"change":next((e['data']['amendment'] for e in self.records.events(path[1]) if e['kind']=='amendment' and e['data']['draft']['version']==v['version']),None)} for v in lot['versions']],"current_version":d['version']}
-            if method=='POST' and path[2:]==['counters']:
-                self.authorize(b['organization_id'],token)
-                if b['version']!=d['version'] or lot['status']=='committed':
-                    raise Conflict("stale or committed version")
-                from harvestnet_agents.negotiation import amendment_from_dict,parse_draft
-                parse_draft(d).amend(amendment_from_dict(b['amendment']),proposer_id=b['organization_id'],reason=b['reason'])
-                move={"organization_id":b['organization_id'],"version":b['version'],"action":"counter","amendment":b['amendment'],"reason":b['reason']}
-                with self.records.transaction():
-                    self.records.put('queued_move',path[1]+':'+b['organization_id'],{"lot_id":path[1],**move})
-                negotiate_pending(self.engine,path[1])
-                return 202,{"lot_id":path[1],"status":"queued_for_turn","based_on_version":d['version'],"move":move,"message":"Counter queued for your organization's next turn."}
-            if method=='POST' and path[2:]==['condition-checks']:
-                self.authorize(b['organization_id'],token)
-                updated=self.engine.protocol.condition_check(path[1],b['version'],b['organization_id'],b['produce_id'],b['condition_grade'],b['usable_until'],b['reason'],self.engine.now)
-                negotiate_pending(self.engine,path[1])
-                return 200,{'lot_id':path[1],'version':updated['version'],'status':'condition_recorded','committed':False}
-            # Proposed (#23): a food bank's holding and its changed version after a disruption.
-            if method=='GET' and path[2:]==['holding']:
-                self.authorize(q.get('food_bank_id'),token)
-                return 200,changes.holding(self.engine,path[1],q['food_bank_id'])
-            if method=='POST' and path[2:]==['changes']:
-                owner=(b.get('terms') or {}).get('proposer_id')
-                self.authorize(owner,token)
-                return 201,changes.propose(self.engine,path[1],b,owner)
-        if root=='approvals':
-            owner=b.get('organization_id') if method=='POST' else q.get('organization_id')
-            self.authorize(owner,token)
-            if method=='GET':
-                approvals=[]
-                for lot in self.records.all('lot'):
-                    d=lot['draft']
-                    if owner in named(d) and lot['status']!='committed' and dt(d['deadline'])>dt(self.engine.now):
-                        approvals.append({"lot_id":d['lot_id'],"version":d['version'],"terms_hash":terms_hash(d),"requested_at":self.engine.now,"expires_at":d['deadline'],"why_you":["exact_version_review"],"summary":d['reason'],"terms":d,"status":"awaiting_decision"})
-                approvals+=changes.pending_approvals(self.records,owner)
-                return 200,{"organization_id":owner,"approvals":approvals}
-            if method=='POST':
-                receipt={k:b[k] for k in ('lot_id','version','organization_id','terms_hash','decision')}
-                if b.get('receipt_id'): receipt['receipt_id']=b['receipt_id']
-                if changes.find(self.records,receipt['lot_id'],receipt['version']):
-                    # A changed version of a committed plan takes its own fresh approvals.
-                    result=changes.approve(self.engine,receipt,owner)
-                    return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"approval_recorded","change_status":result['status'],"committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
-                # A committed change supersedes the version it changed. The lot's own draft stays at
-                # that earlier version, so a decision on it would otherwise still be accepted.
-                if type(receipt['version']) is int:
-                    newer=[c['version'] for c in changes.changes_for(self.records,receipt['lot_id']) if c['status']=='committed' and c['version']>receipt['version']]
-                    if newer:
-                        raise Conflict(f"version {receipt['version']} was superseded by committed version {max(newer)}; decide on the current version")
-                result=self.engine.protocol.approve(receipt,owner,self.engine.now,self.engine.validate)
-                self.engine.distribute(b['lot_id'])
-                reason=result.get('returned_to_negotiation')
-                if reason and self.records.get('lot',b['lot_id'])['status']=='negotiating':
-                    # A decline or an expired hold: the owners' next turns run (design section 8).
-                    negotiate_pending(self.engine,b['lot_id'])
-                return 200,{**receipt,"receipt_id":b.get('receipt_id'),"status":"returned_to_negotiation" if reason else "approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for'],**({"returned_to_negotiation":reason} if reason else {})}
-        if root=='food-banks':
-            if len(path)==1 and method=='GET':
-                banks=[]
-                request=self.records.get('request',q['request_code']) if q.get('request_code') else None
-                language=desk.Language(q.get('language') or (request or {}).get('language') or 'en').value
-                for bid in self.engine.banks:
-                    bank=self.records.get('bank',bid)
-                    committed=[{"produce_id":a['produce_id'],"name":self.item_name(a['produce_id'],language),"pounds":a['pounds'],"badges":["keep_cold"] if calc.profiles.get(a['produce_id']).needs_cold else []} for lot in self.records.all('lot') if lot['status']=='committed' for a in lot['commitments'] if a['food_bank_id']==bid]
-                    fits=None
-                    if request:
-                        probe={"produce_id":"apples","usable_until":request['expires_at']}
-                        candidate={**request,"chosen_food_bank_ids":[bid]}
-                        fits=bool(self.engine.eligible(candidate,bank,probe,dt(self.engine.now)))
-                    banks.append({"food_bank_id":bid,"name":self.engine.names[bid],"area":bank['area'],"pickup_windows":bank['pickup_windows'],"fits_your_pickup_times":fits,"committed_now":committed})
-                return 200,{"food_banks":banks}
-            if len(path)==3:
-                bid=path[1]; self.authorize(bid,token)
-                bank=self.records.get('bank',bid)
-                if path[2]=='status' and method=='PUT':
-                    from harvestnet_agents.negotiation import parse_facts
-                    updated={**bank,**{k:b[k] for k in ('storage','pickup_windows','truck','cooler') if k in b}}
-                    parse_facts('food_bank',{"food_bank_id":bid,"name":self.engine.names[bid],"demand":self.engine.demand(bid),**updated})
-                    for s in updated['storage']: number(s['cold_free_lb']); number(s['dry_free_lb'])
-                    updated['status_version']=bank.get('status_version',0)+1
-                    with self.records.transaction(): self.records.put('bank',bid,updated)
-                    return 200,{"food_bank_id":bid,"status_version":updated['status_version'],"updated_at":self.engine.now,"message":"Your organization's facts are updated."}
-                if path[2]=='dashboard' and method=='GET':
-                    incoming=[]
-                    arrivals=[]
-                    disagreements=[]
-                    for lot in self.records.all('lot'):
-                        d=lot['draft']; allocations=[a for a in d['allocations'] if a['food_bank_id']==bid]
-                        if lot['status']=='preserved_disagreement' and any(a['food_bank_id']==bid for v in lot['versions'] for a in v['allocations']):
-                            # Involved if it was ever on the table, even when the last plan left this food bank out.
-                            view=self.disagreement_view(lot)
-                            disagreements.append({"lot_id":d['lot_id'],"reason":view['reason'],"options":view['options'],"reasons":view['reasons']})
-                        if not allocations: continue
-                        transport=next((t for t in d['transports'] if t['food_bank_id']==bid),None)
-                        suggests,why=self.suggestion(lot,bid)
-                        incoming.append({"lot_id":d['lot_id'],"version":d['version'],"donor_id":d['donor_id'],"donor_name":self.engine.names[d['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":lot['status'] in ('awaiting_approvals','negotiating')})
-                        if transport: arrivals.append({"lot_id":d['lot_id'],"version":d['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
-                        if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":d['lot_id'],"reason":lot['stop_reason']})
-                    return 200,{"food_bank_id":bid,"name":self.engine.names[bid],"capacity":{k:bank.get(k) for k in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bid),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bid)}
-        if root=='results' and method=='GET':
-            try:
-                return 200,self.records.get('results',q['scenario_id'])
-            except NotFound:
-                return 404,{"error":{"code":"not_found","message":"No evaluation published for this scenario; run python -m harvestnet_core evaluate"}}
+    # --- Routing: one named handler per operation ------------------------------------------
+
+    def dispatch(self, method, target, body, token):
+        """Run the handler of the operation that owns this method and path (``OPERATIONS`` is the
+        route table, ``op_<operation>`` the handler). Anything else is a 404."""
+        url=urlsplit(target)
+        segments=url.path.strip('/').split('/')
+        query={name:values[0] for name,values in parse_qs(url.query).items()}
+        if method=='GET' and segments==['']:
+            return self.op_index()
+        for operation,route_method,template,_ in OPERATIONS:
+            params=match_route(template,segments) if route_method==method else None
+            if params is not None:
+                return getattr(self,'op_'+operation)(Call(params,query,body,token))
         return 404,{"error":{"code":"not_found","message":"Unknown operation"}}
+
+    def op_index(self):
+        return 200,{"contract_version":CONTRACT_VERSION,"operations":[{"operation":operation,"method":method,"path":path,"status":status} for operation,method,path,status in OPERATIONS]}
+
+    def op_get_health(self, call):
+        if self.email_dispatcher_thread is not None and not self.email_dispatcher_thread.is_alive():
+            return 503,{"error":{"code":"email_worker_unavailable","message":"Pickup email delivery is unavailable"}}
+        return 200,{"status":"ok","contract_version":CONTRACT_VERSION}
+
+    # Households
+
+    def op_get_fair_share(self, call):
+        share=self.engine.calc.fair_share(int(call.query.get('household_size',0)))
+        return 200,{"household_size":share.household_size,"fair_share_lb":share.pounds,"period":share.period,"table_version":share.table_version,"is_placeholder":share.is_placeholder,"wording":desk.fair_share_wording(share.pounds,desk.Language(call.query.get('language','en')))}
+
+    def household_draft(self, body):
+        """The household's answers as a draft request, refusing what is never collected."""
+        if any(field in body for field in ('name','address','income')):
+            raise ValueError("names, addresses and income are not collected")
+        if 'phone' in body:
+            # contract-v0.2: pickup messages go by email, not SMS (user decision, October 11, 2026).
+            raise ValueError("phone numbers are no longer collected; give an optional email for pickup messages")
+        return desk.draft_from_form(body,desk.Language(body.get('language','en')))
+
+    def op_preview_request(self, call):
+        return 200,self.preview(self.household_draft(call.body))
+
+    def op_create_request(self, call):
+        body=call.body
+        draft=self.household_draft(body)
+        if not draft.is_complete or body.get('consent') is not True:
+            raise ValueError("complete answers and explicit consent are required")
+        if body.get('channel','web') not in ('web','voice'):
+            raise ValueError("channel must be web or voice")
+        share=self.engine.calc.fair_share(draft.household_size)
+        # Optional, write-only, for pickup emails only. Checked before anything is saved.
+        email=email_address(body['email']) if body.get('email') not in (None,'') else None
+        with self.records.transaction():
+            code=''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+            try:
+                self.records.get('request',code)
+            except KeyError:
+                pass
+            else:
+                raise Conflict("request code collision; retry")
+            request={**draft.to_dict(),"request_code":code,"fair_share_lb":share.pounds,"table_version":share.table_version,"received_this_week_lb":0,"initial_received_lb":0,"chosen_food_bank_ids":[],"expires_at":(dt(self.engine.now)+timedelta(days=7)).isoformat(),"submitted_at":self.engine.now,"channel":body.get('channel','web'),"consent":True}
+            self.records.put('request',code,request)
+            if email:
+                self.records.put('email',code,{"email":email,"expires_at":request['expires_at']})
+        return 201,{field:request[field] for field in ('request_code','household_size','fair_share_lb','received_this_week_lb','table_version','chosen_food_bank_ids','expires_at')} | {"emails":email is not None,"next":"choose_food_banks"}
+
+    def op_list_food_banks(self, call):
+        query,calc=call.query,self.engine.calc
+        request=self.records.get('request',query['request_code']) if query.get('request_code') else None
+        language=desk.Language(query.get('language') or (request or {}).get('language') or 'en').value
+        banks=[]
+        for bank_id in self.engine.banks:
+            bank=self.records.get('bank',bank_id)
+            committed=[{"produce_id":a['produce_id'],"name":self.item_name(a['produce_id'],language),"pounds":a['pounds'],"badges":["keep_cold"] if calc.profiles.get(a['produce_id']).needs_cold else []} for lot in self.records.all('lot') if lot['status']=='committed' for a in lot['commitments'] if a['food_bank_id']==bank_id]
+            fits=None
+            if request:
+                probe={"produce_id":"apples","usable_until":request['expires_at']}
+                candidate={**request,"chosen_food_bank_ids":[bank_id]}
+                fits=bool(self.engine.eligible(candidate,bank,probe,dt(self.engine.now)))
+            banks.append({"food_bank_id":bank_id,"name":self.engine.names[bank_id],"area":bank['area'],"pickup_windows":bank['pickup_windows'],"fits_your_pickup_times":fits,"committed_now":committed})
+        return 200,{"food_banks":banks}
+
+    def op_choose_food_banks(self, call):
+        code,body=call.params['request_code'],call.body
+        request=self.records.get('request',code)
+        ids=body['food_bank_ids'] if 'food_bank_ids' in body else body['chosen_food_bank_ids']
+        if not isinstance(ids,list) or len(ids)!=len(set(ids)) or any(bank_id not in self.engine.banks for bank_id in ids):
+            raise ValueError("choose known, distinct food banks")
+        with self.records.transaction():
+            request['chosen_food_bank_ids']=ids
+            self.records.put('request',code,request)
+        return 200,{"request_code":code,"chosen_food_bank_ids":ids,"status":"saved","message":SAVED_MESSAGE.get(request.get('language'),SAVED_MESSAGE['en'])}
+
+    def op_get_request(self, call):
+        code=call.params['request_code']
+        request=self.records.get('request',code)
+        # The page's language when it sends one, else the language the household chose.
+        language=desk.Language(call.query.get('language') or request['language']).value
+        pickups=[{k:v for k,v in pickup.items() if k!='request_code'} | {"items":[{**item,"name":self.item_name(item["produce_id"],language)} for item in pickup["items"]],"wording":self.wording(pickup,request,language)} for pickup in self.records.all('pickup') if pickup['request_code']==code and pickup['status']=='committed']
+        return 200,{field:request[field] for field in ('request_code','household_size','fair_share_lb','received_this_week_lb','chosen_food_bank_ids','expires_at')} | {"pickups":pickups,"market_match_tip":None}
+
+    def op_release_pickup(self, call):
+        return 200,self.release(call.params['pickup_id'],call.body['request_code'])
+
+    def op_confirm_pickup(self, call):
+        body=call.body
+        owner=body['food_bank_id']
+        self.authorize(owner,call.token)
+        request=self.records.get('request',body['request_code'])
+        pending=[pickup for pickup in self.records.all('pickup') if pickup['request_code']==body['request_code'] and pickup['food_bank_id']==owner and pickup['status']=='committed']
+        if not pending:
+            raise Conflict("no open pickup at this food bank")
+        if any(not (dt(pickup['window']['start'])<=dt(self.engine.now)<dt(pickup['window']['end'])) for pickup in pending):
+            raise Conflict("pickup is outside its confirmed window")
+        with self.records.transaction():
+            for pickup in pending:
+                pickup['status']='collected'
+                self.records.put('pickup',pickup['pickup_id'],pickup)
+                self.records.event(pickup['lot_id'],self.engine.now,'pickup_confirmation',{"pickup_id":pickup['pickup_id'],"pounds":pickup['pounds']})
+            collected=sum(pickup['pounds'] for pickup in pending)
+            request['received_this_week_lb']+=collected
+            self.records.put('request',request['request_code'],request)
+        return 200,{"pickup_id":pending[0]['pickup_id'],"request_code":request['request_code'],"food_bank_id":owner,"status":"collected","collected_lb":collected,"received_this_week_lb":request['received_this_week_lb'],"fair_share_lb":request['fair_share_lb'],"confirmed_at":self.engine.now,"items":[item for pickup in pending for item in pickup['items']]}
+
+    def op_voice_intake(self, call):
+        body=call.body
+        if self.extractor is None:
+            return 503,{"error":{"code":"voice_unavailable","message":"Use the text form; voice extraction is not configured"}}
+        if not self.voice_allowed():
+            return 503,{"error":{"code":"rate_limited","message":"Too many voice calls right now; try again shortly or use the text form"}}
+        from harvestnet_agents.llm_negotiators import SpendingCapReached
+        transcript=desk.Transcript.from_dict(body.get('transcript',body))
+        try:
+            draft=desk.intake_transcript(transcript,self.extractor)
+        except SpendingCapReached:
+            return 503,{"error":{"code":"spending_cap_reached","message":"Voice extraction has reached its spending cap; use the text form"}}
+        except desk.ExtractionError:
+            return 503,{"error":{"code":"voice_unavailable","message":"Voice extraction failed; use the text form"}}
+        return 200,{"call_id":body.get('call_id'),**self.preview(draft),"next":"consent" if draft.is_complete else "ask_missing_questions"}
+
+    # Donors
+
+    def op_list_produce_profiles(self, call):
+        calc=self.engine.calc
+        profiles=list(calc.profiles.profiles.values())
+        return 200,{"profile_set_version":calc.profiles.version,"profiles":[{"produce_id":profile.id,"name":profile.name,"units":list(profile.units),"needs_fridge":profile.needs_fridge,"needs_cold":profile.needs_cold} for profile in profiles],"units_needing_pack_weight":{profile.id:[unit for unit,weight in profile.units.items() if weight is None] for profile in profiles}}
+
+    def op_create_surplus_offer(self, call):
+        body,calc=call.body,self.engine.calc
+        owner=body['donor_id']
+        self.authorize(owner,call.token)
+        if owner not in self.engine.donors:
+            raise ValueError("unknown donor")
+        offer=copy.deepcopy(body)
+        offer['lot_id']='lot-'+secrets.token_hex(8)
+        offer['reported_at']=self.engine.now
+        if dt(offer['deadline'])<=dt(self.engine.now):
+            raise ValueError("deadline already passed")
+        if not isinstance(offer['items'],list) or not offer['items'] or not all(isinstance(item,dict) for item in offer['items']):
+            raise ValueError("an offer needs a list of items")
+        basis={}
+        for item in offer['items']:
+            if item.get('produce_id') not in calc.profiles:
+                raise ValueError(f"unknown produce_id {item.get('produce_id')!r}; GET /produce-profiles lists them")
+            if item['condition_grade'] not in ('good','use_soon','not_for_people'):
+                raise ValueError("condition_grade must be good, use_soon or not_for_people")
+            item['usable_until'],basis[item['produce_id']]=self.usable_life(item,owner)
+        offer['usable_until_basis']=basis
+        if 'drop_off' in body:
+            # This offer's drop-off only; the donor's recorded drop-off stays as it is.
+            offer['drop_off']=self.drop_off(body['drop_off'])
+        draft=self.engine.create_offer(offer)
+        negotiate_pending(self.engine,offer['lot_id'])
+        return 201,{"lot_id":offer['lot_id'],"version":1,"status":"offered","items":[{"produce_id":item['produce_id'],"name":calc.profiles.get(item['produce_id']).name,"pounds":item['pounds'],"usable_until":item['usable_until'],"usable_until_basis":basis[item['produce_id']]} for item in draft['items']],"needs_human":[item['produce_id'] for item in draft['items'] if item.get('condition_doubt')],"message":"Nothing is promised until every named organization approves."}
+
+    def op_get_lot(self, call):
+        lot_id=call.params['lot_id']
+        lot=self.records.get('lot',lot_id)
+        draft=lot['draft']
+        return 200,{"lot_id":lot_id,"donor_id":draft['donor_id'],"status":lot['status'],"current_version":draft['version'],"deadline":draft['deadline'],"items":[self.lot_item(lot,item) for item in draft['items']],"draft":draft,"approvals":list(lot['approvals'].values()),"awaiting_approval_from":[org for org in named(draft) if lot['approvals'].get(org,{}).get('decision')!='approve'],"disagreement":self.disagreement_view(lot)}
+
+    def op_list_lot_versions(self, call):
+        lot_id=call.params['lot_id']
+        lot=self.records.get('lot',lot_id)
+        return 200,{"lot_id":lot_id,"versions":[{"version":version['version'],"proposer_id":version['proposer_id'],"move":"counter" if version['version']>1 else "offer","reason":version['reason'],"change":next((event['data']['amendment'] for event in self.records.events(lot_id) if event['kind']=='amendment' and event['data']['draft']['version']==version['version']),None)} for version in lot['versions']],"current_version":lot['draft']['version']}
+
+    def op_submit_counter(self, call):
+        lot_id,body=call.params['lot_id'],call.body
+        lot=self.records.get('lot',lot_id)
+        draft=lot['draft']
+        self.authorize(body['organization_id'],call.token)
+        if body['version']!=draft['version'] or lot['status']=='committed':
+            raise Conflict("stale or committed version")
+        from harvestnet_agents.negotiation import amendment_from_dict,parse_draft
+        parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
+        move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
+        with self.records.transaction():
+            self.records.put('queued_move',lot_id+':'+body['organization_id'],{"lot_id":lot_id,**move})
+        negotiate_pending(self.engine,lot_id)
+        return 202,{"lot_id":lot_id,"status":"queued_for_turn","based_on_version":draft['version'],"move":move,"message":"Counter queued for your organization's next turn."}
+
+    # Proposed (#1 pending): a condition check, and a food bank's holding and changed version after a disruption.
+
+    def op_record_condition_check(self, call):
+        lot_id,body=call.params['lot_id'],call.body
+        self.records.get('lot',lot_id)
+        self.authorize(body['organization_id'],call.token)
+        updated=self.engine.protocol.condition_check(lot_id,body['version'],body['organization_id'],body['produce_id'],body['condition_grade'],body['usable_until'],body['reason'],self.engine.now)
+        negotiate_pending(self.engine,lot_id)
+        return 200,{'lot_id':lot_id,'version':updated['version'],'status':'condition_recorded','committed':False}
+
+    def op_get_holding(self, call):
+        lot_id=call.params['lot_id']
+        self.records.get('lot',lot_id)
+        self.authorize(call.query.get('food_bank_id'),call.token)
+        return 200,changes.holding(self.engine,lot_id,call.query['food_bank_id'])
+
+    def op_propose_change(self, call):
+        lot_id,body=call.params['lot_id'],call.body
+        self.records.get('lot',lot_id)
+        owner=(body.get('terms') or {}).get('proposer_id')
+        self.authorize(owner,call.token)
+        return 201,changes.propose(self.engine,lot_id,body,owner)
+
+    # Approvals
+
+    def op_list_approvals(self, call):
+        owner=call.query.get('organization_id')
+        self.authorize(owner,call.token)
+        approvals=[]
+        for lot in self.records.all('lot'):
+            draft=lot['draft']
+            if owner in named(draft) and lot['status']!='committed' and dt(draft['deadline'])>dt(self.engine.now):
+                approvals.append({"lot_id":draft['lot_id'],"version":draft['version'],"terms_hash":terms_hash(draft),"requested_at":self.engine.now,"expires_at":draft['deadline'],"why_you":["exact_version_review"],"summary":draft['reason'],"terms":draft,"status":"awaiting_decision"})
+        approvals+=changes.pending_approvals(self.records,owner)
+        return 200,{"organization_id":owner,"approvals":approvals}
+
+    def op_record_approval(self, call):
+        body=call.body
+        owner=body.get('organization_id')
+        self.authorize(owner,call.token)
+        receipt={field:body[field] for field in ('lot_id','version','organization_id','terms_hash','decision')}
+        if body.get('receipt_id'): receipt['receipt_id']=body['receipt_id']
+        if changes.find(self.records,receipt['lot_id'],receipt['version']):
+            # A changed version of a committed plan takes its own fresh approvals.
+            result=changes.approve(self.engine,receipt,owner)
+            return 200,{**receipt,"receipt_id":body.get('receipt_id'),"status":"approval_recorded","change_status":result['status'],"committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for']}
+        # A committed change supersedes the version it changed. The lot's own draft stays at
+        # that earlier version, so a decision on it would otherwise still be accepted.
+        if type(receipt['version']) is int:
+            newer=[change['version'] for change in changes.changes_for(self.records,receipt['lot_id']) if change['status']=='committed' and change['version']>receipt['version']]
+            if newer:
+                raise Conflict(f"version {receipt['version']} was superseded by committed version {max(newer)}; decide on the current version")
+        result=self.engine.protocol.approve(receipt,owner,self.engine.now,self.engine.validate)
+        self.engine.distribute(body['lot_id'])
+        reason=result.get('returned_to_negotiation')
+        if reason and self.records.get('lot',body['lot_id'])['status']=='negotiating':
+            # A decline or an expired hold: the owners' next turns run (design section 8).
+            negotiate_pending(self.engine,body['lot_id'])
+        return 200,{**receipt,"receipt_id":body.get('receipt_id'),"status":"returned_to_negotiation" if reason else "approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for'],**({"returned_to_negotiation":reason} if reason else {})}
+
+    # Food banks
+
+    def op_update_food_bank_status(self, call):
+        bank_id,body=call.params['food_bank_id'],call.body
+        self.authorize(bank_id,call.token)
+        bank=self.records.get('bank',bank_id)
+        from harvestnet_agents.negotiation import parse_facts
+        updated={**bank,**{field:body[field] for field in ('storage','pickup_windows','truck','cooler') if field in body}}
+        parse_facts('food_bank',{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"demand":self.engine.demand(bank_id),**updated})
+        for slot in updated['storage']: number(slot['cold_free_lb']); number(slot['dry_free_lb'])
+        updated['status_version']=bank.get('status_version',0)+1
+        with self.records.transaction(): self.records.put('bank',bank_id,updated)
+        return 200,{"food_bank_id":bank_id,"status_version":updated['status_version'],"updated_at":self.engine.now,"message":"Your organization's facts are updated."}
+
+    def op_get_food_bank_dashboard(self, call):
+        bank_id,calc=call.params['food_bank_id'],self.engine.calc
+        self.authorize(bank_id,call.token)
+        bank=self.records.get('bank',bank_id)
+        incoming=[]
+        arrivals=[]
+        disagreements=[]
+        for lot in self.records.all('lot'):
+            draft=lot['draft']
+            allocations=[a for a in draft['allocations'] if a['food_bank_id']==bank_id]
+            if lot['status']=='preserved_disagreement' and any(a['food_bank_id']==bank_id for version in lot['versions'] for a in version['allocations']):
+                # Involved if it was ever on the table, even when the last plan left this food bank out.
+                view=self.disagreement_view(lot)
+                disagreements.append({"lot_id":draft['lot_id'],"reason":view['reason'],"options":view['options'],"reasons":view['reasons']})
+            if not allocations: continue
+            transport=next((t for t in draft['transports'] if t['food_bank_id']==bank_id),None)
+            suggests,why=self.suggestion(lot,bank_id)
+            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":lot['status'] in ('awaiting_approvals','negotiating')})
+            if transport: arrivals.append({"lot_id":draft['lot_id'],"version":draft['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
+            if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":draft['lot_id'],"reason":lot['stop_reason']})
+        return 200,{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"capacity":{field:bank.get(field) for field in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bank_id),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bank_id)}
+
+    # Results
+
+    def op_get_results(self, call):
+        try:
+            return 200,self.records.get('results',call.query['scenario_id'])
+        except NotFound:
+            return 404,{"error":{"code":"not_found","message":"No evaluation published for this scenario; run python -m harvestnet_core evaluate"}}
