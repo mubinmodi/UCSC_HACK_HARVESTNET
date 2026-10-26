@@ -1,27 +1,56 @@
 """Same fixture and safety rules for every method; replay never calls a model."""
 from collections import defaultdict
 import copy
+from dataclasses import replace
 from datetime import timedelta
 import json
 from pathlib import Path
 from statistics import mean, pstdev
 from harvestnet_agents.negotiation import parse_agent_input, Move, MoveKind, TimeWindow
-from harvestnet_agents.rules_negotiators import rules_negotiator
+from harvestnet_agents.rules_negotiators import RulesFoodBank, rules_negotiator
 from .calculators import Calculators
 from .engine import Engine, run_fixture
 from .protocol import dt
 from .records import Records
 
 
-class Baseline:
-    """Food banks bid in baseline priority order, subject to their own real review.
+class FirstComeFoodBank(RulesFoodBank):
+    """First come, first served (design section 16): a food bank claims the whole of an item.
 
-The priority controls who gets a first opportunity; it does not approve for them.
+    Its bids ignore fair share and other food banks, and stop only at the hard limits the
+    rules negotiators already respect: storage at arrival and until pickup ends, its truck,
+    pickup hours before the item spoils, and the profile's keeping time. An item another food
+    bank claimed first is left alone, so pounds this food bank cannot take stay unclaimed and
+    end up counted as wasted."""
+
+    def _bid(self, draft, facts):
+        me=self.organization_id
+        for item in sorted(draft.items,key=lambda i:(i.usable_until,i.produce_id)):
+            pid=item.produce_id
+            if draft.unallocated_lb(pid)<=0 or any(a.pounds>0 and a.food_bank_id!=me for a in draft.allocations if a.produce_id==pid):
+                continue
+            bid=self._bid_for(draft,facts,item,None)
+            if bid is not None:
+                name=self._item_name(pid).lower()
+                return replace(bid,reason=f"First come, first served: we claimed first, so we ask for all of the {name} that our storage, transport and pickup hours allow, whatever fair share says.")
+        return None
+
+
+class Baseline:
+    """A baseline method. Both go through each owner's real review, resource holds and human approvals.
+
+    ``first_come_first_served``: the food bank whose households asked first claims whole items
+    (``FirstComeFoodBank``); a later food bank can claim only an item nobody claimed. Pounds the
+    claimant cannot take under the hard rules are never passed on, so they are wasted.
+    ``nearest_food_bank``: food banks bid in order of recorded travel time from the donor, with
+    the rules negotiators' own bids. The priority only controls who gets a first opportunity; it
+    does not approve for anyone.
 """
     def __init__(self, fixture, method):
         self.fixture=fixture
         self.method=method
         self.engine=Engine(fixture)
+        self.claimants={}
         rs=fixture['requests']
         banks=[b['organization_id'] for b in fixture['food_banks']]
         if method=='first_come_first_served':
@@ -42,7 +71,10 @@ The priority controls who gets a first opportunity; it does not approve for them
             outstanding=[b for b in self.priority if b not in self.passed]
             if outstanding and outstanding[0]!=org and not typed.draft.allocations_to(org):
                 return Move(org,role,typed.draft.version,MoveKind.PASS,'Waiting for baseline priority turn').to_dict()
-        move=self.engine.rules_for(role,org).move(typed)
+        negotiator=self.engine.rules_for(role,org)
+        if self.method=='first_come_first_served' and role.value=='food_bank':
+            negotiator=self.claimants.setdefault(org,FirstComeFoodBank(org,self.engine.calc))
+        move=negotiator.move(typed)
         if role.value=='food_bank' and move.kind in (MoveKind.ACCEPT,MoveKind.PASS,MoveKind.REJECT):
             self.passed.add(org)
         return move.to_dict()

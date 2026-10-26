@@ -166,6 +166,14 @@ opportunity by earliest household request or recorded donor travel time,
 respectively. They still use each owner's real review, resource holds and human
 approvals. The advocate makes no baseline amendments.
 
+**First-come-first-served** follows design section 16: the first food bank to
+claim an item gets the whole item. Its bids ignore fair share and other food
+banks and stop only at the hard limits the harness enforces (storage over time,
+its truck, pickup hours before the item spoils). Pounds it cannot take are never
+passed to another food bank; they stay unclaimed and count as wasted. Before this
+change the baseline ran the rules-based negotiators in bidding order, which still
+split items by fair share. **Nearest food bank** is unchanged.
+
 Metrics come from run records: produce wasted with its split (below),
 worst-served weekly coverage, households reached, pickup-window match, time to
 first commitment, invalid commitments and counted number failures.
