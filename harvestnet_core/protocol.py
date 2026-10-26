@@ -4,9 +4,8 @@ Scheduling and recording are shared. Decisions remain with each organization.
 """
 import copy
 from datetime import datetime
-import hashlib
-import json
 import math
+from harvestnet_agents.terms import terms_hash
 
 
 class Conflict(ValueError):
@@ -24,10 +23,6 @@ def number(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
         raise ValueError("a finite nonnegative number is required")
     return float(value)
-
-
-def terms_hash(draft):
-    return "sha256:" + hashlib.sha256(json.dumps(draft, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
 def named(draft):

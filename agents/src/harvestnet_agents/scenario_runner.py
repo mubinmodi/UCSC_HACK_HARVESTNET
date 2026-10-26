@@ -62,7 +62,7 @@ from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 from .calculators import CalculatorCall, CalculatorError, Calculators, StandInCalculators
 from .cooler_failure import Candidate, CoolerFailure, HeldItem, PickupWindow, assess_cooler_failure
 from .cooler_failure import Truck as CoolerTruck
-from .cooler_failure_flow import terms_hash
+from .terms import terms_hash
 from .negotiation import (
     AdvocateFacts,
     AgentInput,

@@ -80,10 +80,11 @@ def card(flow, food_bank_id):
 
 
 def lane_c_terms_hash(terms):
-    # Lane C's harvestnet_platform.transport.terms_hash (PR #27), restated here so the
-    # hashes the approval store issues and the ones Lane B checks are the same.
+    # Lane C's harvestnet_platform.transport.terms_hash (PR #27), restated here: sha256: plus the
+    # hex digest of sorted, compact JSON, so the hashes the approval store issues and the ones
+    # Lane B checks are the same.
     canonical = json.dumps(terms, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(canonical.encode()).hexdigest()
+    return "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def approval(new_version, org, decision="approve", **changes):
@@ -344,7 +345,7 @@ def test_prior_version_approvals_do_not_carry_over():
 
 def test_approval_for_different_terms_does_not_count():
     nv = run().new_version
-    status = approval_status(nv, [approval(nv, "eastside", terms_hash="0" * 64), approval(nv, "city")])
+    status = approval_status(nv, [approval(nv, "eastside", terms_hash="sha256:" + "0" * 64), approval(nv, "city")])
     assert status.approved_by == ("city",)
     assert status.missing == ("eastside",)
     assert status.all_named_approved is False

@@ -8,7 +8,8 @@ from harvestnet_agents.negotiation import parse_agent_input, parse_draft, parse_
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.calculators import HouseholdBalance
 from .calculators import Calculators
-from .protocol import Protocol, Conflict, dt, number, named, terms_hash
+from harvestnet_agents.terms import terms_hash
+from .protocol import Protocol, Conflict, dt, number, named
 from .records import Records
 from .checks import rule_checks
 from .workflows import checked_move

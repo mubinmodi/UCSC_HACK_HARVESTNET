@@ -1,6 +1,7 @@
 """Recompute audit checks from stored evidence, not a constant success flag."""
 from collections import defaultdict
-from .protocol import dt, number, named, terms_hash
+from harvestnet_agents.terms import terms_hash
+from .protocol import dt, number, named
 
 
 def rule_checks(records, lot_id, pathways, capacities):

@@ -17,7 +17,8 @@ import copy
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 from harvestnet_agents.negotiation import parse_facts
-from .protocol import Conflict, dt, named, number, terms_hash
+from harvestnet_agents.terms import terms_hash
+from .protocol import Conflict, dt, named, number
 
 
 def _key(lot_id, version):
@@ -431,9 +432,9 @@ def cold_left_in_failed_cooler(engine, lot_id):
 
 
 def decision_records(change):
-    """Lane C-shaped decision records (hex terms hash) for Lane B's ``approval_status``."""
+    """Lane C-shaped decision records for Lane B's ``approval_status``."""
     return [{'event_id': change['lot_id'], 'version': a['version'], 'organization_id': a['organization_id'],
-             'terms_hash': a['terms_hash'].removeprefix('sha256:'), 'decision': a['decision']} for a in change['approvals'].values()]
+             'terms_hash': a['terms_hash'], 'decision': a['decision']} for a in change['approvals'].values()]
 
 
 def households(engine, lot_id, version):

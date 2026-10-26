@@ -177,7 +177,7 @@ class CoolerFailureJoin(unittest.TestCase):
 
         # 3. The new version needs fresh approvals.
         self.assertEqual((change['version'], change['based_on_version'], change['committed']), (self.new, self.committed, False))
-        self.assertEqual(change['terms_hash'], 'sha256:' + flow.new_version.terms_hash)
+        self.assertEqual(change['terms_hash'], flow.new_version.terms_hash)
         self.assertEqual(lot_before['approvals']['eastside']['version'], self.committed)  # the old approvals exist ...
         self.assertEqual(changes.find(self.engine.records, LOT, self.new)['approvals'], {})  # ... and don't carry over
         status, pending = call('GET', self.core_url + '/approvals?organization_id=eastside', token=TOKENS['eastside'])
@@ -189,8 +189,8 @@ class CoolerFailureJoin(unittest.TestCase):
         self.assertEqual(status, 201)
         links = {link['organization_id']: link for link in issued['requests']}
         self.assertEqual(sorted(links), ['city', 'eastside'])
-        # Lane C issues the contract's sha256:-prefixed hash (README decision 8); Lane B's is bare hex.
-        self.assertTrue(all(l['terms_hash'].removeprefix('sha256:') == flow.new_version.terms_hash and f'version {self.new}' in l['message'] for l in links.values()))
+        # Lane C and Lane B both use the contract's sha256:-prefixed hash (README decision 8).
+        self.assertTrue(all(l['terms_hash'] == flow.new_version.terms_hash and f'version {self.new}' in l['message'] for l in links.values()))
 
         status, decided = self.human(links['eastside'], 'approve', '2026-10-13T15:35:00-07:00')
         self.assertEqual(status, 200)

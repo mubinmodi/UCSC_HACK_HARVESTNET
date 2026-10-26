@@ -33,7 +33,7 @@ from zoneinfo import ZoneInfo
 
 from harvestnet_agents.cooler_failure import PickupWindow
 from harvestnet_agents.cooler_failure_flow import NewVersion, household_change_notices, read_cooler_signal, run_cooler_failure_flow
-from harvestnet_agents.cooler_failure_flow import terms_hash as lane_b_terms_hash
+from harvestnet_agents.terms import terms_hash
 from harvestnet_agents.negotiation import parse_facts
 
 from . import changes
@@ -360,7 +360,7 @@ def new_version_from_change(engine, change):
                       based_on_version=terms['based_on_version'], proposer_id=terms['proposer_id'],
                       receiving_food_bank_id=receiver, receiving_food_bank_name=engine.names[receiver] if receiver else None,
                       households_collect=collect, organizations=tuple(change['organizations']), terms=terms,
-                      terms_hash=lane_b_terms_hash(terms), status='awaiting_receiver_decision' if moves else 'awaiting_approval')
+                      terms_hash=terms_hash(terms), status='awaiting_receiver_decision' if moves else 'awaiting_approval')
 
 
 def household_texts(engine, lot_id, version, *, household_page_url, item_names=None, profiles=None):

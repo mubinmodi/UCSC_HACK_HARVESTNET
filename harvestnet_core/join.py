@@ -37,7 +37,8 @@ from harvestnet_agents.scenario import load_scenario
 from harvestnet_agents.scenario_runner import EventLog, RecordedCalculators, negotiator_label, run_scenario
 from .calculators import Calculators
 from .engine import run_fixture
-from .protocol import dt, named, terms_hash
+from harvestnet_agents.terms import terms_hash
+from .protocol import dt, named
 from .records import Records
 
 ROOT = Path(__file__).resolve().parents[1]

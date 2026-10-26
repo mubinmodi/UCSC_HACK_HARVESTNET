@@ -10,7 +10,8 @@ from harvestnet_agents.negotiation import MoveKind, parse_agent_input
 from harvestnet_agents.rules_negotiators import rules_negotiator
 from .engine import Engine, jsonable
 from . import changes
-from .protocol import Conflict, dt, terms_hash, named, number
+from harvestnet_agents.terms import terms_hash
+from .protocol import Conflict, dt, named, number
 from .records import NotFound
 from .contact import email_address
 from .workflows import negotiate_pending

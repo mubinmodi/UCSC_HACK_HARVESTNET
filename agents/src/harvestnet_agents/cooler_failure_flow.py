@@ -30,7 +30,6 @@ arithmetic (ADR 0002). Every shape here is **proposed**, pending ticket #1.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 from dataclasses import dataclass, field
@@ -48,6 +47,7 @@ from .cooler_failure import (
     Truck,
     assess_cooler_failure,
 )
+from .terms import terms_hash
 from .front_desk import AgreementStatus, Language, PickupFacts, ProducePortion, pickup_wording
 from .profiles import ProfileSet, load_profiles
 
@@ -347,12 +347,6 @@ def _candidate(org: str, name: str, answer: Mapping[str, Any] | None, minutes: f
 
 
 # --- The new version and its approvals (Lane C shape, PR #28) ----------------------------
-
-
-def terms_hash(terms: Mapping[str, Any]) -> str:
-    """Same as Lane C's ``transport.terms_hash``: sha256 of sorted, compact JSON."""
-    canonical = json.dumps(terms, sort_keys=True, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 @dataclass(frozen=True)

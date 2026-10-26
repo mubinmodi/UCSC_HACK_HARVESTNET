@@ -142,7 +142,7 @@ def test_a_commitment_missing_one_named_approval_fails(events):
 
 
 def test_an_approval_of_other_terms_fails(events):
-    first(events, "approval", organization_id="city")["terms_hash"] = "0" * 64
+    first(events, "approval", organization_id="city")["terms_hash"] = "sha256:" + "0" * 64
     assert failing(events) == {"commits_only_with_every_named_approval"}
 
 
