@@ -1,307 +1,141 @@
-# Lane A takeover: issues #7, #8, #9, #10, #22 and #24
+# The HarvestNet core
 
-User direction (October 11, 2026): implement the six assigned yi36 issues and commit to each original branch. The review stack uses `yi36/07-scenario-harness-records`, `yi36/08-calculators-matching-stop-rules`, `yi36/09-real-api-logic`, `yi36/10-baselines-evaluation-runner`, `yi36/22-join-live-households-voice`, `yi36/24-join-evaluation-live`. Each branch includes its prerequisites. Shared records, calculator and API primitives are introduced with #7 because the harness must execute actual commitments and household replies. Later commits add the issue-specific acceptance tests and joins. No original teammate commits were overwritten. The base includes merged contracts, agents and #20 at `bf099b0`. Issues remain open until their external acceptance gates are verified.
+The core is the deterministic middle of HarvestNet: the records, the calculators, the rules that stop a negotiation, the public API, and the evaluation. It never decides for an organization. It checks every move, keeps every record, and commits a Surplus lot only when each named organization's Staff approver has approved the same exact version while the owners' holds are still valid (ADR 0001, 0004). Every number comes from a calculator or a record (ADR 0002). All shipped data is synthetic, and responses say so (`mode`, `synthetic`).
 
-## Run and integrate
+API shapes live in [`docs/contracts/`](../contracts/README.md), terms in [`CONTEXT.md`](../../CONTEXT.md), decisions in [`docs/adr/`](../adr/), the design in [`docs/MVP_DESIGN.md`](../MVP_DESIGN.md). This page says how the code works and what is easy to get wrong.
 
-From the repository root, install the `agents` package or put `agents/src` on
-`PYTHONPATH`. No model SDK is needed for rules, baselines or replay.
+## Run it
+
+Run everything from the repository root. The core imports `harvestnet_agents` (Lane B) and `harvestnet_platform` (Lane C), so first `cd agents && uv sync`, then use `agents/.venv/bin/python` with `PYTHONPATH=agents/src`. Rules, baselines and replay need no model SDK. `HARVESTNET_PLATFORM_SOURCE=.` switches on the tests that run Lane C's code in process (they skip without it), and `demo_replay` reads it too. The Postgres test runs only when `HARVESTNET_TEST_DATABASE_URL` names a dedicated test database.
 
 ```sh
-PYTHONPATH=agents/src python -m unittest discover -s core_tests -v
-PYTHONPATH=agents/src python -m harvestnet_core run core_fixtures/normal-afternoon.json
-PYTHONPATH=agents/src python -m harvestnet_core evaluate core_fixtures/*.json
-PYTHONPATH=agents/src python -m harvestnet_core replay runtime/replays/normal-afternoon-rules_based-0.json
-PYTHONPATH=agents/src python -m harvestnet_core.server
+export PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=.
+PY=agents/.venv/bin/python
+$PY -m unittest discover -s core_tests          # one test: -m unittest core_tests.test_stop_rules
+$PY -m harvestnet_core run core_fixtures/normal-afternoon.json
+$PY -m harvestnet_core evaluate core_fixtures/*.json
+$PY -m harvestnet_core replay runtime/replays/normal-afternoon-rules_based-0.json
+$PY -m harvestnet_core.server                    # localhost:8050
+$PY -m harvestnet_core.join                      # every fixture through both rule-check sets
+$PY -m harvestnet_core.cooler_join --export-systems runtime/cooler-systems.json --export-openapi runtime/cooler-openapi.json
+$PY -m harvestnet_core.demo_replay --check       # is the offline demo recording current?
 ```
 
-On PowerShell, use `$env:PYTHONPATH='agents/src'` once, then omit the prefix from
-the commands. `evaluate` stores each scenario's results in the records the server
-reads (`--database`, default `DATABASE_URL` or `runtime/core.sqlite`), so
-`GET /results?scenario_id=...` serves them unchanged. The cooler-failure scenario
-reads Lane C's organization systems in process, so run from the repository root. The server binds localhost port 8050. `HOST` (set `0.0.0.0` in a container), `PORT`, `DATABASE_URL`,
-`HARVESTNET_FIXTURE`, `HARVESTNET_ALLOWED_ORIGIN` and `HARVESTNET_STAFF_TOKENS`
-configure it. Staff tokens are a JSON object with a different secret for each
-organization ID. Store them in ignored local configuration and pass them as
-Bearer credentials. Never expose them to household pages or put them in Git.
-The frontend must attach its own organization's staff credential for staff
-operations. Household read-back and create routes require no staff token.
+`python -m harvestnet_core --help` lists the flags. What each command is for:
 
-`DATABASE_URL` accepts a SQLite path or PostgreSQL DSN. PostgreSQL requires
-`psycopg[binary]==3.2.10`. Both use transactions; Postgres reservations also take
-an advisory transaction lock across API processes. SQLite is the labeled local
-persistence option. A persistent server seeds missing fixture records only,
-and never resets existing household balances on restart.
+- **`run`** runs fixtures through the harness and prints the result.
+- **`evaluate`** runs every method on each fixture and stores the result in the records the server reads (`--database`, default `DATABASE_URL` or `runtime/core.sqlite`), so `GET /results?scenario_id=...` serves it unchanged. It also saves each run's replay under `--output` (default `runtime/replays`).
+- **`replay`** re-runs a saved run from its recorded moves. It must reproduce commitments, pathways and checks with no model call, or it raises.
+- **`join`** (`join.py`) runs each fixture two ways with the real calculators: Lane A's harness and Lane B's own runner. A `HarnessLog` writes Lane B's event log for the harness run, so the fixture's checks and Lane B's six checks both read one run. Every calculator call is also compared with Lane B's stand-ins.
+- **`cooler_join`** exports the cooler-failure scenario's day as organization-systems data and an OpenAPI file for Beeceptor.
+- **`demo_replay`** records the demo scenario into `docs/demo/replay/recording.json` and `docs/demo/replay.html` for the offline backup (`docs/demo/REHEARSAL.md`). Run it again, without `--check`, after any change that alters the recording; a core test fails when the files are stale.
 
-The default fixture is synthetic, and responses retain that label. A real
-deployment must supply reviewed organization facts, a real clock, and a fixture
-without scripted households. Changing a label does not turn recorded facts into
-live evidence. The original Lambda address serves the example skeleton. The
-team subsequently deployed the core at `https://18-217-110-223.sslip.io/api`
-and the household, donor-dashboard and results-strip pages on the same host.
-Read-only checks on October 11 verified HTTP 200 responses for health, fair share,
-food banks, published results and all three pages. API responses remain explicitly
-synthetic. These checks do not verify browser interactions, voice calls, SMS,
-n8n publication or Directory registration. AWS work remains deferred for this
-Codex session; no resources were provisioned here.
+### Server settings
 
-## #7: scenario harness and records
+| Variable | Meaning |
+|---|---|
+| `HOST` (127.0.0.1), `PORT` (8050) | Bind address. A container sets `HOST=0.0.0.0`. |
+| `DATABASE_URL` | SQLite path (default `runtime/core.sqlite`) or a PostgreSQL DSN (needs `psycopg[binary]==3.2.10`). |
+| `HARVESTNET_FIXTURE` | Scenario the server seeds from. Seeding adds missing records only; a restart never resets household balances. |
+| `HARVESTNET_STAFF_TOKENS` | JSON map of organization ID to its own secret. Each token authenticates that one organization. Keep it out of Git and out of household pages. |
+| `HARVESTNET_ALLOWED_ORIGIN` | CORS origin (default `http://127.0.0.1:8040`). |
+| `ANTHROPIC_API_KEY`, `CLAUDE_RUN_CAP_USD` | Voice intake is on only when both are set and the cap is above zero. Otherwise `voice_intake` answers 503 and households use the text form. |
+| `HARVESTNET_HOUSEHOLD_URL`, `N8N_PICKUP_WEBHOOK_URL`, `N8N_RELEASE_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN`, `SES_TEST_RECIPIENTS` | Household email. Setting either webhook requires all of these, or the server refuses to start. `GET /health` answers 503 if the email worker thread has died. |
 
-`records.py`, `protocol.py`, `engine.py` and `checks.py` provide
-transactional records, ordered events, real Lane B
-rules and a shared seeded clock. (`core_tests/stand_ins.py` holds a replaceable
-stand-in move provider that the harness tests use; it is test support, not product
-code.) The small normal fixture produces a commitment,
-pickup notice and confirmation. Every named human must explicitly approve the
-exact terms hash/version while owner holds remain valid. No missing reply or
-deadline can create a commitment. Fixture humans are always labeled scripted.
+SQLite is the labeled single-host option. PostgreSQL takes an advisory transaction lock for each reservation, so several API processes stay consistent. Staff routes read the token from `Authorization: Bearer ...`; bodies are JSON objects up to 256 KiB.
 
-Audits recompute approval/version evidence, overlapping storage/truck/lot holds,
-per-item conservation, pathways, fair-share limits and counted number failures.
-Tests tamper with an approval and double-book storage, and assert audit failure.
-CI runs a real Postgres service and tests event persistence, rollback and reconnect.
-The local machine has no Postgres server. GitHub Actions run 38127403436 verified
-the actual Postgres test: all 32 core tests passed with no skips, followed by
-601 existing agent and API skeleton tests. Each of the six original branch push
-workflows also passed. This verifies test database persistence, not production
-deployment or external provider delivery.
+## What each module owns
 
-## #8: calculators, matching, versions and stop rules
+| Module | Owns |
+|---|---|
+| `records.py` | Transactional JSON records and the append-only event log. Events never contain an email address. |
+| `protocol.py` | The rules for holds, versions, approvals and commitment. |
+| `engine.py` | The scripted harness (`run_fixture`): a seeded clock, owner-by-owner turns, scripted humans, pickups and household replies. |
+| `workflows.py` | Negotiation for live offers (`negotiate_pending`) without scripted humans, and the outgoing-message number check. |
+| `checks.py` | Audit checks recomputed from stored evidence (approvals, holds, conservation, fair share), never a constant. |
+| `calculators.py` | The agreed calculators plus capacity, gap-after-plan and arrival helpers (`docs/contracts/calculators.md`). |
+| `api.py` | The public API. `OPERATIONS` is the route table (`GET /` lists it) and each operation has an `op_<name>` handler. |
+| `server.py` | The JSON HTTP server around `API`. |
+| `changes.py` | A changed version of a committed lot after a disruption, with its own approvals. |
+| `cooler_join.py`, `cooler_watch.py` | Workflow 4 end to end: `apply_fault` in the harness, `handle_cooler_reading` and the deployed per-food-bank watcher over HTTP. |
+| `evaluation.py`, `live_evaluation.py` | Methods, metrics, replay, and the capped LLM provider. |
+| `voice.py` | `CappedExtractor`: a hard spending cap around Lane B's Claude extractor. |
+| `notices.py`, `contact.py`, `email_delivery.py` | Household pickup emails: the facts, address checking and the release link, and the outbox that delivers to n8n. |
+| `join.py`, `join_adapter.py` | Lane A and Lane B joined in one process; the policy and harness the platform's A2A hosts run (`AGENT_POLICY=harvestnet_core.join_adapter:policy`). |
+| `demo_replay.py` | The recorded demo. |
 
-`Calculators` implements all six agreed calculators and the supporting capacity,
-gap-after-plan and arrival tools, without inheriting stand-in calculators. Calls
-are logged. Household portions water-fill the largest deficits, never exceed the
-placeholder fair share, and leave excess unassigned. Missing pack weights and
-storage readings cannot invent capacity. NaN, infinity and boolean quantities
-are rejected. Pickup eligibility checks actual weekly household windows,
-can't-eat exclusions, spoilage deadlines and same-day collection for limited-fridge
-households receiving produce whose profile says it needs a fridge (`needs_fridge`,
-design section 8; not the transport cold chain). Pickup windows also stay within
-the owner's reserved storage interval.
+## The lot lifecycle
 
-Every counter creates a version and clears previous approvals and holds. Owner
-holds reject overlapping overbooking. Three rounds without new terms preserve
-disagreement, and the API records deadline unclaimed without auto-commit.
-Recalled produce is refused. Condition doubt needs an explicit authenticated
-condition check; it never disappears through ordinary approval.
+A Surplus lot moves through **negotiating, awaiting approvals, committed**, with two other endings: **unclaimed** and **preserved disagreement**.
 
-Outgoing policy reasons are checked against inputs and calculator results
-(`workflows.checked_move`, shared by the fixture harness and the public API's
-scheduler). After a failed number check the same owner is asked once more; only
-after the second failure does the deterministic owner move with template wording
-replace it (`template_fallback` event). Each failure is counted on the lot and in
-the event log. LLM policy provenance includes internal number failures and
-fallback causes.
+- **Versions.** Every counter creates a new version and clears all approvals and holds. Approvals and holds name one version and one terms hash (`sha256:<hex>`); a stale one is refused (409).
+- **Turns.** Each organization's own negotiator moves in published turn order (`turn_order` in the fixture). A move must come from the organization whose turn it is, name the current version, and carry a reason. The advocate may only counter or pass. Each owner's negotiator persists across turns, in the harness, the public scheduler, the baselines and the evaluation provider.
+- **Holds.** Only a resource's owner places a hold on it. Overlapping holds are checked against capacity at every boundary, so two non-concurrent holds do not block each other, and a double booking is refused. A hold that is already over is a refused move (`hold_refused`), not a crash.
+- **Awaiting approvals.** A lot reaches it when it has allocations and every named organization holds its resources, and no human has declined this version.
+- **Commitment.** When every named organization has approved the exact version, and every hold is still valid, the core validates the plan against its own records and commits. No missing reply and no deadline commits anything. Fixture humans are scripted and labeled so.
+- **A hold that expires** before the last approval returns the lot to negotiation: stale holds go, approvals clear, and the owners' next turns run (`hold_expired`).
+- **A decline** returns the lot to negotiation the same way (`returned_to_negotiation`). The declined version stays declined, so those exact terms are never sent for approval again.
+- **Stop rule.** A round counts toward the stop only if nobody changed the terms in it. After `rounds_without_new_terms_before_disagreement` such rounds (3 in the shipped fixtures), the lot becomes a **preserved disagreement** with a reason. The dashboards of the involved organizations show the competing plans and each organization's last reason (`disagreement_view`). Nothing commits.
+- **Deadline.** A lot still negotiating or awaiting approvals at its deadline becomes **unclaimed** with a reason. A preserved disagreement is a result, so it survives the deadline.
+- **Staleness is checked when the API is called.** Each call first runs `purge`: deadlines, hold expiry, and the seven-day request expiry.
+- **Refusals before negotiation.** A recalled lot is never offered. Condition doubt waits for an explicit authenticated condition check (`POST /lots/{lot_id}/condition-checks`, by the donor or the receiving food bank). That creates a new version and invalidates old approvals; ordinary approval never clears the doubt.
+- **Counters from people** (`submit_counter`) queue until that organization's next published turn. Approvals are refused while a counter is queued.
+- **Usable time.** An item with no `usable_until` gets the Produce profile's minimum usable days (cold life if the profile needs cold, room life otherwise), counted from the report time and labeled `usable_until_basis: profile_assumption` with the profile field, days, version and sources. A `use_soon` item must carry the donor's own `usable_until`; the profiles give no use-soon life and none is invented (ADR 0002).
+- **Drop-off.** A surplus offer's `drop_off` applies to that offer only. The donor's recorded drop-off and other lots are unchanged.
 
-Scripted faults are **not forecast**. No method's agents see a cooler failure
-before its time: the plan is negotiated and committed on the working cooler. At
-the fault time the harness runs Workflow 4 in process
-(`cooler_join.apply_fault`): Lane C's demo switch fails the cooler, the failing
-food bank's agent reads its own systems, rediscovers food banks through Lane C's
-local Directory, runs Lane B's cooler-failure flow, records the failed cooler in
-its status and proposes the new version. Each named organization's scripted human
-decides on that exact version, minutes counted from the fault. No reply is no
-approval. Without an approved change, cold-dependent pickups at the failed cooler
-become `held_for_human` and are never counted as collected. This is the same path
-as the #23 join, without HTTP. It does not certify the live AGNTCY Directory or
-n8n re-approval.
+### The outgoing-message number check
 
-With the shipped cooler fixture, the scripted eastside human answers 15 minutes
-after being asked. That is exactly the planned trip's arrival time, because Lane
-B's plan departs at the moment of detection, so the core refuses the answer as
-stale and nothing commits. This is reported as is (see #10 below). A variant
-where humans answer within the trip time commits the change; the tests cover both.
+`workflows.checked_move` compares every number in a move's reason with the move's inputs and the calculator results. After a failed check the same owner is asked once more. After a second failure the deterministic owner move replaces it with template wording (`template_fallback`). Every failure is counted on the lot and in the event log.
 
-## #9: real API logic
+### Per-item status
 
-`api.py` implements every agreed public API operation with the same top-level
-response fields. Unknown records return 404; stale terms return 409. Fair share
-comes from the real calculator. Preview saves nothing; saving requires complete
-answers and explicit consent. Requests expire after seven days, including their
-write-only phone and pickup records. Their pickup notices in the event log keep
-only the pounds, items and food bank; the request code and the household's pickup
-window are removed (design section 12). Names, addresses and income are refused.
+`get_lot` gives each item its own `status`, derived from the records and not copied from the lot: `offered`, `negotiating`, `held` (the owners of its pounds have placed holds), `committed`, `moving`, `at_food_bank` (its transports or a committed change's trip, against the clock), `collected` (every live pickup of it was collected), `disagreement`, and `unclaimed` (with `unclaimed_reason` when pounds are left over). Items also carry `split` (food bank, pounds, mover) and `households_reached`.
 
-`GET /` lists every operation (the agreed contract plus the three additive,
-proposed routes), with `contract_version`. A contract test calls all 20 agreed
-operations for real and checks each status and field against its example, one
-level into nested objects and list items (`core_tests/test_followups.py`).
-`get_lot` items carry `split` (food bank, pounds, mover), `unclaimed_lb` once the
-lot is settled, and `households_reached`. Each item also has its own `status`, derived from the records and not copied
-from the lot: `offered` (no food bank has planned any), `negotiating`, `held` (the
-owners of its pounds have placed their holds), `committed`, `moving` and
-`at_food_bank` (its transports, or a committed change's trip, against the clock),
-`collected` (every live pickup of it was collected), `disagreement` (the lot kept a
-preserved disagreement) and `unclaimed`, with `unclaimed_reason` when pounds are
-left over. A preserved disagreement survives the deadline and `disagreement` carries
-its reason, the plans that were on the table and each organization's last reason. A missing body field, an unknown
-`produce_id` or another bad input returns the contract's 400; only unknown
-records return 404.
+### After commitment
 
-A surplus offer's `drop_off` applies to that offer only. It is checked and stored
-with the lot, survives restarts, and never changes the donor's recorded drop-off
-or other lots. An item without `usable_until` gets the **produce profile's**
-minimum usable days (cold life for cold-dependent produce, room life otherwise),
-counted from the report time and labeled `usable_until_basis: profile_assumption`
-with the profile field, days, profile set version and that field's sources. The
-label is returned by `create_surplus_offer` and `get_lot`. A `use_soon` item must
-state the donor's own `usable_until`: the profiles give no use-soon life, and
-none is invented (ADR 0002). A condition check relabels the item `condition_check`.
+- **Pickups.** Each committed pound is split among eligible households by the portion calculator, which fills the largest fair-share deficits first and never exceeds fair share. Eligibility checks the household's weekly windows, can't-eat items, spoilage deadlines, the food bank's pickup hours, and same-day collection for limited-fridge households receiving produce whose profile says `needs_fridge` (a household fridge, not the transport cold chain). Pickup windows stay inside the owner's reserved storage interval. Household views show only committed pickups.
+- **Release.** `release_pickup` is scoped to its pickup and request code, is safe to retry, and reassigns only inside the reserved window to eligible households below fair share.
+- **Cooler failure (Workflow 4).** No method's agents see a scripted fault before its time: the plan is negotiated and committed on the working cooler. When the cooler fails, the failing food bank's own agent reads its systems, rediscovers food banks through the Directory, runs Lane B's cooler-failure flow, records the failed cooler in its status, and proposes a new version (`POST /lots/{lot_id}/changes`). `changes.py` records it and treats it as its own versioned record on top of the commitment. Each named organization's Staff approver decides on that exact version. Only when all approve does the core place the owners' holds, move the commitments and move the affected pickups. Without an approved change, cold-dependent pickups at the failed cooler become `held_for_human` and are never counted as collected. The reason cards appear under `disruptions` on the food bank dashboard. In the deployed stack each food bank's host runs its own watcher (`cooler_watch.py`); it proposes and asks for review emails, and never approves.
 
-Offers schedule each organization's real rules, acquire its own holds and stop
-awaiting actual human approvals. The food bank dashboard's `agent_suggests` and `agent_reason` come from that food
-bank's own rules-based negotiator, run on its own facts only (accept, counter,
-decline or ask a human; `null` with the reason when the offer is no longer open).
-A decline, or a hold that expires, returns the lot to negotiation and the owners'
-next turns run; the declined terms are never sent for approval again. Accept/decline, counter queueing, version history,
-status updates, donor item views, dashboards and pickup confirmation use records.
-Household views show only committed pickups. A release is scoped to its pickup
-and request code, is safe to retry, and reassigns only within the reserved pickup
-window to eligible households below fair share.
+## Evaluation
 
-The additive authenticated `POST /lots/{lot_id}/condition-checks` takes
-`organization_id`, `version`, `produce_id`, `condition_grade`, `usable_until`, and
-`reason`. Only donor staff or the receiving bank can clear its condition doubt;
-this creates a new version and invalidates old approvals. This operation needs
-frontend contract review; it does not change existing route shapes.
+`evaluate` runs four methods on one fixture with the same rules, trucks, storage and Staff approver scripts: **first come, first served**, **nearest food bank**, **rules based**, and **llm**. Both baselines still go through each owner's real review, holds and approvals, and the advocate makes no baseline amendments.
 
-Staff auth binds each token to one organization. `POST /approvals` takes only the
-agreed payload: `lot_id`, the organization's own ID (the donor is `market`, not a
-role) and the `sha256:`-prefixed terms hash (README decision 8). Lane C's bridge has
-sent exactly that since PR #56, so the core no longer translates `event_id`, the
-donor role alias or a bare hex digest; an older payload is refused (400) and records
-nothing. The one place a bare hex hash is still accepted is the platform's own
-`ApprovalStore.decide`, where a human's page or n8n sends it. The actual platform
-approval store/HTTP client is tested against the core with separate owner credentials.
+- **First come, first served** (design section 16): the food bank whose households asked first claims whole items. A claimant takes the whole item, limited only by the hard rules (storage over time, its truck, pickup hours before the item spoils). Pounds it cannot take are never passed to another food bank; they stay unclaimed and count as wasted.
+- **Nearest food bank**: food banks bid in order of recorded travel time from the donor, using the rules negotiators' own bids.
+- **Pathway split** (ADR 0011, decided October 11, 2026): `produce_split` counts every offered pound once, as `collected_by_households_lb`, else `committed_to_food_banks_lb`, else `produce_wasted_lb`. A committed pound counts as committed only when its food bank's own storage hold (cold if the profile needs it) overlaps the food bank's pickup hours before the usable time, checked with `pickup_feasibility`. A failed cooler ends cold storage at the failure. A Workflow 4 fallback kept at the failed cooler counts only as a `same_day_offer` with the profile's room life. A household's collected pounds come out of its food bank's committed share. None of this is observed spoilage, and the result's `note` says so. `uncollected_by_scenario_households_lb` is the older number: everything the scripted households did not collect.
+- **Worst-served coverage** (design section 16): for each food bank, the average over the households that chose it of each household's share of fair share received (capped at 1, zeros included). The metric is the lowest of those averages, and `coverage_by_food_bank` shows each one. A household that chose several food banks counts in each.
+- **Pickup-window match**: the share of collected pounds whose confirmation came before the item's usable time (`null` when nothing was collected).
+- Also reported: households reached, time to first commitment, `invalid_commitments` (counted on first commitments and on change commitments), counted number-check failures, and for a scenario with a fault a `cooler_failure` block (faults, change statuses and refusals, pounds and pickups moved or released, pounds held for a human).
+- **LLM labels.** Without a provider the method is `not_run` with null values. `--llm-cap-usd 0` runs it with no model calls: every decision is a rules fallback, so it is `fallback_only` with `measured: false`. A nonzero cap needs `--allow-paid` and is shared by every scenario and repetition in the command (`--repeats`); it is refused above $100. Each run is labeled from its own `policy_provenance` events, not from the shared cap: `completed` (every decision from the model), `partial` (a mix of model, rules fallbacks and templates, with the counts visible), or `fallback_only`. A number-check re-ask records both calls' cost. `llm_cost_usd` is this scenario's own spend and `llm_cap_spent_usd` the shared cap's running total. A zero cap never builds the Anthropic client. `not_run` and `fallback_only` are not an LLM evaluation, and the frontends show them as such. Repeated runs report each value plus mean and standard deviation.
+- **A shipped-fixture gotcha.** In `core_fixtures/cooler-failure.json` the eastside human answers 15 minutes after being asked, exactly the planned trip's arrival time, so the core refuses the answer as stale and nothing commits. Every method reports the refusal and the held cold pickups. A variant where humans answer within the trip time commits the change (both are tested), and the demo recording uses the 10-minute variant, labeled as such.
 
-## #10: baselines and evaluation runner
+## Privacy
 
-Five synthetic fixtures cover normal afternoon, storage shortage, produce
-shortage, cooler failure and condition doubt. Baselines give banks first
-opportunity by earliest household request or recorded donor travel time,
-respectively. They still use each owner's real review, resource holds and human
-approvals. The advocate makes no baseline amendments.
+- A household request carries no name, address or income (those fields are refused). Email is optional, write-only, used only for pickup emails, never returned by the API or written to the event log.
+- A request expires after seven days. Expiry deletes the request, its email, and its pickups. Pickup notices in the event log keep only the pounds, items and food bank; the request code and the household's window are removed (design section 12).
+- Household notices are built by `notices.py` (`pickup_ready`, `pickup_changed`, `pickup_released`). Delivery goes through an **outbox** in `email_delivery.py`: the event and its outbox entry commit together without an address or request code, and each entry is claimed before the network call. A restart or timeout therefore never sends a second copy. An ambiguous result is `uncertain`, and an operator inspects and reissues it. A changed or released pickup supersedes an unsent older notice, and only addresses in `SES_TEST_RECIPIENTS` are sent to.
+- The release link carries the pickup and code in the URL fragment, so web server logs never see them. Opening the link changes nothing; only the household's tap on "Can't make it" releases the pickup.
+- Voice intake returns a read-back and a consent question without saving. A separate consented request saves, with the same fair share as the web. Raw transcripts are not stored. `voice_intake` has a per-process rate limit (20 calls a minute, `voice_rate_limit` on `API`) and answers 503 `rate_limited` over it. The API refuses a bare Claude extractor: it must be a `CappedExtractor`, which reserves each call's worst case (every prompt and transcript character as an input token, the full output, the highest listed price) and makes no call, answering 503 `spending_cap_reached`, when the next call does not fit. The cap is per process and starts at zero spent after a restart.
 
-**First-come-first-served** follows design section 16: the first food bank to
-claim an item gets the whole item. Its bids ignore fair share and other food
-banks and stop only at the hard limits the harness enforces (storage over time,
-its truck, pickup hours before the item spoils). Pounds it cannot take are never
-passed to another food bank; they stay unclaimed and count as wasted. Before this
-change the baseline ran the rules-based negotiators in bidding order, which still
-split items by fair share. **Nearest food bank** is unchanged.
+## Proposed routes, not yet in the contract
 
-Metrics come from run records: produce wasted with its split (below),
-worst-served weekly coverage, households reached, pickup-window match, time to
-first commitment, invalid commitments and counted number failures.
-**Worst-served coverage** follows design section 16: for each food bank, the
-average over the households that chose it of each household's share of fair share
-received (capped at 1, zeros included), then the lowest of those averages.
-`coverage_by_food_bank` shows each average. **Pickup-window match** is the share
-of collected pounds whose recorded confirmation came before the item's usable
-time (`null` when nothing was collected). A household that chose several food
-banks counts in each. The old value took the single lowest household and was 0.0
-in every run; it now differs across scenarios and methods.
+`GET /` lists every operation with `contract_version` and marks each `agreed` or `proposed`. These three are additive, authenticated, and change no existing route's shape. They need contract review (#1) and are not in `docs/contracts/public-api.md`:
 
-For a scenario with a fault, each method's result has `cooler_failure`: how many
-faults, `mid_run_workflow_4`, the change statuses and any refusals, pounds and
-pickups moved or released, and pounds `held_for_human`. On the shipped cooler
-fixture every method reports the refused late answer and held cold pickups,
-because the fixture's scripted timing is what it is. Change commitments count
-toward `invalid_commitments` like first commitments.
+- `POST /lots/{lot_id}/condition-checks`: `organization_id`, `version`, `produce_id`, `condition_grade`, `usable_until`, `reason`.
+- `GET /lots/{lot_id}/holding?food_bank_id=...`: what the food bank holds, for the cooler-failure flow.
+- `POST /lots/{lot_id}/changes`: a food bank's proposed changed version.
 
-**Produce wasted** (design section 16, decided by the user October 11, 2026):
-`produce_split` in `evaluation.py` counts every offered pound once, as
-`collected_by_households_lb`, else `committed_to_food_banks_lb`, else
-`produce_wasted_lb`. A committed pound counts as committed only when its food
-bank's own storage hold (cold if the produce profile needs it) overlaps the food
-bank's pickup hours before the item's usable time, checked with the
-`pickup_feasibility` calculator. A failed cooler ends cold storage at the
-failure. A Workflow 4 fallback kept at the failed cooler counts only as a
-`same_day_offer`, using the profile's room-temperature life. Everything else is
-wasted: unclaimed pounds, and commitments that would spoil first. A household's
-collected pounds come out of its food bank's committed share, so nothing is
-counted twice. The old value (everything the scripted households did not collect)
-is still reported as `uncollected_by_scenario_households_lb`. None of this is
-observed spoilage, and the note beside each result says so. Replays carry
-the original moves and must reproduce commitments/pathways/checks without any
-Claude calls. Results remain whatever the run computes.
+The change record and the `disruptions` field on the food bank dashboard are proposed with them.
 
-## #20: join, real agents in the harness
+## Gotchas
 
-`harvestnet_core/join.py`. `run_join(fixture)` runs one contract fixture through Lane A's harness (`run_fixture`) with Lane B's rules-based negotiators and the real calculators, and a `HarnessLog` writes Lane B's event log for that same run. So the fixture's eight checks (from the harness records) and Lane B's six (from the log) are both real results on one run, with nothing pending. Every calculator call is compared with Lane B's stand-ins; a difference carries both answers and the reason from `Calculators.stand_in_differences`. `run_join` also runs Lane B's `run_scenario` with the real calculators as a cross-check, and for its cooler-failure logic (#15). `python -m harvestnet_core.join` prints one line per fixture. The fixtures in `core_fixtures/` are already contract-v0.1 scenarios, so they load unchanged. Test: `core_tests/test_join.py`.
+- `POST /approvals` takes only the agreed payload: `lot_id`, the organization's own ID (the donor is `market`, not a role), and a `sha256:`-prefixed hash. The core does not translate older forms; they are refused (400). Only the platform's `ApprovalStore.decide` also accepts a bare hex hash, because a human's page or n8n sends it.
+- Staff tokens bind to one organization. An organization cannot approve, counter or confirm for another.
+- Unknown records return 404, stale terms return 409, and any other bad input returns the contract's 400.
+- `core_tests/stand_ins.py` is a replaceable move provider for harness tests. It is test support, not product code.
+- A real deployment needs reviewed organization facts, a real clock and a fixture without scripted households. Relabeling a recorded fact does not make it live evidence.
 
-## #22: household, voice, approval and pickup join
+## History
 
-Web and recorded English/Spanish transcripts go through the existing Lane B
-front desk. An injected extractor must pass its evidence checks; raw transcript
-text is not stored. Voice intake returns read-back/consent without saving; a
-separate consented voice request gets the same calculated fair share as the web.
-Without a configured voice extractor the API returns 503 and directs to text.
-`POST /voice-intake` has a per-process sliding-window rate limit (20 calls a
-minute by default, `voice_rate_limit` on `API`); over it, 503 `rate_limited`. The
-API refuses a bare Lane B `ClaudeExtractor`: it must be wrapped in
-`harvestnet_core.voice.CappedExtractor`, which takes a spending cap (zero to $100,
-nonzero needs `allow_paid`). The extractor doesn't report token usage, so each
-call is reserved and charged at its worst case (every prompt and transcript
-character as an input token, full `max_tokens` output, highest listed price).
-When the next call's worst case doesn't fit, no call is made: 503
-`spending_cap_reached`. The local server attaches no extractor.
-
-Local HTTP tests exercise browser-style request creation and the existing
-capability-verified human approval relay. Tests also cover pickup views, wrong
-request releases, retries, reassignment and fair-share conservation. Live
-ElevenLabs calls, n8n publication, SES email delivery and the actual frontend screens
-still require their configuration/deployment. No real pickup email was sent.
-
-## #23: join, cooler failure end to end (local only)
-
-Cooler failure end to end. `harvestnet_core/cooler_join.py` runs the cooler-failure fixture to its commitment, then fails the city cooler mid-run through Lane C's demo switch. The city's agent reads its own organization systems, gets its holding from `GET /lots/{lot_id}/holding`, rediscovers food banks through Lane C's Directory, and runs Lane B's cooler-failure flow. It records the failed cooler with `PUT /food-banks/{id}/status` and proposes the new version with `POST /lots/{lot_id}/changes`. `harvestnet_core/changes.py` records that version. Each named human decides on it through Lane C's review links and `/approvals`. Only when every named organization approves does the core place the owners' holds, move the commitments, and move the affected pickups. Lane B writes the household texts, and the core adds `to`, `pickup_id` and `release_url`. The reason cards appear under `disruptions` on the food bank dashboard. The new routes and the change record are proposed, pending #1. Test: `python -m unittest core_tests.test_cooler_failure_join -v`, with `PYTHONPATH=agents/src` and `HARVESTNET_PLATFORM_SOURCE=.`. Nothing is deployed. Beeceptor data for the scenario's day: `python -m harvestnet_core.cooler_join --export-systems runtime/cooler-systems.json --export-openapi runtime/cooler-openapi.json`.
-
-## #24: real evaluation join
-
-`live_evaluation.py` connects existing Lane B LLM negotiators to the same real
-calculators/harness and records source, model calls, number failures, cost and
-fallback cause. One cap is shared across repetitions and scenarios when the same
-provider is reused. It defaults to zero and rejects limits above $100. A nonzero
-cap requires explicit authorization. This session spent no provider credits.
-
-Repeated runs report individual values plus mean and standard deviation.
-`publish_evaluation` stores the results response; `/results` returns those method
-values unchanged. `python -m harvestnet_core evaluate` calls it for each fixture.
-`--llm-cap-usd 0` runs the LLM method with no model calls (`fallback_only`); a
-nonzero cap needs `--allow-paid` and is shared by every scenario and repetition
-in the command (`--repeats`). Missing LLM configuration gives `not_run`, with null values.
-Each LLM run is labeled from its own `policy_provenance` events, not from the
-shared cap: it reports `model_calls`, `llm_decisions`, `fallback_decisions` and
-`template_fallbacks`. Runs with no LLM decisions (zero cap, or a shared cap
-already spent) are `fallback_only` with `measured: false`; a run that hits the
-cap midway is `partial`, with the counts visible. A number-check re-ask records
-both calls' cost and counts. `llm_cost_usd` is this scenario's own spend;
-`llm_cap_spent_usd` is the shared cap's running total. A zero cap never builds
-the Anthropic client. `not_run` and `fallback_only` are not presented as a real
-LLM evaluation. Paid repeated LLM runs on the deployed system
-remain an open acceptance gate.
-
-## Actual transport join
-
-`join_adapter.policy` uses the existing real Lane B policy and real core
-calculators. `join_adapter.harness` adapts only the transport's donor alias,
-preserving typed draft/facts, clocks, decisions and resource ownership. A test
-runs the full mixed batch across five actual A2A HTTP hosts and in-process and
-requires identical nonempty commitments, pathways and all core rule checks.
-
-For Lane C, use `AGENT_POLICY=harvestnet_core.join_adapter:policy` and the harness
-export `harvestnet_core.join_adapter:harness`. Bake both core and reviewed agents
-into the organization images. This local proof does not replace container,
-native Directory daemon or public HTTPS deployment acceptance.
-
-## Latest teammate compatibility
-
-Merged main `3e427e6` adds the team's beyond-fair-share bank bidding policy.
-The original six branches now include it. The core implements its signed
-`adjust_pounds` operation and preserves each owner's negotiator across turns in
-the harness, public scheduler, baselines and evaluation provider. A2A policy
-sessions isolate owner memory between independent runs. This memory is local
-process state; host-restart recovery and native Directory deployment are not
-claimed verified. Household portions retain the agreed fair-share cap; a bank
-bid beyond its gap does not fabricate consent or allocate above household caps.
+The core was built ticket by ticket (#7 to #10, #20, #22 to #24). The record of that work is in the GitHub issues and pull requests of `mubinmodi/UCSC_HACK_HARVESTNET`; this page describes only what the code does now.
