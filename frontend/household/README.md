@@ -32,8 +32,10 @@ npm run build      # type-checks, then builds dist/
 
 ## API
 
-- The address comes from `VITE_API_BASE_URL` (see `.env.example`). Unset, the page calls the live API
-  skeleton, `https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`.
+- The address comes from `VITE_API_BASE_URL` (see `.env.example`). Unset, the page calls `/api` on its
+  own origin, which is where the gateway serves the core. For development, point it at the core
+  (`http://127.0.0.1:8050`) or, explicitly, at the example API skeleton,
+  `https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`.
 - `src/api.ts` is the only place that talks to the API. It uses the `contract-v0.2` household operations
   in `docs/contracts/public-api.md` with their exact shapes: `get_fair_share`, `preview_request`,
   `create_request`, `list_food_banks`, `choose_food_banks`, `get_request`, `release_pickup`.

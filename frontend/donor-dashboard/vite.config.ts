@@ -10,5 +10,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Tests call an absolute address so the fetch mock can tell the API's host from any other.
+    env: { VITE_API_BASE_URL: 'https://api.harvestnet.test' },
   },
 });

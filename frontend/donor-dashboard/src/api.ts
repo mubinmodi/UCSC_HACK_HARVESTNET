@@ -23,12 +23,23 @@ import type {
 } from './types';
 import { staffToken } from './session';
 
-/** The live API skeleton on AWS. It answers every operation with the contract's example. */
-export const DEFAULT_API_BASE_URL = 'https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws';
+/** The gateway serves the pages and the API on one origin, so the default is `/api` on the page's own origin. */
+export const DEFAULT_API_BASE_URL = '/api';
 
-export const API_BASE_URL: string = (
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || DEFAULT_API_BASE_URL
-).replace(/\/+$/, '');
+/** The example API skeleton on AWS, answering every operation with the contract's example. An explicit dev option: set VITE_API_BASE_URL to it. */
+export const SKELETON_API_BASE_URL = 'https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws';
+
+/** The configured address without trailing slashes, or the same-origin default. */
+export function resolveApiBase(configured: string | undefined): string {
+  return (configured?.trim() || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+}
+
+export const API_BASE_URL: string = resolveApiBase(import.meta.env.VITE_API_BASE_URL as string | undefined);
+
+/** A route's full address: an absolute base is used as is, a path like `/api` resolves against the page's origin. */
+export function apiUrl(route: string, base: string = API_BASE_URL): URL {
+  return new URL(base + route, window.location.origin);
+}
 
 export class ApiError extends Error {
   constructor(
@@ -56,7 +67,7 @@ interface CallOptions {
 const path = (...parts: string[]) => '/' + parts.map(encodeURIComponent).join('/');
 
 async function call<T>(method: Method, route: string, options: CallOptions = {}): Promise<T> {
-  const url = new URL(API_BASE_URL + route);
+  const url = apiUrl(route);
   for (const [key, value] of Object.entries(options.query ?? {})) url.searchParams.set(key, value);
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';

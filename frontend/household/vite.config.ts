@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Tests call an absolute address so the fetch mock can tell the API's host from any other.
+    env: { VITE_API_BASE_URL: 'https://api.harvestnet.test' },
     restoreMocks: true,
     unstubGlobals: true,
   },

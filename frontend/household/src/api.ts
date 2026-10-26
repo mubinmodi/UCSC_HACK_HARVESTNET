@@ -4,14 +4,20 @@
 // docs/contracts/examples/public-api/. The page never calculates a fair share, a balance, or
 // a portion: every number it shows comes from these responses (ADR-0002).
 //
-// The address comes from VITE_API_BASE_URL. Without it, the page calls the live API skeleton,
-// which answers every call with the contract's synthetic example ("mode": "example").
+// The gateway serves the page and the API on one origin, so without VITE_API_BASE_URL the page
+// calls `/api` on its own origin. Set VITE_API_BASE_URL for another address. The example API
+// skeleton, which answers every call with the contract's synthetic example ("mode": "example"),
+// is an explicit dev option: VITE_API_BASE_URL=<SKELETON_API_BASE_URL>.
 
-export const DEFAULT_API_BASE_URL = 'https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws';
+export const DEFAULT_API_BASE_URL = '/api';
+export const SKELETON_API_BASE_URL = 'https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws';
 
-export const API_BASE_URL = (
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || DEFAULT_API_BASE_URL
-).replace(/\/+$/, '');
+/** The configured address without trailing slashes, or the same-origin default. */
+export function resolveApiBase(configured: string | undefined): string {
+  return (configured?.trim() || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+}
+
+export const API_BASE_URL = resolveApiBase(import.meta.env.VITE_API_BASE_URL as string | undefined);
 
 /** Slow connections get a generous wait before we give up and offer "Try again". */
 export const REQUEST_TIMEOUT_MS = 20_000;

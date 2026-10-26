@@ -15,7 +15,7 @@ npm run build
 npm test           # Vitest + Testing Library; fetch is mocked, no network
 ```
 
-The API address comes from `VITE_API_BASE_URL` (see `.env.example`). By default the app calls the live API skeleton, `https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws`, which answers every operation with the contract's example response. For the core (`python -m harvestnet_core.server`, port 8050), set `VITE_API_BASE_URL=http://127.0.0.1:8050` and set `HARVESTNET_ALLOWED_ORIGIN` on the core to this page's origin.
+The API address comes from `VITE_API_BASE_URL` (see `.env.example`). By default the app calls `/api` on its own origin, which is where the gateway serves the core. To develop against the example API skeleton, `https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws` (it answers every operation with the contract's example response), set `VITE_API_BASE_URL` to it. For the core (`python -m harvestnet_core.server`, port 8050), set `VITE_API_BASE_URL=http://127.0.0.1:8050` and set `HARVESTNET_ALLOWED_ORIGIN` on the core to this page's origin.
 
 ## Screens
 

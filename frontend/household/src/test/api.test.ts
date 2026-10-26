@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { api, ApiError, API_BASE_URL, DEFAULT_API_BASE_URL, isExampleData, showablePickups, type Pickup } from '../api';
+import { api, ApiError, API_BASE_URL, DEFAULT_API_BASE_URL, isExampleData, resolveApiBase, SKELETON_API_BASE_URL, showablePickups, type Pickup } from '../api';
 import { examples, HOUSEHOLD_OPERATIONS, mockApi, operationFor } from './contract';
 
 const ex = (op: string) => examples[op].example.request;
@@ -16,9 +16,13 @@ const callFor: Record<(typeof HOUSEHOLD_OPERATIONS)[number], () => Promise<unkno
 };
 
 describe('API client matches the public API contract', () => {
-  it('defaults to the live API skeleton', () => {
-    expect(DEFAULT_API_BASE_URL).toBe('https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws');
-    expect(API_BASE_URL).toBe(DEFAULT_API_BASE_URL);
+  it('defaults to the same-origin /api, takes VITE_API_BASE_URL when set, and keeps the skeleton as an explicit option', () => {
+    expect(DEFAULT_API_BASE_URL).toBe('/api');
+    expect(resolveApiBase(undefined)).toBe('/api');
+    expect(resolveApiBase('  ')).toBe('/api');
+    expect(resolveApiBase(' https://core.example/api/// ')).toBe('https://core.example/api');
+    expect(resolveApiBase(SKELETON_API_BASE_URL)).toBe('https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws');
+    expect(API_BASE_URL).toBe('https://api.harvestnet.test'); // what the test config sets
   });
 
   it.each(HOUSEHOLD_OPERATIONS)('%s sends the example method, path, query, and body, and returns the example', async operation => {

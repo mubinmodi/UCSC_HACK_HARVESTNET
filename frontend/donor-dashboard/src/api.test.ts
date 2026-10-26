@@ -1,7 +1,7 @@
 // Each API call this app makes must match the agreed contract: the example's method,
 // path, query, and body, and it must hand back the example's response unchanged.
 import { describe, expect, it } from 'vitest';
-import { api, API_BASE_URL, ApiError, DEFAULT_API_BASE_URL, describeError } from './api';
+import { api, API_BASE_URL, ApiError, apiUrl, DEFAULT_API_BASE_URL, describeError, resolveApiBase, SKELETON_API_BASE_URL } from './api';
 import { staffToken } from './session';
 import { example, examples, mockApi } from './test/contract';
 import type {
@@ -37,9 +37,18 @@ const cases: Case[] = [
 ];
 
 describe('API calls match the public API contract', () => {
-  it('defaults to the live API skeleton', () => {
-    expect(DEFAULT_API_BASE_URL).toBe('https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws');
-    expect(API_BASE_URL).toBe(DEFAULT_API_BASE_URL);
+  it('defaults to the same-origin /api, takes VITE_API_BASE_URL when set, and keeps the skeleton as an explicit option', () => {
+    expect(DEFAULT_API_BASE_URL).toBe('/api');
+    expect(resolveApiBase(undefined)).toBe('/api');
+    expect(resolveApiBase('  ')).toBe('/api');
+    expect(resolveApiBase(' https://core.example/api/// ')).toBe('https://core.example/api');
+    expect(resolveApiBase(SKELETON_API_BASE_URL)).toBe('https://5ibpa6ukufm2dmyidprwzv5e7e0vrpfj.lambda-url.us-east-2.on.aws');
+    expect(API_BASE_URL).toBe('https://api.harvestnet.test'); // what the test config sets
+  });
+
+  it('resolves a path like /api against the page origin, and leaves an absolute address alone', () => {
+    expect(apiUrl('/lots/lot-1', '/api').href).toBe(`${window.location.origin}/api/lots/lot-1`);
+    expect(apiUrl('/lots/lot-1', 'https://core.example').href).toBe('https://core.example/lots/lot-1');
   });
 
   it('covers every operation the donor page and dashboard use', () => {
