@@ -16,6 +16,10 @@ _Avoid_: Sub-agent, worker
 An organization's representative that talks to other organizations, proposes changes to deals, and explains its organization's decisions.
 _Avoid_: Supervisor, gateway, dispatcher
 
+**Staff approver**:
+A person at a donor or food bank who approves or declines that organization's commitments, always for one exact version. Nobody approves for another organization.
+_Avoid_: Manager, admin, operator, reviewer
+
 **Coordinator**:
 Removed from the MVP (ADR 0009). Disagreements and approvals appear on the dashboards of the donors and food banks involved.
 _Avoid_: Admin, operator, manager, allocator
@@ -47,12 +51,12 @@ _Avoid_: Equity agent, fairness checker, validator
 ## Food and outcomes
 
 **Surplus lot**:
-A specific batch of at-risk food, such as 10,000 lb of strawberries in one field.
-_Avoid_: Load, donation, shipment, inventory
+A specific batch of surplus produce that must move soon, followed from its first offer to its final outcome, such as one farmers market's apples, romaine and potatoes at closing time.
+_Avoid_: Event, load, donation, shipment, inventory
 
-**Food profile**:
-A reviewed description of a food at the required specificity, including maturity or processing state: handling requirements, quality/storage targets, chilling sensitivity, usable-life assumptions, packaging units, compatibility, quality categories, candidate pathways, and required assessments. Each field has a source or an explicit assumption and a version. Actual lot condition is separate evidence; a profile alone does not establish eligibility. The framework applies common procedures to these properties and identifies unsupported assessments.
-_Avoid_: Crop type, product config, handling rules (when meaning the whole profile)
+**Produce profile**:
+A reviewed, versioned description of one produce item: whether it needs a fridge or cold transport, how long it stays usable cold and at room temperature, condition grades and units. Each field cites a source or is labeled an assumption, and a lot's actual condition is separate evidence.
+_Avoid_: Food profile, crop type, product config, handling rules (when meaning the whole profile)
 
 **Request**:
 A household's statement of what it needs: household size, when it can pick up, whether its fridge space is limited, rough area, anything it can't eat, optionally whether it receives SNAP/CalFresh, and the food banks it chose. It carries no name.
@@ -62,12 +66,8 @@ _Avoid_: Order, application, demand
 A household's reply that it will collect, or has collected, produce at a food bank. It is how HarvestNet counts households actually reached.
 _Avoid_: Delivery receipt, check-in
 
-**Event**:
-One surplus lot's journey from first offer to final outcome.
-_Avoid_: Transaction, order, case
-
 **Pathway**:
-Where a surplus lot's food finally ends up: donated, upcycled, animal feed, compost, or left unharvested. Each pound is counted once.
+Where each pound of a surplus lot ends up: collected by a household, committed to a food bank that can store it and hand it out before it stops being usable, or wasted (no pathway). Each pound is counted once (ADR 0011).
 _Avoid_: Destination tier, disposition, outlet
 
 **Coverage**:
@@ -75,23 +75,27 @@ The share of its weekly fair share a household has received. Worst-served covera
 _Avoid_: Fairness score, fulfillment rate, equity
 
 **First-come-first-served baseline**:
-The simple comparison method: whoever claims first gets served, under the same trucks, money, and rules as HarvestNet.
+The simple comparison method: the first food bank to claim an item gets all of it, under the same trucks, storage, and rules as HarvestNet.
 _Avoid_: Greedy, naive matching
 
 ## Agreements
 
 **Draft agreement**:
-The one shared, numbered plan for an event. Organizations edit it until everyone accepts the same version.
+The one shared, numbered plan for a surplus lot. Organizations edit it until everyone accepts the same version.
 _Avoid_: Bundle, deal proposal, contract
 
 **Hold**:
-A temporary, expiring reservation of a resource (truck time, cold-storage space, grant money), placed by the resource's owner.
+A temporary, expiring reservation of a resource (truck time, cold or dry storage space), placed by the resource's owner.
 _Avoid_: Lock, booking, claim
 
 **Commitment**:
 The final state of a draft agreement: every named organization has approved the exact same version.
 _Avoid_: Deal, consensus, approval
 
+**Reason card**:
+A short explanation, built only from recorded facts, of why one candidate food bank was chosen or rejected, for example after a cooler failure.
+_Avoid_: Justification, score, ranking
+
 **Preserved disagreement**:
-The outcome when no version wins every named organization's approval. The coordinator sees the competing options and each organization's reasons. Nobody picks for them.
+The outcome when no version wins every named organization's approval. The dashboards of the organizations involved show the competing options and each organization's reasons. Nobody picks for them.
 _Avoid_: Deadlock, failure, escalation (when meaning the outcome itself)

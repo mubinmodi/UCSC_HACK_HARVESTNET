@@ -20,7 +20,7 @@ A hackathon entry (Cisco "When AI Agents Disagree", Level 3). Code on `main`:
 - `deploy/aws/`: `setup.sh` / `teardown.sh` for the live stack (profile `incubator`, us-east-2). See `deploy/aws/README.md`.
 - Agreed interfaces: `docs/contracts/`.
 
-- **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0009`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP. If any other file disagrees with these, these win.
+- **Source of truth:** `docs/MVP_DESIGN.md`, `CONTEXT.md`, `docs/adr/0001`–`0012`. ADRs 0001–0005 come from the frozen whole-chain framework; 0006–0009 are the user's scope cuts that define the MVP; 0010–0012 are the October 11 build decisions (email via SES, committed produce is not waste, one small instance with SQLite). If any other file disagrees with these, these win.
 - **Derived copies:** `docs/harvestnet_mvp_design.html` and `docs/HarvestNet_MVP_Design.pdf` are styled renderings of `docs/MVP_DESIGN.md`. When the Markdown changes materially, the copies go stale; say so, or regenerate them if asked.
 - **Work plan:** `.scratch/harvestnet-mvp/spec.md`, `lanes.md` (four lanes, with integration only in join tickets 20–24), and 25 tickets in `issues/`. The live tickets are GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`; the local `issues/` files are the original snapshot.
 - **`learning/`:** a short course teaching the user the design (HTML lessons, PDFs, glossary). Follow `learning/NOTES.md`: plain, short English, and no quizzes or exercises.
