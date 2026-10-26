@@ -6,6 +6,8 @@ import secrets
 import time
 from urllib.parse import urlsplit, parse_qs
 from harvestnet_agents import front_desk as desk
+from harvestnet_agents.negotiation import MoveKind, parse_agent_input
+from harvestnet_agents.rules_negotiators import rules_negotiator
 from .engine import Engine, jsonable
 from . import changes
 from .protocol import Conflict, dt, terms_hash, named, number
@@ -57,6 +59,15 @@ RELEASED_MESSAGE = {
     'en': "Thanks for telling us. Your portion will go to another family.",
     'es': "Gracias por avisarnos. Su porción pasará a otra familia.",
 }
+# Why the dashboard has no suggestion for an offer that is no longer open.
+NO_SUGGESTION = {
+    'committed': "This offer is already committed; there is nothing left to decide.",
+    'unclaimed': "The deadline passed and the produce is unclaimed; no decision is open.",
+    'preserved_disagreement': "The organizations kept their disagreement; nothing is open for approval.",
+}
+# What the food bank's own negotiator did, as the dashboard's buttons name it.
+SUGGESTED = {MoveKind.ACCEPT: 'accept', MoveKind.REQUEST_HOLD: 'accept', MoveKind.COUNTER: 'counter',
+             MoveKind.REJECT: 'decline', MoveKind.ASK_HUMAN: 'ask_human'}
 SAVED_MESSAGE = {
     'en': "Your food banks are saved.",
     'es': "Sus bancos de alimentos están guardados.",
@@ -271,6 +282,21 @@ class API:
         if any(now>=departs for departs,_ in trips):
             return 'moving'
         return 'committed'
+
+    def suggestion(self, lot, bank_id):
+        """The suggested move and its reason for one offer, from this food bank's own rules-based
+        negotiator and its own facts only (ADR 0001). A fresh negotiator answers, so asking never
+        changes what the real negotiation remembers. ``(None, reason)`` when none applies."""
+        d=lot['draft']
+        if lot['status'] not in ('awaiting_approvals','negotiating'):
+            return None,NO_SUGGESTION.get(lot['status'],d['reason'])
+        try:
+            _,typed=parse_agent_input({'role':'food_bank','draft':d,'facts':self.engine.facts(bank_id,d),
+                                       'turn':{'organization_id':bank_id,'number':1,'now':self.engine.now,'accepted_by':[]}})
+            move=rules_negotiator('food_bank',bank_id,self.engine.calc).move(typed)
+        except (ValueError,KeyError) as exc:
+            return None,f"No suggestion yet: your negotiator could not review this version ({exc})"
+        return SUGGESTED.get(move.kind),move.reason
 
     def disagreement_view(self, lot):
         """A preserved disagreement as the involved dashboards show it (design section 8): why the
@@ -557,7 +583,8 @@ class API:
                             disagreements.append({"lot_id":d['lot_id'],"reason":view['reason'],"options":view['options'],"reasons":view['reasons']})
                         if not allocations: continue
                         transport=next((t for t in d['transports'] if t['food_bank_id']==bid),None)
-                        incoming.append({"lot_id":d['lot_id'],"version":d['version'],"donor_id":d['donor_id'],"donor_name":self.engine.names[d['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":None,"agent_reason":d['reason'],"needs_your_approval":lot['status']!='committed'})
+                        suggests,why=self.suggestion(lot,bid)
+                        incoming.append({"lot_id":d['lot_id'],"version":d['version'],"donor_id":d['donor_id'],"donor_name":self.engine.names[d['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":lot['status'] in ('awaiting_approvals','negotiating')})
                         if transport: arrivals.append({"lot_id":d['lot_id'],"version":d['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
                         if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":d['lot_id'],"reason":lot['stop_reason']})
                     return 200,{"food_bank_id":bid,"name":self.engine.names[bid],"capacity":{k:bank.get(k) for k in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bid),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bid)}

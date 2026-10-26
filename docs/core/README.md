@@ -147,7 +147,11 @@ state the donor's own `usable_until`: the profiles give no use-soon life, and
 none is invented (ADR 0002). A condition check relabels the item `condition_check`.
 
 Offers schedule each organization's real rules, acquire its own holds and stop
-awaiting actual human approvals. Accept/decline, counter queueing, version history,
+awaiting actual human approvals. The food bank dashboard's `agent_suggests` and `agent_reason` come from that food
+bank's own rules-based negotiator, run on its own facts only (accept, counter,
+decline or ask a human; `null` with the reason when the offer is no longer open).
+A decline, or a hold that expires, returns the lot to negotiation and the owners'
+next turns run; the declined terms are never sent for approval again. Accept/decline, counter queueing, version history,
 status updates, donor item views, dashboards and pickup confirmation use records.
 Household views show only committed pickups. A release is scoped to its pickup
 and request code, is safe to retry, and reassigns only within the reserved pickup
