@@ -49,7 +49,7 @@ Region: Central Coast California (Decided). Sponsors: Cisco AGNTCY, Beeceptor, E
 |---|---|---|---|
 | **Household** (low-income) | Gives household size, pickup times, fridge space, and anything it can't eat. Optionally says it receives SNAP/CalFresh. Chooses food banks. Hears or sees what's ready. Shows a code at pickup. | Mobile web page or the ElevenLabs voice line. Optional pickup emails through n8n and Amazon SES. No app, no account, no name. | Decided |
 | **Donor staff** (farm, packer, distributor, grocer, farmers market, food bank with produce overflow) | Report surplus produce. Say whether they can drop it off. Approve the plan. | The same web page, or the voice line | Proposed |
-| **Food bank manager** | Sets storage, pickup hours, and truck availability. Approves incoming produce. Sees disagreements. Marks pickups. | Food bank dashboard, plus n8n approval messages | Proposed |
+| **Food bank staff approver** | Sets storage, pickup hours, and truck availability. Approves incoming produce. Sees disagreements. Marks pickups. | Food bank dashboard, plus n8n approval messages | Proposed |
 
 There's no driver role and no coordinator role (ADR 0009). Households **collect from food banks only**, and no home addresses are collected. Decided.
 
@@ -124,8 +124,8 @@ Agents that **decide for their own organization**: donors and food banks. The **
 ### When a human must approve (Proposed)
 
 - **Donor staff:** before any produce is promised, and for any drop-off.
-- **Food bank manager:** for any delivery above the food bank's set limit, for anything graded "use soon," and for any truck run.
-- **Condition doubt** (bruising, soft spots, a broken cold chain for greens, any recall notice): the donor or food bank manager checks before the produce is offered.
+- **Food bank staff approver:** for any delivery above the food bank's set limit, for anything graded "use soon," and for any truck run.
+- **Condition doubt** (bruising, soft spots, a broken cold chain for greens, any recall notice): the donor or food bank staff approver checks before the produce is offered.
 
 ## 7. Architecture
 
@@ -312,7 +312,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    actor Staff as Farmers market manager
+    actor Staff as Market staff approver
     participant Donor as Donor agent
     participant Room as AGNTCY room
     participant Banks as Food bank agents
@@ -330,8 +330,8 @@ sequenceDiagram
     Donor->>Room: Version 3, drop-off to rural and eastside on one route, city collects romaine
     Banks->>Room: Accept or counter
     Note over Room: Repeat in turns until agreement or a stop rule
-    Donor->>N8: Market manager approves version 3 and the drop-off
-    Banks->>N8: Food bank managers approve deliveries and the city truck run
+    Donor->>N8: Market staff approver approves version 3 and the drop-off
+    Banks->>N8: Food bank staff approvers approve deliveries and the city truck run
     N8->>Room: All approvals for version 3
     Room->>Room: Record the commitment
 ```
@@ -348,7 +348,7 @@ sequenceDiagram
     participant Rec as Shared records
     participant N8 as n8n alerts
     participant Mover as Donor drop-off or food bank truck
-    participant Bank as Food bank agent and manager
+    participant Bank as Food bank agent and staff approver
     actor Household as Household
     Rec->>N8: Commitment recorded
     N8->>Mover: Run details, time, and storage needs
@@ -398,8 +398,8 @@ sequenceDiagram
     City->>Room: Version 4, romaine moves to eastside using the city truck
     Others->>Room: Eastside accepts 150 lb, counter for the rest
     Donor->>Room: No change needed, already delivered
-    Others->>N8: Eastside manager approves version 5
-    City->>N8: City manager approves the truck run
+    Others->>N8: Eastside staff approver approves version 5
+    City->>N8: City staff approver approves the truck run
     N8->>Room: All approvals for version 5
     Room->>Notify: Affected households get a new food bank, time, and code
     alt No food bank can take it in time
@@ -419,7 +419,7 @@ sequenceDiagram
 sequenceDiagram
     participant Donor as Donor agent
     participant Bank as Food bank agent
-    actor Human as Food bank manager or donor staff
+    actor Human as Food bank or donor staff approver
     participant Dash as Dashboards
     Donor->>Bank: Offer, romaine with 1 day left, cold chain unknown
     Bank->>Bank: Profile check fails or record is missing
@@ -585,9 +585,9 @@ All four run on the same inputs.
 ## 17. Demo, about 3 minutes (Proposed)
 
 1. A parent calls the voice line in Spanish: family of four, near Watsonville, can pick up after 6 pm, small fridge, receives CalFresh. They hear their fair share (12 lb a week) and choose the rural and city food banks.
-2. A farmers market manager reports end-of-day surplus: 300 lb of apples, 200 lb of romaine, 400 lb of potatoes.
+2. A market staff approver reports end-of-day surplus: 300 lb of apples, 200 lb of romaine, 400 lb of potatoes.
 3. Food bank agents bid item by item. The advocate argues for more apples to the rural food bank, whose households are furthest below fair share. The donor offers one drop-off route, and the city food bank collects the romaine in its refrigerated truck. The draft changes on screen, with reasons.
-4. Managers approve live through n8n.
+4. Staff approvers approve live through n8n.
 5. The city food bank's cooler fails (Beeceptor switch). Its agent finds eastside through the Directory, with reason cards. The romaine moves, everyone re-approves, and affected households with an email address get a pickup-change email.
 6. The parent gets an email: 8 lb of apples and potatoes at the rural food bank, 6 to 8 pm, with a code and a **Can't make it** link. Plus a tip about Market Match at a nearby farmers market.
 7. The results strip shows pounds wasted, fair-share coverage, and households reached, against first-come-first-served.
