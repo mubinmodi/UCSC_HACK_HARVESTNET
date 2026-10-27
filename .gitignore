@@ -24,3 +24,6 @@ demo-video/
 
 # Local demo handouts (one copy contains staff tokens)
 /demo-handout/
+
+# Local chat printout (contains personal emails)
+/Claude.pdf
