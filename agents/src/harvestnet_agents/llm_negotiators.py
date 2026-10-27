@@ -36,13 +36,17 @@ decides only for its own organization (ADR 0001) and never invents a number (ADR
    reason is built only from calculator results. The failures are counted on the
    decision, so evaluation can count them.
 
-**Spending.** ``SpendingCap`` is a hard cap per run, shared by every negotiator in the
-run. Its deployed value is one setting, ``CLAUDE_RUN_CAP_USD`` (``SpendingCap.from_env()``),
-which defaults to 0: with no setting, no live call is made. Before each API call it reserves a worst-case cost (a conservative input-token
-estimate plus ``max_tokens`` of output). If that doesn't fit under the cap, no call is
-made and the move falls back to the rules-based one. After the call it settles the
-actual cost from ``response.usage`` and logs it (``SpendingCap.entries``, and the
-``harvestnet_agents.llm_negotiators`` logger).
+**Spending.** ``SpendingCap`` enforces two caps. The **run cap** is in memory, shared by every
+negotiator in the run: ``CLAUDE_RUN_CAP_USD`` (``SpendingCap.from_env()``), default 0, so with no
+setting no live call is made. The **total cap**, ``CLAUDE_TOTAL_CAP_USD``, is checked against the
+persistent spend ledger (``spend_ledger.py``, ``CLAUDE_SPEND_LEDGER``), which survives restarts and
+is shared by every process and every caller; unset, it defaults to the run cap. Before each API call
+it reserves a worst-case cost (a conservative input-token estimate plus ``max_tokens`` of output)
+against both. If that doesn't fit under either, no call is made and the move falls back to the
+rules-based one. After the call it settles the actual cost from ``response.usage``, adds it to the
+ledger, and logs it (``SpendingCap.entries``, and the ``harvestnet_agents.llm_negotiators`` logger).
+A cap built directly, ``SpendingCap(limit_usd)``, has no ledger and enforces the run cap only; every
+live caller builds its cap with ``from_env``.
 
 **Tests never call the API.** The model client is injected; tests replay recorded
 responses from ``tests/fixtures/llm_negotiators/``. The live client needs the ``claude``
@@ -58,6 +62,7 @@ import logging
 import math
 import os
 import re
+import threading
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime
 from importlib import resources
@@ -82,6 +87,7 @@ from .negotiation import (
 )
 from .rules_negotiators import TurnError, rules_negotiator
 from .serialize import jsonable
+from .spend_ledger import LedgerError, SpendLedger
 
 __all__ = [
     "FALLBACK_BETA",
@@ -94,9 +100,11 @@ __all__ = [
     "SpendingCap",
     "SpendingCapReached",
     "RUN_CAP_ENV",
+    "TOTAL_CAP_ENV",
     "check_move",
     "load_llm_config",
     "run_cap_usd_from_env",
+    "total_cap_usd_from_env",
     "precompute",
     "render_input",
 ]
@@ -152,18 +160,32 @@ def load_llm_config(data: Mapping[str, Any] | None = None) -> LLMConfig:
 
 
 RUN_CAP_ENV = "CLAUDE_RUN_CAP_USD"
+TOTAL_CAP_ENV = "CLAUDE_TOTAL_CAP_USD"
+
+
+def _cap_from_env(name: str, raw: str) -> float:
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number of US dollars, not {raw!r}") from exc
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{name} must be a finite, nonnegative number of US dollars")
+    return value
 
 
 def run_cap_usd_from_env(env: Mapping[str, str] | None = None) -> float:
     """The run's spending cap in USD, from ``CLAUDE_RUN_CAP_USD``. Unset means 0 (no live calls)."""
-    raw = (os.environ if env is None else env).get(RUN_CAP_ENV, "") or "0"
-    try:
-        value = float(raw)
-    except ValueError as exc:
-        raise ValueError(f"{RUN_CAP_ENV} must be a number of US dollars, not {raw!r}") from exc
-    if not math.isfinite(value) or value < 0:
-        raise ValueError(f"{RUN_CAP_ENV} must be a finite, nonnegative number of US dollars")
-    return value
+    return _cap_from_env(RUN_CAP_ENV, (os.environ if env is None else env).get(RUN_CAP_ENV, "") or "0")
+
+
+def total_cap_usd_from_env(env: Mapping[str, str] | None = None, *, default: float | None = None) -> float:
+    """The total spending cap in USD, from ``CLAUDE_TOTAL_CAP_USD``. Unset (or blank) means ``default``,
+    which is the run cap when not given. An explicit 0 means no live calls."""
+    env = os.environ if env is None else env
+    raw = (env.get(TOTAL_CAP_ENV) or "").strip()
+    if not raw:
+        return run_cap_usd_from_env(env) if default is None else default
+    return _cap_from_env(TOTAL_CAP_ENV, raw)
 
 
 class SpendingCapReached(RuntimeError):
@@ -205,31 +227,89 @@ def usage_cost_usd(models: Sequence[str], usage: Any) -> float:
 
 @dataclass
 class SpendingCap:
-    """A hard spending cap for one run, shared by all negotiators in it."""
+    """A hard spending cap for one run, shared by all negotiators in it, and (with a ledger) a cap on
+    cumulative spend across runs and processes.
+
+    ``limit_usd`` is the run cap, in memory. ``total_limit_usd`` is checked against ``ledger``, the
+    persistent spend ledger, which also receives every call's actual cost. With no ledger only the run
+    cap applies. ``caller`` labels this cap's entries in the ledger.
+    """
 
     limit_usd: float
     entries: list[CostEntry] = field(default_factory=list)
     reserved_usd: float = 0.0
+    total_limit_usd: float | None = None
+    ledger: SpendLedger | None = None
+    caller: str = "llm"
+    _held: list[tuple[float, str | None]] = field(default_factory=list, init=False, repr=False, compare=False)
+    _lock: Any = field(default_factory=threading.RLock, init=False, repr=False, compare=False)
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> "SpendingCap":
-        """The deployed cap: ``CLAUDE_RUN_CAP_USD``, default 0."""
-        return cls(run_cap_usd_from_env(env))
+    def from_env(
+        cls, env: Mapping[str, str] | None = None, *, run_cap_usd: float | None = None, caller: str = "llm"
+    ) -> "SpendingCap":
+        """The deployed cap. The run cap is ``CLAUDE_RUN_CAP_USD`` (default 0) unless ``run_cap_usd`` is given
+        (the evaluation's ``--llm-cap-usd``); the total cap is ``CLAUDE_TOTAL_CAP_USD`` (default: the run cap),
+        checked against the ledger at ``CLAUDE_SPEND_LEDGER``."""
+        run = run_cap_usd_from_env(env) if run_cap_usd is None else float(run_cap_usd)
+        return cls(
+            run,
+            total_limit_usd=total_cap_usd_from_env(env, default=run),
+            ledger=SpendLedger.from_env(env),
+            caller=caller,
+        )
 
     @property
     def spent_usd(self) -> float:
         return sum(e.cost_usd for e in self.entries)
 
     def reserve(self, worst_case_usd: float) -> None:
-        if self.spent_usd + self.reserved_usd + worst_case_usd > self.limit_usd:
-            raise SpendingCapReached(
-                f"a call could cost up to ${worst_case_usd:.4f}; spent ${self.spent_usd:.4f} of the ${self.limit_usd:.2f} cap"
-            )
-        self.reserved_usd += worst_case_usd
+        """Hold a call's worst case against the run cap and, with a ledger, the total cap. Raises
+        ``SpendingCapReached`` (no call may be made) if it doesn't fit either, or if the ledger can't be used."""
+        with self._lock:
+            if self.spent_usd + self.reserved_usd + worst_case_usd > self.limit_usd:
+                raise SpendingCapReached(
+                    f"a call could cost up to ${worst_case_usd:.4f}; spent ${self.spent_usd:.4f} of the ${self.limit_usd:.2f} run cap"
+                )
+            reservation = None
+            if self.ledger is not None:
+                try:
+                    reservation = self.ledger.reserve(self.caller, worst_case_usd, self.total_limit_usd or 0.0)
+                except LedgerError as exc:  # over the total cap, or the ledger is unusable: fail closed
+                    raise SpendingCapReached(str(exc)) from exc
+            self.reserved_usd += worst_case_usd
+            self._held.append((worst_case_usd, reservation))
+
+    def _take(self, worst_case_usd: float) -> str | None:
+        for i, (held, reservation) in enumerate(self._held):
+            if held == worst_case_usd:
+                del self._held[i]
+                return reservation
+        return None
+
+    def release(self, worst_case_usd: float) -> None:
+        """Give back a reservation whose call was never made."""
+        with self._lock:
+            self.reserved_usd = max(0.0, self.reserved_usd - worst_case_usd)
+            reservation = self._take(worst_case_usd)
+        if self.ledger is not None:
+            try:
+                self.ledger.release(reservation)
+            except LedgerError as exc:
+                log.error("couldn't release a spend ledger reservation: %s", exc)
 
     def settle(self, worst_case_usd: float, entry: CostEntry) -> None:
-        self.reserved_usd = max(0.0, self.reserved_usd - worst_case_usd)
-        self.entries.append(entry)
+        with self._lock:
+            self.reserved_usd = max(0.0, self.reserved_usd - worst_case_usd)
+            self.entries.append(entry)
+            reservation = self._take(worst_case_usd)
+        if self.ledger is not None:
+            try:
+                self.ledger.settle(reservation, self.caller, entry.model, entry.cost_usd)
+            except LedgerError as exc:
+                # The call is already paid for. The reservation stays in the ledger at its worst case,
+                # and the next reserve() fails closed if the ledger is still unusable.
+                log.error("couldn't record a settled call in the spend ledger: %s", exc)
         log.info(
             "claude call %s %s: %d in, %d out, %d cache write, %d cache read, $%.4f (run total $%.4f of $%.2f)",
             entry.organization_id, entry.model, entry.input_tokens, entry.output_tokens,
@@ -806,7 +886,7 @@ class LLMNegotiator:
                 try:
                     client = _default_client()
                 except Exception:
-                    self.cap.reserved_usd = max(0.0, self.cap.reserved_usd - worst)
+                    self.cap.release(worst)
                     raise
             response = client.beta.messages.create(**request)
             state.calls += 1

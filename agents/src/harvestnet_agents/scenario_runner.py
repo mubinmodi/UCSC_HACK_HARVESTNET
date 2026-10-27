@@ -434,11 +434,11 @@ def llm_negotiators_for(roles: Iterable[Role | str], **llm_kwargs: Any) -> Negot
 
     ``llm_kwargs`` go to ``LLMNegotiator`` (``cap``, ``client``, ``config``). Without a
     ``cap``, every negotiator from this factory shares ``SpendingCap.from_env()``
-    (``CLAUDE_RUN_CAP_USD``, default 0).
+    (``CLAUDE_RUN_CAP_USD``, default 0, and the total cap in the spend ledger).
     """
     llm_roles = {Role(r) for r in roles}
     if llm_kwargs.get("cap") is None:
-        llm_kwargs["cap"] = SpendingCap.from_env()
+        llm_kwargs["cap"] = SpendingCap.from_env(caller="negotiator")
 
     def factory(role: Role, organization_id: str, calculators: Calculators) -> Negotiator:
         if role in llm_roles:

@@ -8,14 +8,16 @@ from .protocol import number
 
 class LLMProvider:
     label='LLM negotiators with real core calculators; fallback sources recorded'
-    def __init__(self,client,*,limit_usd=0,allow_paid=False,config=None):
+    def __init__(self,client,*,limit_usd=0,allow_paid=False,config=None,cap=None):
         limit_usd=number(limit_usd)
         if limit_usd>100:
             raise ValueError('cap must be between zero and 100 USD')
         if limit_usd>0 and not allow_paid:
             raise ValueError('paid calls require explicit authorization')
         self.client=client
-        self.cap=SpendingCap(limit_usd)
+        # limit_usd is the per-run cap; the total cap (CLAUDE_TOTAL_CAP_USD, default the run cap) is checked
+        # against the persistent spend ledger, so repeated evaluation commands share one total.
+        self.cap=cap if cap is not None else SpendingCap.from_env(run_cap_usd=limit_usd,caller='evaluation')
         self.config=config
         self.decisions=[]
         self.metadata=None

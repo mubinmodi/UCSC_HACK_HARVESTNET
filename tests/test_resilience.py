@@ -12,7 +12,6 @@ from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
 from harvestnet_platform.approvals import ApprovalStore, CoreAPI, handler_for, pickup_email
-from harvestnet_platform.budget import Budget, BudgetExceeded
 from harvestnet_platform.directory import search_capability
 from harvestnet_platform.http import request_json
 from harvestnet_platform.join import MoveBridge
@@ -145,22 +144,6 @@ class ResilienceTests(unittest.TestCase):
             bridge('market', data)
         self.assertEqual(bridge.sequence, 0)
         self.assertIsNotNone(bridge.pending)
-
-    def test_budget_shared_connections_enforce_global_cap_concurrently(self):
-        with TemporaryDirectory() as tmp:
-            path = str(Path(tmp) / 'budget.sqlite')
-            budgets = [Budget(path, run_cap_usd=1, total_cap_usd=1) for _ in range(12)]
-            def reserve(index):
-                try:
-                    budgets[index].reserve('same-run', str(index), .2)
-                    return True
-                except BudgetExceeded:
-                    return False
-            with ThreadPoolExecutor(max_workers=12) as pool:
-                self.assertEqual(sum(pool.map(reserve, range(12))), 5)
-            self.assertEqual(budgets[0].db.execute('SELECT SUM(cents) FROM charges').fetchone()[0], 100)
-            for budget in budgets:
-                budget.db.close()
 
     def test_approval_restart_preserves_receipt_and_independent_votes(self):
         with TemporaryDirectory() as tmp:

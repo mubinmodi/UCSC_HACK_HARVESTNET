@@ -7,11 +7,15 @@ an input token, plus the full ``max_tokens`` output, at the highest listed price
 server-side fallback may answer with another model). Actual spend is at most this. When the
 next call's worst case doesn't fit under the cap, no call is made and the API answers 503,
 pointing the caller to the text form.
+
+The cap is ``SpendingCap.from_env``: the run cap is the ``limit_usd`` given here (deployed:
+``CLAUDE_RUN_CAP_USD``), and the total cap, ``CLAUDE_TOTAL_CAP_USD``, is checked against the persistent
+spend ledger (``CLAUDE_SPEND_LEDGER``), so a core restart does not reset what has been spent.
 """
 import json
 import os
 from harvestnet_agents.front_desk import EXTRACTION_PROMPT, EXTRACTION_SCHEMA
-from harvestnet_agents.llm_negotiators import SpendingCapReached, PRICES_USD_PER_MTOK, CostEntry, SpendingCap
+from harvestnet_agents.llm_negotiators import SpendingCapReached, PRICES_USD_PER_MTOK, CostEntry, SpendingCap, total_cap_usd_from_env
 from .protocol import number
 
 # Message framing and tool overhead, counted generously, in tokens.
@@ -21,14 +25,15 @@ OVERHEAD_TOKENS = 2000
 class CappedExtractor:
     cost_basis = 'worst case reserved per call; actual usage is not reported by the extractor'
 
-    def __init__(self, extractor, *, limit_usd, allow_paid=False):
+    def __init__(self, extractor, *, limit_usd, allow_paid=False, cap=None):
         limit_usd = number(limit_usd)
         if limit_usd > 100:
             raise ValueError('cap must be between zero and 100 USD')
         if limit_usd > 0 and not allow_paid:
             raise ValueError('paid calls require explicit authorization')
         self.extractor = extractor
-        self.cap = SpendingCap(limit_usd)
+        # Tests pass their own cap; deployed, the cap carries the total cap and the ledger from the environment.
+        self.cap = cap if cap is not None else SpendingCap.from_env(run_cap_usd=limit_usd, caller='voice_line')
         # An extractor with its own spending cap (Lane B's ClaudeExtractor) shares this one
         # and charges actual usage itself, so this wrapper doesn't charge twice.
         self.shares_cap = hasattr(extractor, 'cap')
@@ -60,22 +65,24 @@ class CappedExtractor:
 def extractor_from_env(environ=None, client=None):
     """The deployed voice extractor, or ``None`` (the API then answers 503 "use the text form").
 
-    On only when ``ANTHROPIC_API_KEY`` is set and ``CLAUDE_RUN_CAP_USD`` is above zero. The
-    cap is the one explicit authorization for paid calls: Lane B's ``ClaudeExtractor`` is
-    wrapped in ``CappedExtractor`` with that cap, and the API's own rate limit applies on
-    top. The cap is per process (it restarts at zero spent when the core restarts), so it
-    stays at or below the run cap the lead set. ``client`` is for tests; deployed, the
-    Anthropic SDK reads the key from the environment. The key is never printed.
+    On only when ``ANTHROPIC_API_KEY`` is set and both ``CLAUDE_RUN_CAP_USD`` and the total cap
+    (``CLAUDE_TOTAL_CAP_USD``, default: the run cap) are above zero. The caps are the explicit
+    authorization for paid calls: Lane B's ``ClaudeExtractor`` is wrapped in ``CappedExtractor``,
+    which holds each call to the run cap (per process) and to the total cap in the persistent
+    spend ledger (shared across restarts and callers), and the API's own rate limit applies on
+    top. ``client`` is for tests; deployed, the Anthropic SDK reads the key from the
+    environment. The key is never printed.
     """
     environ = os.environ if environ is None else environ
     if not (environ.get('ANTHROPIC_API_KEY') or '').strip():
         return None
     try:
         cap = number(float(environ.get('CLAUDE_RUN_CAP_USD') or 0))
+        total = total_cap_usd_from_env(environ, default=cap)
     except (TypeError, ValueError):
-        print('voice intake: CLAUDE_RUN_CAP_USD is not a number; voice extraction stays off', flush=True)
+        print('voice intake: CLAUDE_RUN_CAP_USD or CLAUDE_TOTAL_CAP_USD is not a number; voice extraction stays off', flush=True)
         return None
-    if cap <= 0:
+    if cap <= 0 or total <= 0:
         return None
     if client is None:
         try:
@@ -85,9 +92,10 @@ def extractor_from_env(environ=None, client=None):
             return None
     from harvestnet_agents.front_desk import ClaudeExtractor
     try:
-        capped = CappedExtractor(ClaudeExtractor(client=client), limit_usd=cap, allow_paid=True)
+        spend_cap = SpendingCap.from_env(environ, run_cap_usd=cap, caller='voice_line')
+        capped = CappedExtractor(ClaudeExtractor(client=client, cap=spend_cap), limit_usd=cap, allow_paid=True, cap=spend_cap)
     except ValueError as exc:
         print(f'voice intake: {exc}; voice extraction stays off', flush=True)
         return None
-    print(f'voice intake: Claude extractor on, spending cap ${cap:g} per process', flush=True)
+    print(f'voice intake: Claude extractor on, spending caps: run ${cap:g} per process, total ${total:g} in the spend ledger', flush=True)
     return capped

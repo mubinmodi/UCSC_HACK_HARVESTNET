@@ -3,7 +3,7 @@ import unittest
 from harvestnet_core.api import API
 from harvestnet_core.engine import Engine,run_fixture
 from harvestnet_core.records import Records
-from stand_ins import StandInAgents
+from stand_ins import StandInAgents,isolate_spend_ledger
 from harvestnet_agents.llm_negotiators import CostEntry,SpendingCap
 
 from test_core import fixture
@@ -40,6 +40,9 @@ class ScriptedProvider:
 
 
 class LiveEvaluationTests(unittest.TestCase):
+    def setUp(self):
+        self.ledger=isolate_spend_ledger(self)
+
     def test_invalid_or_unauthorized_spending_caps_are_rejected(self):
         from harvestnet_core.live_evaluation import LLMProvider
         for cap in (float('nan'),float('inf'),True,-1,101):
@@ -128,3 +131,47 @@ class LiveEvaluationTests(unittest.TestCase):
         status,response=api.call('GET','/results?scenario_id='+f['scenario_id'])
         self.assertEqual(status,200)
         self.assertEqual(response['methods'],result['methods'])
+
+
+class TotalCapTests(unittest.TestCase):
+    """CLAUDE_TOTAL_CAP_USD, checked against the persistent spend ledger, applies to paid evaluation."""
+
+    def test_the_total_cap_stops_a_paid_run_whose_run_cap_would_allow_it(self):
+        from harvestnet_agents.spend_ledger import SpendLedger
+        from harvestnet_core.live_evaluation import LLMProvider
+        ledger=isolate_spend_ledger(self,total_cap_usd=50)
+        SpendLedger(ledger).add(49.999,note='earlier runs')
+        provider=LLMProvider(forbidden_client(),limit_usd=5,allow_paid=True)  # --llm-cap-usd 5 stays the run cap
+        self.assertEqual((provider.cap.limit_usd,provider.cap.total_limit_usd),(5,50))
+        llm=evaluate(fixture(),llm_provider=provider)['methods'][-1]
+        self.assertEqual(llm['status'],'fallback_only')  # every reservation was refused; the client was never called
+        self.assertEqual(SpendLedger(ledger).total_usd(),49.999)
+
+    def test_an_unset_total_cap_is_the_run_cap(self):
+        from harvestnet_core.live_evaluation import LLMProvider
+        isolate_spend_ledger(self)
+        provider=LLMProvider(forbidden_client(),limit_usd=2,allow_paid=True)
+        self.assertEqual((provider.cap.limit_usd,provider.cap.total_limit_usd),(2,2))
+
+    def test_a_zero_total_cap_means_no_paid_calls_even_with_a_run_cap(self):
+        from harvestnet_core.live_evaluation import LLMProvider
+        isolate_spend_ledger(self,total_cap_usd=0)
+        provider=LLMProvider(forbidden_client(),limit_usd=5,allow_paid=True)
+        llm=evaluate(fixture(),llm_provider=provider)['methods'][-1]
+        self.assertEqual(llm['status'],'fallback_only')
+        self.assertEqual(provider.cap.spent_usd,0)
+
+    def test_the_evaluate_command_honors_the_ledger(self):
+        import contextlib,io,json,tempfile
+        from pathlib import Path
+        from harvestnet_agents.spend_ledger import SpendLedger
+        from harvestnet_core.__main__ import main
+        ledger=isolate_spend_ledger(self,total_cap_usd=3)
+        SpendLedger(ledger).add(3.0,note='earlier runs')
+        scenario=sorted(Path('core_fixtures').glob('*.json'))[0]
+        with tempfile.TemporaryDirectory() as tmp,contextlib.redirect_stdout(io.StringIO()):
+            (result,)=main(['evaluate',str(scenario),'--database',str(Path(tmp)/'core.sqlite'),'--output',tmp,
+                            '--llm-cap-usd','2','--allow-paid'])
+        self.assertEqual(result['methods'][-1]['status'],'fallback_only')
+        self.assertEqual(result['llm_cost_usd'],0)
+        self.assertEqual(SpendLedger(ledger).total_usd(),3.0)

@@ -6,7 +6,7 @@ A Cisco "When AI Agents Disagree" (Level 3) hackathon entry: each donor and food
 
 The lead (mubinmodi) has authorized implementation, reviewing and merging teammates' PRs, completing their tickets, and deploying to AWS (October 11, 2026). Work in this checkout on `main`: pull first, test, commit, push.
 
-- **Money:** stay inside the caps. AWS: only resources tagged `project=harvestnet`; the account also runs the lead's unrelated `clinical-trials-viz` stack, which stays untouched. Claude: `CLAUDE_RUN_CAP_USD` per run and `CLAUDE_TOTAL_CAP_USD` overall (`deploy/aws/.env`). Ask the lead before raising a cap or creating new paid resources.
+- **Money:** stay inside the caps. AWS: only resources tagged `project=harvestnet`; the account also runs the lead's unrelated `clinical-trials-viz` stack, which stays untouched. Claude: `CLAUDE_RUN_CAP_USD` per run and `CLAUDE_TOTAL_CAP_USD` overall (`deploy/aws/.env`), the total enforced through the spend ledger (`python -m harvestnet_agents.spend_ledger show`). Ask the lead before raising a cap or creating new paid resources.
 - **Secrets:** they live in `deploy/aws/.env` (gitignored) and the Secrets Manager secret `harvestnet/platform`. Read them inside scripts; keep their values out of chat, logs and commits.
 - **Results:** every number is synthetic unless a source says otherwise. Keep candidate, simulated and externally verified results distinct; agent agreement alone is not the lead's approval.
 

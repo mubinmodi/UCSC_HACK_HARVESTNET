@@ -2,6 +2,10 @@
 
 Test support only: the harness tests use them to show that a different move provider plugs in.
 The product runs the real rules-based negotiators."""
+import os
+import tempfile
+from unittest import mock
+
 from harvestnet_agents.negotiation import parse_agent_input
 from harvestnet_agents.profiles import STORAGE_COLD, STORAGE_DRY
 from harvestnet_core.calculators import Calculators
@@ -53,3 +57,18 @@ class StandInAgents:
             if pounds>0 and (not cold or facts.truck.refrigerated) and self.calc.pickup_feasibility(arrival,facts.pickup_windows,item.usable_until).feasible:
                 return {**base,'action':'counter','amendment':{'kind':'set_pounds','food_bank_id':org,'produce_id':item.produce_id,'pounds':pounds}}
         return {**base,'action':'pass'}
+
+
+def isolate_spend_ledger(case, total_cap_usd=None):
+    """For one test case: point CLAUDE_SPEND_LEDGER at a fresh temp file and set (or clear) CLAUDE_TOTAL_CAP_USD,
+    so no test touches the real ledger at runtime/claude-spend.json. Returns the ledger path."""
+    tmp = tempfile.TemporaryDirectory()
+    case.addCleanup(tmp.cleanup)
+    path = os.path.join(tmp.name, 'claude-spend.json')
+    patch = mock.patch.dict(os.environ, {'CLAUDE_SPEND_LEDGER': path})
+    patch.start()
+    case.addCleanup(patch.stop)
+    os.environ.pop('CLAUDE_TOTAL_CAP_USD', None)
+    if total_cap_usd is not None:
+        os.environ['CLAUDE_TOTAL_CAP_USD'] = str(total_cap_usd)
+    return path

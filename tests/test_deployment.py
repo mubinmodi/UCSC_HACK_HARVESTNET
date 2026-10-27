@@ -1,9 +1,6 @@
 import importlib.util
-import threading
 import unittest
-from tempfile import TemporaryDirectory
 from pathlib import Path
-from harvestnet_platform.budget import Budget,BudgetExceeded
 from harvestnet_platform.voice import text_intake
 
 spec = importlib.util.spec_from_file_location('load_secrets',Path(__file__).parents[1]/'deploy'/'load_secrets.py')
@@ -12,48 +9,6 @@ spec.loader.exec_module(secrets_loader)
 
 
 class DeploymentTests(unittest.TestCase):
-    def test_spending_cap_blocks_live_calls_and_survives_restart(self):
-        with TemporaryDirectory() as tmp:
-            path = str(Path(tmp)/'budget.sqlite')
-            budget = Budget(path,run_cap_usd=1,total_cap_usd=2)
-            calls = []
-            result = budget.call('run-1','call-1',.8,lambda:(calls.append(1) or 'response',.5))
-            self.assertEqual(result,'response')
-            with self.assertRaises(BudgetExceeded):
-                budget.call('run-1','call-2',.6,lambda:(calls.append(2),.1))
-            self.assertEqual(calls,[1])
-            other = Budget(path,run_cap_usd=1,total_cap_usd=2)
-            with self.assertRaises(BudgetExceeded):
-                other.reserve('run-1','call-1',.1)
-            other.reserve('run-2','call-1',1)
-            with self.assertRaises(BudgetExceeded):
-                other.reserve('run-3','call-1',.6)
-            budget.db.close()
-            other.db.close()
-
-    def test_zero_budget_and_uncertain_failure_are_fail_closed(self):
-        with self.assertRaises(BudgetExceeded):
-            Budget().reserve('run','call',.01)
-        budget = Budget(run_cap_usd=1,total_cap_usd=1)
-        def fail():
-            raise OSError('uncertain network response')
-        with self.assertRaises(OSError):
-            budget.call('run','call',1,fail)
-        with self.assertRaises(BudgetExceeded):
-            budget.reserve('run','retry',.01)
-        for invalid in ('NaN','Infinity',-1):
-            with self.assertRaises(ValueError):
-                Budget(run_cap_usd=invalid)
-
-    def test_underestimated_cost_is_recorded_and_blocks_all_future_calls(self):
-        budget = Budget(run_cap_usd=10,total_cap_usd=10)
-        budget.reserve('run','call',.1)
-        with self.assertRaises(BudgetExceeded):
-            budget.settle('run','call',.2)
-        self.assertEqual(budget.db.execute('SELECT cents FROM charges').fetchone()[0],20)
-        with self.assertRaises(BudgetExceeded):
-            budget.reserve('another-run','another-call',.01)
-
     def test_secrets_export_does_not_allow_environment_injection(self):
         content = secrets_loader.env_file({'TRANSPORT_TOKEN':'test$with#characters'})
         self.assertEqual(content,"TRANSPORT_TOKEN='test$with#characters'\n")
@@ -88,3 +43,14 @@ class DeploymentTests(unittest.TestCase):
         self.assertNotIn('f06b148', workflow)
         self.assertNotIn('repository:', workflow)
         self.assertIn('PYTHONPATH: agents/src', workflow)
+
+    def test_the_aws_core_keeps_the_claude_spend_ledger_on_the_volume_reset_data_keeps(self):
+        root = Path(__file__).parents[1]
+        compose = (root / 'deploy' / 'aws' / 'compose.aws.yaml').read_text()
+        core = compose[compose.index('\n  core:'):compose.index('\n  gateway:')]
+        self.assertIn('CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json', core)
+        self.assertIn('budget-data:/app/budget', core)
+        # An unset total cap stays unset (the code then uses the run cap) instead of becoming 0.
+        self.assertIn('CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}', core)
+        reset = (root / 'deploy' / 'aws' / 'reset_data.sh').read_text()
+        self.assertNotIn('budget-data', reset[reset.index('volumes="'):reset.index('compose=')])

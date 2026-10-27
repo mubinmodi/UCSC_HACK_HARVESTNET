@@ -16,8 +16,8 @@ services:
       SYSTEMS_URL: http://systems:8010
       DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [donor-data:/app/runtime, budget-data:/app/budget]
   city:
@@ -29,8 +29,8 @@ services:
       SYSTEMS_URL: http://systems:8010
       DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [city-data:/app/runtime, budget-data:/app/budget]
   rural:
@@ -42,8 +42,8 @@ services:
       SYSTEMS_URL: http://systems:8010
       DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [rural-data:/app/runtime, budget-data:/app/budget]
   eastside:
@@ -55,8 +55,8 @@ services:
       SYSTEMS_URL: http://systems:8010
       DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [eastside-data:/app/runtime, budget-data:/app/budget]
   advocate:
@@ -68,8 +68,8 @@ services:
       SYSTEMS_URL: http://systems:8010
       DIRECTORY_REFRESH_SECONDS: ${DIRECTORY_REFRESH_SECONDS:-30}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [advocate-data:/app/runtime, budget-data:/app/budget]
 networks:

@@ -515,6 +515,8 @@ class VoiceIntakeLimitTests(unittest.TestCase):
     """#22: voice intake has a per-process rate limit and a capped Claude extractor."""
 
     def setUp(self):
+        from stand_ins import isolate_spend_ledger
+        isolate_spend_ledger(self)
         self.data = json.loads(Path('agents/tests/fixtures/front_desk/en_complete.json').read_text())
         self.engine = Engine(fixture())
         self.body = {'transcript': self.data['transcript'], 'call_id': 'recorded'}

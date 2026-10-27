@@ -4,7 +4,9 @@
 (``--database``, default ``DATABASE_URL`` or ``runtime/core.sqlite``), so ``GET /results``
 returns them unchanged. Without ``--llm-cap-usd`` the LLM method is ``not_run``. A zero cap
 runs the LLM method with no model calls and labels it ``fallback_only``. A nonzero cap needs
-``--allow-paid`` and is shared by every scenario and repetition in this command.
+``--allow-paid`` and is shared by every scenario and repetition in this command. It is the per-run
+cap; ``CLAUDE_TOTAL_CAP_USD`` (default: the same cap) also applies, against the persistent spend ledger
+(``CLAUDE_SPEND_LEDGER``) that every paid caller shares.
 """
 import argparse
 import json
@@ -20,7 +22,7 @@ def main(argv=None):
     parser.add_argument('--database', default=os.environ.get('DATABASE_URL', 'runtime/core.sqlite'),
                         help='records that GET /results reads (SQLite path or PostgreSQL DSN)')
     parser.add_argument('--repeats', type=int, default=1, help='repetitions of the LLM method')
-    parser.add_argument('--llm-cap-usd', type=float, default=None, help='shared spending cap for the LLM method (0 to 100)')
+    parser.add_argument('--llm-cap-usd', type=float, default=None, help='per-run spending cap for the LLM method (0 to 100); CLAUDE_TOTAL_CAP_USD also applies, via the spend ledger')
     parser.add_argument('--allow-paid', action='store_true', help='authorize a nonzero LLM spending cap')
     args = parser.parse_args(argv)
     if args.command == 'replay':

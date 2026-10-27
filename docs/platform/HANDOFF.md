@@ -38,4 +38,4 @@ Tickets and their checklists are the live list: GitHub issues on `mubinmodi/UCSC
 - **A live lot over A2A.** The deployed core negotiates in process; the A2A hosts are exercised by the join comparison and the Directory ([`JOIN.md`](JOIN.md)). Routing live turns through the hosts is not done.
 - **Voice line.** The ElevenLabs agent and a live call (issues #4 and #22). Voice intake answers 503 until `ANTHROPIC_API_KEY` and a run cap are set.
 - **Paid evaluation runs.** More repeats within the agreed budget (issue #24); see `docs/core/README.md`, Evaluation.
-- **Total Claude cap.** `CLAUDE_TOTAL_CAP_USD` is not enforced in code ([`DEPLOYMENT.md`](DEPLOYMENT.md)).
+- **Seed the Claude spend ledger after a fresh `setup.sh`.** The total cap is enforced against the ledger, which `teardown.sh` deletes ([`DEPLOYMENT.md`](DEPLOYMENT.md)).

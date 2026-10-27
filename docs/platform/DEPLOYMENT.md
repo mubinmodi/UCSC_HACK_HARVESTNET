@@ -29,11 +29,16 @@ Each one is labeled on screen. Pick one before a run and do not switch inside a 
 
 ## Claude spending cap
 
-`CLAUDE_RUN_CAP_USD` (default 0, meaning no live calls; above $100 is refused) is the one setting that authorizes paid calls. Lane B reads it with `SpendingCap.from_env()` for the LLM negotiators (one shared cap per run) and the voice line's front-desk extractor. The core's voice intake also reads it, and needs `ANTHROPIC_API_KEY` (`harvestnet_core/voice.py`).
+Two settings authorize paid calls, and both are enforced in code by `SpendingCap` (`agents/src/harvestnet_agents/llm_negotiators.py`):
 
-Before each call the cap reserves a deliberately high worst case and settles the actual cost. If the reservation does not fit, no call is made and the caller falls back to rules or the text form. The cap is **per process**: a restart starts it from zero again. `python -m harvestnet_core evaluate --llm-cap-usd N --allow-paid` has its own cap, shared across that command.
+- `CLAUDE_RUN_CAP_USD` (default 0, meaning no live calls; above $100 is refused) is the **run cap**, in memory per process.
+- `CLAUDE_TOTAL_CAP_USD` is the **total cap** on cumulative actual spend across runs, restarts and callers. Unset, it defaults to the run cap; 0 means no paid calls.
 
-`CLAUDE_TOTAL_CAP_USD` is read only by `harvestnet_platform.budget.Budget`, a durable SQLite ledger with a run cap and a total cap. No live path uses it yet, so the total cap is a team agreement, not enforced code. To enforce it, reserve through `Budget` as well. Conservative bounds are a prerequisite, and neither mechanism is a provider billing cap.
+The total is kept in the **spend ledger**, a JSON file at `CLAUDE_SPEND_LEDGER` (`harvestnet_agents/spend_ledger.py`; default `runtime/claude-spend.json`, `/app/budget/claude-spend.json` on AWS, on the `budget-data` volume). Entries hold only a time, a caller label, a model and a cost, never prompts or personal data. Writes take a file lock and replace the file atomically, so concurrent processes lose no entries.
+
+Every live caller goes through `SpendingCap.from_env()`: the LLM negotiators, the voice line's front-desk extractor (the core's voice intake also needs `ANTHROPIC_API_KEY`, `harvestnet_core/voice.py`), and `python -m harvestnet_core evaluate --llm-cap-usd N --allow-paid` (where `N` stays the per-run cap). Before each call the cap reserves a deliberately high worst case against **both** caps and, after the call, records the actual cost in the ledger. If the reservation does not fit either cap, or the ledger cannot be read or written, no call is made and the caller falls back to rules or the text form.
+
+Spending that happened before the ledger existed is recorded by hand: `python -m harvestnet_agents.spend_ledger add 9.92 --note "Oct 11 runs, upper bound"` (`show` prints the entries and total). The ledger survives `deploy/aws/reset_data.sh` but not `teardown.sh`, which deletes the instance's disk; re-seed it after a fresh `setup.sh`. The costs are estimates from token usage and a price table, and neither cap is a provider billing cap.
 
 ## Secrets and configuration
 

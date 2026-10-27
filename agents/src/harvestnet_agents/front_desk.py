@@ -827,13 +827,13 @@ class ClaudeExtractor:
     model: str = "claude-sonnet-5-5"
     max_tokens: int = 1024
     effort: str = "low"
-    cap: Any = None  # a SpendingCap; default SpendingCap.from_env() (CLAUDE_RUN_CAP_USD, default 0)
+    cap: Any = None  # a SpendingCap; default SpendingCap.from_env() (CLAUDE_RUN_CAP_USD, CLAUDE_TOTAL_CAP_USD and the spend ledger)
 
     def __post_init__(self) -> None:
         from .llm_negotiators import SpendingCap
 
         if self.cap is None:
-            self.cap = SpendingCap.from_env()
+            self.cap = SpendingCap.from_env(caller="front_desk")
 
     def __call__(self, transcript: Transcript) -> Mapping[str, Any]:
         from .llm_negotiators import CostEntry, SpendingCapReached, usage_cost_usd, worst_case_cost_usd
@@ -857,7 +857,7 @@ class ClaudeExtractor:
             client = self.client if self.client is not None else _default_client()
             response = client.beta.messages.create(**request)
         except Exception:
-            self.cap.reserved_usd = max(0.0, self.cap.reserved_usd - worst)
+            self.cap.release(worst)
             raise
         usage = getattr(response, "usage", None)
         served = getattr(response, "model", None) or self.model

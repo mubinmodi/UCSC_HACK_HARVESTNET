@@ -8,7 +8,7 @@
 #
 # Deletes: core records (lots, households, pickups, email outbox, results), review links,
 # cooler switch state, and each organization host's runtime data.
-# Keeps: the Claude spending ledger (budget-data), the Directory, HTTPS certificates,
+# Keeps: the Claude spending ledger (budget-data volume, /app/budget/claude-spend.json), the Directory, HTTPS certificates,
 # the secret, and every AWS resource. No AWS resource is created or deleted.
 set -euo pipefail
 # shellcheck source=deploy/aws/lib.sh
@@ -47,7 +47,7 @@ $compose ps --format 'table {{.Service}}\t{{.State}}\t{{.Status}}'"
 
 step "Reset live demo data on $instance"
 info "deletes volumes:$rm_volumes"
-info "keeps: budget-data (Claude spending ledger), directory, caddy certificates, all AWS resources"
+info "keeps: budget-data (Claude spending ledger, claude-spend.json), directory, caddy certificates, all AWS resources"
 if [ "$DRY_RUN" = 1 ]; then
   printf '%s\n' "$script" | sed 's/^/        /'
   exit 0

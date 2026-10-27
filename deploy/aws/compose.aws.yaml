@@ -21,7 +21,7 @@ x-app-image: &app-image
 x-agent-env: &agent-env
   AGENT_POLICY: harvestnet_core.join_adapter:policy
   CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-  CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
+  CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
 
 # The three food bank hosts also run their own cooler watcher (harvestnet_core.cooler_watch,
 # #23): it polls that food bank's own cooler reading from the systems service and, when it
@@ -98,8 +98,8 @@ services:
       HARVESTNET_ALLOWED_ORIGIN: ${HARVESTNET_ALLOWED_ORIGIN:?set HARVESTNET_ALLOWED_ORIGIN}
       HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       HARVESTNET_HOUSEHOLD_URL: ${HARVESTNET_HOUSEHOLD_URL:-}
       N8N_PICKUP_WEBHOOK_URL: ${N8N_PICKUP_WEBHOOK_URL:-}

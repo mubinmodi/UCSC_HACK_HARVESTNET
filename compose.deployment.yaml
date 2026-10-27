@@ -53,8 +53,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       API_EVENTS_TOKEN: ${API_EVENTS_TOKEN}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
-      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-0}
-      CLAUDE_BUDGET_DB: /app/budget/claude.sqlite
+      CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
+      CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes: [budget-data:/app/budget]
     depends_on:
