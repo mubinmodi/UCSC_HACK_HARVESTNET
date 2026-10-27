@@ -1,7 +1,8 @@
 """A scripted clock and owner-by-owner moves; never a supervisor policy."""
 import copy
 from dataclasses import asdict, is_dataclass
-from datetime import timedelta, time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import re
 import uuid
 from harvestnet_agents.negotiation import parse_agent_input, parse_draft, parse_facts, Role
@@ -59,6 +60,10 @@ class Engine:
     def reserved(self, code):
         return sum(p["pounds"] for p in self.records.all("pickup") if p["request_code"] == code and p["status"] == "committed")
 
+    def local(self, value):
+        """An instant (ISO text or datetime) on the region's own clock, where weekdays and hours are read."""
+        return (value if isinstance(value, datetime) else dt(value)).astimezone(ZoneInfo(self.fixture["timezone"]))
+
     def eligible(self, request, bank, item, arrival):
         exclusions={str(x).strip().casefold() for x in request['cant_eat']}
         profile=self.calc.profiles.get(item['produce_id'])
@@ -67,8 +72,10 @@ class Engine:
         # Design section 8: produce that needs a household fridge goes to limited-fridge
         # households only for same-day pickup. The profile's needs-fridge field, not its cold chain.
         needs_fridge = profile.needs_fridge
+        # Weekdays, hours and "same day" are the region's local clock, whatever offset the instants carry.
+        arrival = self.local(arrival)
         for window in bank["pickup_windows"]:
-            start, end = max(dt(window["start"]), arrival), min(dt(window["end"]), dt(item["usable_until"]))
+            start, end = max(self.local(window["start"]), arrival), self.local(min(dt(window["end"]), dt(item["usable_until"])))
             if request["limited_fridge"] and needs_fridge and start.date() != arrival.date():
                 continue
             for hw in request["pickup_windows"]:

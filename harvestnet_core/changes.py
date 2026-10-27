@@ -15,7 +15,6 @@ committed version instead of a draft amendment.
 """
 import copy
 from collections import defaultdict
-from zoneinfo import ZoneInfo
 from harvestnet_agents.negotiation import parse_facts
 from harvestnet_agents.profiles import STORAGE_COLD
 from harvestnet_agents.terms import terms_hash
@@ -39,10 +38,6 @@ def find(records, lot_id, version):
 
 def changes_for(records, lot_id):
     return sorted((c for c in records.all('change') if c['lot_id'] == lot_id), key=lambda c: c['version'])
-
-
-def _local(engine, value):
-    return dt(value).astimezone(ZoneInfo(engine.fixture['timezone']))
 
 
 def _held(lot, food_bank_id):
@@ -247,9 +242,9 @@ def _commit(engine, change):
     new_holds = defaultdict(list)
     receiver = moves[0]['to_food_bank_id'] if moves else None
     if moves:
-        depart = min(_local(engine, m['departs_at']) for m in moves)
-        arrive = max(_local(engine, m['arrives_at']) for m in moves)
-        collect_end = max(_local(engine, m['households_collect']['end']) for m in moves)
+        depart = min(engine.local(m['departs_at']) for m in moves)
+        arrive = max(engine.local(m['arrives_at']) for m in moves)
+        collect_end = max(engine.local(m['households_collect']['end']) for m in moves)
         pounds = sum(number(m['pounds']) for m in moves)
         cold = sum(number(m['pounds']) for m in moves if profiles.get(m['produce_id']).storage_resource == STORAGE_COLD)
         # The receiver's recorded cold space at arrival, rechecked now, not the agent's answer.
@@ -267,7 +262,7 @@ def _commit(engine, change):
         new_holds[receiver].append(hold)
         new_holds[owner].append(truck_hold)
     # From the failure on, the failed cooler holds nothing cold.
-    failure = _local(engine, change['failure_at'])
+    failure = engine.local(change['failure_at'])
     kept = []
     for h in lot['holds'].get(owner, []):
         if h['resource'] != STORAGE_COLD:
@@ -315,12 +310,12 @@ def _move_pickups(engine, lot, change, receiver, moved, fallback, touched):
         window = None
         if receiver and budget.get(pid, 0) + 1e-8 >= p['pounds']:
             m = next(m for m in change['terms']['moves'] if m['produce_id'] == pid)
-            collect = {k: _local(engine, m['households_collect'][k]).isoformat() for k in ('start', 'end')}
+            collect = {k: engine.local(m['households_collect'][k]).isoformat() for k in ('start', 'end')}
             request = records.get('request', p['request_code'])
             original = next(i for i in lot['draft']['items'] if i['produce_id'] == pid)
             # The household's own pickup times and limits still apply at the new food bank.
             window = engine.eligible({**request, 'chosen_food_bank_ids': [receiver]}, {**rbank, 'pickup_windows': [collect]},
-                                     original, _local(engine, m['arrives_at']))
+                                     original, engine.local(m['arrives_at']))
         if window:
             budget[pid] -= p['pounds']
             p.update(food_bank_id=receiver, food_bank_name=engine.names[receiver], window=window, version=version,
