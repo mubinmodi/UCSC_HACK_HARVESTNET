@@ -1,0 +1,33 @@
+{
+  "synthetic": true,
+  "note": "Written by sync_agent.py. No secrets. Tool ids and the agent id are identifiers, not credentials.",
+  "agent_name": "HarvestNet front desk",
+  "agent_id": "agent_5701m4p6jybaens82trmrqdr70k4",
+  "tool_ids": {
+    "voice_intake": "tool_2501m4p6g7bgfgabrgswerpace76",
+    "create_request": "tool_5001m4p6g7gzefxrvy5ayc7tv3sb",
+    "list_food_banks": "tool_0701m4p6g7ndf8x966mbpktvhrgx",
+    "choose_food_banks": "tool_8101m4p6g7v3ew9a3y8jtx34764k",
+    "get_request": "tool_6301m4p6g7znfcmrj16tva9wszse"
+  },
+  "tools_base_url": "https://18-217-110-223.sslip.io/api",
+  "settings": {
+    "llm": "claude-sonnet-5-5",
+    "temperature": 0.2,
+    "default_language": "en",
+    "extra_languages": [
+      "es"
+    ],
+    "language_detection": true,
+    "tts_model": "eleven_flash_v2",
+    "voice_id": "cjVigY5qzO86Huf0OWal",
+    "max_call_seconds": 900,
+    "tools": {
+      "voice_intake": "POST https://18-217-110-223.sslip.io/api/voice-intake",
+      "create_request": "POST https://18-217-110-223.sslip.io/api/requests",
+      "list_food_banks": "GET https://18-217-110-223.sslip.io/api/food-banks",
+      "choose_food_banks": "PUT https://18-217-110-223.sslip.io/api/requests/{request_code}/food-banks",
+      "get_request": "GET https://18-217-110-223.sslip.io/api/requests/{request_code}"
+    }
+  }
+}

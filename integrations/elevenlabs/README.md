@@ -116,6 +116,17 @@ Check every dashboard label against the current ElevenLabs docs, because menu na
 
 ## Testing
 
+### Created account configuration (October 11, 2026)
+
+`agent.json` records the HarvestNet front-desk agent created in Caleb's account
+and its five webhook tools, pointed at the team's public core API. It contains
+identifiers only, not credentials. The English default uses `eleven_flash_v2`;
+the Spanish language override uses multilingual `eleven_flash_v2_5`. The live
+create API rejected using the multilingual model for the English default.
+Configuration creation succeeded, and the 37 offline configuration/contract
+tests passed. No simulation or call was run by this session, so backend
+reachability, spoken read-back, consent and code repetition remain unverified.
+
 - **Contract check (no network):** `uv run --with pytest pytest -q tests/test_elevenlabs_tools.py`.
 - **Call test against the skeleton:** with `base_url` as it is, call the agent from the dashboard's
   test widget. Each tool gets the contract's example back. Check that the agent says the example's

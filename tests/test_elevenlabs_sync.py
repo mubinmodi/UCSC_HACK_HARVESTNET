@@ -98,6 +98,14 @@ def test_spanish_fixed_lines_are_appended_to_the_prompt():
     assert "Su código es" in text and "Gracias. No se guardó nada." in text
 
 
+def test_language_voice_models_match_api_requirements():
+    # The live create API rejects v2.5 for the English default, while Spanish
+    # requires the multilingual variant rather than inheriting English-only v2.
+    cfg = PLAN["agent"]["conversation_config"]
+    assert cfg["tts"]["model_id"] == "eleven_flash_v2"
+    assert cfg["language_presets"]["es"]["overrides"]["tts"]["model_id"] == "eleven_flash_v2_5"
+
+
 def test_dry_run_prints_the_plan_without_a_key_or_network(monkeypatch, capsys):
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
 
