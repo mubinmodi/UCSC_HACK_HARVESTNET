@@ -27,7 +27,7 @@ The lead (mubinmodi) has authorized implementation, reviewing and merging teamma
 - `harvestnet_core/` + `core_tests/` + `core_fixtures/`: records, calculators, harness, public API, evaluation. `cd agents && uv sync && cd .. && PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=. agents/.venv/bin/python -m unittest discover -s core_tests`. Guide: `docs/core/README.md`.
 - `harvestnet_platform/` + `tests/`: organization systems, A2A and Directory transport, approvals, n8n. `uv run --with pytest pytest -q` at the root. Guide: `docs/platform/`.
 - `api_skeleton/`: the example-data API on Lambda. `cd api_skeleton && uv run pytest`.
-- `frontend/<app>/` (household, donor-dashboard, results-strip): Vite + React. `npm ci && npm run typecheck && npm test && npm run build`.
+- `frontend/<app>/` (landing, household, donor-dashboard, results-strip): Vite + React. `npm ci && npm run typecheck && npm test && npm run build`. `frontend/shared/theme.css` is the one design-token file all four import; `landing` is served at `/` and built with base `/`.
 - `deploy/aws/`: `setup.sh`, `teardown.sh`, `reset_data.sh`, `logs.sh` for the live stack at https://18-217-110-223.sslip.io. Guide: `deploy/aws/README.md`.
 - `docs/demo/`: run sheet, script, slides, offline replay (`python -m harvestnet_core.demo_replay --check` keeps it current), recording scripts.
 

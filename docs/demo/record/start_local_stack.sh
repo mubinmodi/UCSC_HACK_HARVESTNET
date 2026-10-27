@@ -22,7 +22,7 @@ PY="$ROOT/agents/.venv/bin/python"
 GATEWAY_PORT=8080
 CORE_PORT=8050; APPROVALS_PORT=8030; SYSTEMS_PORT=8010
 ORG_PORTS=(market:8021 city:8022 rural:8023 eastside:8024 advocate:8025)
-APPS=(household donor-dashboard results-strip)
+APPS=(household donor-dashboard results-strip landing)
 
 mkdir -p "$RUN" "$OUT"
 cd "$ROOT"
@@ -52,10 +52,12 @@ stop_all() {
 build_frontends() {
   for app in "${APPS[@]}"; do
     if [ ! -f "$OUT/dist/$app/index.html" ]; then
+      local base="/$app/"
+      [ "$app" = landing ] && base="/" # the landing page is the site root, as on AWS
       echo "building frontend $app against http://127.0.0.1:$GATEWAY_PORT/api"
       ( cd "frontend/$app"
         [ -d node_modules ] || npm ci --silent
-        VITE_API_BASE_URL="http://127.0.0.1:$GATEWAY_PORT/api" npm run build --silent -- --base="/$app/" >/dev/null )
+        VITE_API_BASE_URL="http://127.0.0.1:$GATEWAY_PORT/api" npm run build --silent -- --base="$base" >/dev/null )
       mkdir -p "$OUT/dist/$app"; cp -R "frontend/$app/dist/." "$OUT/dist/$app/"
     fi
   done

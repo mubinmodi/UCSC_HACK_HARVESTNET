@@ -27,6 +27,8 @@
 	handle /health {
 		respond "HarvestNet gateway is up; check /api/health and /platform/health" 200
 	}
+	# frontends.caddy ends with a catch-all that serves frontend/landing at / (when the release has it),
+	# so it must stay after every other route; the fallback below only answers when there is no landing app.
 	import /etc/caddy/frontends.caddy
 	handle {
 		respond "HarvestNet. Core API at /api/, frontend apps listed at /apps.txt" 200

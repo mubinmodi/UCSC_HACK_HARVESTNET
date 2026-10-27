@@ -21,7 +21,7 @@ once into `demo-video/.local-env` (mode 600, gitignored) and are never printed.
 
 | File | What it does |
 |---|---|
-| `start_local_stack.sh up`, `down`, `reset` | Plain local processes: the core, the approvals service, the organization systems, the five organization hosts (the three food banks run their own cooler watcher), and `gateway.py`. It builds the three frontends against the local gateway and publishes the free (rules-based) evaluation so the results strip has numbers. |
+| `start_local_stack.sh up`, `down`, `reset` | Plain local processes: the core, the approvals service, the organization systems, the five organization hosts (the three food banks run their own cooler watcher), and `gateway.py`. It builds the four frontends (the landing page is served at `/`) against the local gateway and publishes the free (rules-based) evaluation so the results strip has numbers. |
 | `gateway.py` | A same-origin stand-in for `deploy/aws/Caddyfile`: serves the frontends and proxies `/api`, `/human`, `/platform` and the cooler demo switch. |
 | `record_demo.py` | Playwright (Python) at 1280x720 with video. One clip per moment, a caption bar on each (moment name, one line from `SCRIPT.md`, "Synthetic data · local run of the same code"), and a visible cursor. `--only 05` records one clip, which needs the earlier state. |
 | `stitch.py` | ffmpeg: joins the clips into one H.264 MP4, adds title cards, and cuts the short version from the timestamps in `demo-video/marks.json`. |

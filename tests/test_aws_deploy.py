@@ -204,6 +204,19 @@ class AwsScriptsStructure(unittest.TestCase):
         self.assertIn('try_files {path} /household/index.html', result.stdout)
         self.assertIn('respond "Frontend apps: /results-strip/ /household/ " 200', result.stdout)
 
+    def test_landing_app_is_the_site_root_and_every_other_route_wins_first(self):
+        result = subprocess.run(['bash', '-c', 'RELEASE=test; source deploy/aws/setup.sh; frontend_routes household landing results-strip'],
+                                capture_output=True, text=True, cwd=ROOT)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out = result.stdout
+        self.assertNotIn('handle /landing/*', out)
+        self.assertIn('respond "Frontend apps: /household/ / /results-strip/ " 200', out)
+        # The catch-all root handler comes after the per-app routes and /apps.txt, so those match first.
+        root_handler = out.index('handle {\n\troot * /srv/frontend/landing')
+        self.assertGreater(root_handler, out.index('handle /results-strip/*'))
+        self.assertGreater(root_handler, out.index('handle /apps.txt'))
+        self.assertIn('handle /household/* {', out)
+
 
 class AwsDryRun(unittest.TestCase):
     """setup.sh and teardown.sh --dry-run against the stub: no mutation, no secret in the output."""

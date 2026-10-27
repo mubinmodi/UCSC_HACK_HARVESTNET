@@ -317,7 +317,7 @@ export function MyLots({ donorId, initialLot }: { donorId: string; initialLot?: 
           ))}
         </div>
       )}
-      {!lotId && <p className="muted">Offer surplus, or enter a lot ID to see its status.</p>}
+      {!lotId && <p className="muted empty">Offer surplus, or enter a lot ID to see its status.</p>}
       {lot.loading && <p role="status">Loading lot…</p>}
       <ErrorNote message={lot.error} />
       {lot.data && (

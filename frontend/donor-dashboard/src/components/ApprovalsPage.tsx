@@ -19,7 +19,7 @@ export function ApprovalsPage({ organizationId, roleLabel }: { organizationId: s
       {list.data && (
         <>
           <DataLabel data={list.data} />
-          {list.data.approvals.length === 0 && <p className="muted">Nothing is waiting for you.</p>}
+          {list.data.approvals.length === 0 && <p className="muted empty">Nothing is waiting for you.</p>}
           <div className="offer-list">
             {list.data.approvals.map((a) => (
               <ApprovalCard key={`${a.lot_id}:${a.version}:${a.terms_hash}`} approval={a} organizationId={organizationId} />

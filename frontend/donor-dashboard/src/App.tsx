@@ -43,11 +43,13 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="shell lg:flex">
       <nav className="desktop-sidebar" aria-label="Main">
         <div className="sidebar-brand">
-          <Sprout aria-hidden="true" />
-          HarvestNet
+          <a className="hn-wordmark" href="/">
+            <Sprout aria-hidden="true" />
+            <span>HarvestNet</span>
+          </a>
         </div>
         <p className="sidebar-tagline">Surplus produce to households, agreed by every organization.</p>
         {(['Donor', 'Food bank', 'Settings'] as const).map((group) => (
@@ -65,8 +67,11 @@ export default function App() {
         </div>
       </nav>
       <div className="app-area">
-        <header className="topbar">
-          <span>HarvestNet</span>
+        <header className="topbar hn-on-deep">
+          <a className="hn-wordmark topbar-brand" href="/">
+            <Sprout aria-hidden="true" />
+            <span>HarvestNet</span>
+          </a>
           <span className="topbar-org">
             Donor <b>{donorId}</b> · Food bank <b>{foodBankId}</b>
           </span>

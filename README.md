@@ -27,6 +27,7 @@ The evaluation runs five synthetic scenarios through four methods on the same in
 
 | Screen | Address |
 |---|---|
+| Landing page (what it is, log in) | https://18-217-110-223.sslip.io/ |
 | Household page | https://18-217-110-223.sslip.io/household/ |
 | Donor page and food bank dashboards | https://18-217-110-223.sslip.io/donor-dashboard/ |
 | Results strip | https://18-217-110-223.sslip.io/results-strip/ |
@@ -66,7 +67,7 @@ cd frontend/household && npm ci && npm test
 | `agents/` | Negotiators (rules-based and Claude), produce profiles, fair share, front desk, cooler-failure logic |
 | `harvestnet_core/` | Records, calculators, scenario harness, public API, evaluation ([guide](docs/core/README.md)) |
 | `harvestnet_platform/` | Organization systems, A2A and Directory transport, approvals, n8n bridge ([guide](docs/platform/)) |
-| `frontend/` | Household page, donor page and food bank dashboards, results strip |
+| `frontend/` | Landing page, household page, donor page and food bank dashboards, results strip, and the shared theme (`frontend/shared/`) |
 | `integrations/` | n8n email workflows and the ElevenLabs voice agent setup |
 | `deploy/aws/` | One-command AWS setup, teardown and data reset ([guide](deploy/aws/README.md)) |
 | `docs/contracts/` | The agreed API, agent move, calculator and scenario formats |

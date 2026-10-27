@@ -88,9 +88,9 @@ export default function App() {
   };
 
   return <div className="page">
-    <header className="strip-header">
+    <header className="strip-header hn-on-deep">
       <div>
-        <div className="brand-name"><Sprout aria-hidden="true"/><span>HarvestNet</span></div>
+        <div className="brand-name"><a className="hn-wordmark" href="/"><Sprout aria-hidden="true"/><span>HarvestNet</span></a></div>
         <h1>{results ? t('Results', 'Resultados') + ' · ' + results.scenario_id : error ? t('Results unavailable', 'Resultados no disponibles') : t('Loading results…', 'Cargando resultados…')}</h1>
       </div>
       <button type="button" className="language" lang={es ? 'en' : 'es'} onClick={() => setLanguage(es ? 'en' : 'es')}>{es ? 'English' : 'Español'}</button>

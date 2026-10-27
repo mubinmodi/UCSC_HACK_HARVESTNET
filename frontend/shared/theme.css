@@ -1,0 +1,318 @@
+/* HarvestNet shared theme. One token set and a few shared parts, used by every web app
+   (landing, household, donor-dashboard, results-strip) so they look like one product.
+
+   Identity: fresh greens, a berry accent, cold blue for cold-chain items, warm neutrals with a
+   slight green bias. Display type is Archivo, body type is IBM Plex Sans.
+
+   How an app uses it (in its own src/styles.css, after `@import "tailwindcss";`):
+       @import "../../shared/theme.css";
+   and in its index.html, the font links (see frontend/shared/README.md).
+
+   Plain CSS, no build step of its own. Tokens are --hn-*. Dark mode follows the system setting,
+   or the page can force it with <html data-theme="dark"> or data-theme="light".
+
+   Contrast: every text/background pair below meets WCAG AA (4.5:1 for text, 3:1 for large text
+   and UI parts). Checked with a script when the theme was written; see frontend/shared/README.md. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Fonts, with fallbacks that are already on the device. */
+  --hn-font-display: "Archivo", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --hn-font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --hn-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Type scale (rem; 1rem = 16px). */
+  --hn-text-xs: 0.8125rem;
+  --hn-text-sm: 0.9375rem;
+  --hn-text-base: 1.0625rem;
+  --hn-text-lg: 1.25rem;
+  --hn-text-xl: 1.5rem;
+  --hn-text-2xl: clamp(1.75rem, 1.4rem + 1.6vw, 2.25rem);
+  --hn-text-3xl: clamp(2.25rem, 1.6rem + 3vw, 3.5rem);
+  --hn-text-hero: clamp(2.6rem, 1.8rem + 4.4vw, 4.75rem);
+  --hn-leading: 1.5;
+
+  /* Spacing (4px steps), radii, motion. */
+  --hn-space-1: 0.25rem;
+  --hn-space-2: 0.5rem;
+  --hn-space-3: 0.75rem;
+  --hn-space-4: 1rem;
+  --hn-space-5: 1.25rem;
+  --hn-space-6: 1.5rem;
+  --hn-space-8: 2rem;
+  --hn-space-10: 2.5rem;
+  --hn-space-12: 3rem;
+  --hn-space-16: 4rem;
+  --hn-radius-sm: 8px;
+  --hn-radius: 12px;
+  --hn-radius-lg: 18px;
+  --hn-radius-pill: 999px;
+  --hn-ease: 160ms ease;
+  --hn-focus-width: 3px;
+  --hn-focus-offset: 3px;
+
+  /* Colors, light. Surfaces and text. */
+  --hn-bg: #f4f7f0;
+  --hn-surface: #fdfefb;
+  --hn-surface-2: #ecf1e6;
+  --hn-ink: #15221a;
+  --hn-ink-2: #34473c;
+  --hn-muted: #52635a;
+  --hn-line: #d2dbcd;
+  --hn-line-strong: #7a8c74;
+
+  /* Leaf green: primary actions, success, "good". */
+  --hn-leaf: #2f6b4c;
+  --hn-leaf-hover: #25573d;
+  --hn-on-leaf: #ffffff;
+  --hn-leaf-text: #25613f;
+  --hn-leaf-tint: #e0efe4;
+  --hn-leaf-tint-ink: #1b4a31;
+
+  /* Berry: the accent, and things that need a person (errors, danger, "needs approval"). */
+  --hn-berry: #b02a3f;
+  --hn-berry-hover: #92202f;
+  --hn-on-berry: #ffffff;
+  --hn-berry-text: #a3263a;
+  --hn-berry-tint: #f8e6e9;
+  --hn-berry-tint-ink: #7e1c2c;
+
+  /* Cold blue: cold-chain items and cold storage. */
+  --hn-cold: #2a5d82;
+  --hn-cold-text: #245378;
+  --hn-cold-tint: #e2edf5;
+  --hn-cold-tint-ink: #1b4466;
+
+  /* Warning and "example data" notes. */
+  --hn-warn-bg: #fff3cf;
+  --hn-warn-ink: #5a3a00;
+  --hn-warn-line: #b58100;
+
+  /* Marigold: a warm highlight on dark photo and header backgrounds. */
+  --hn-marigold: #f2c14e;
+
+  --hn-focus: #8a5a00;
+  --hn-focus-on-dark: #ffd166;
+
+  /* Header, hero and deep panels stay dark green in both modes. */
+  --hn-deep: #153a2b;
+  --hn-deep-2: #1f5239;
+  --hn-on-deep: #f6faf2;
+  --hn-on-deep-muted: #cfe0d4;
+
+  --hn-shadow-sm: 0 1px 2px rgb(21 34 26 / 0.06), 0 1px 1px rgb(21 34 26 / 0.04);
+  --hn-shadow: 0 4px 14px rgb(21 34 26 / 0.08), 0 1px 3px rgb(21 34 26 / 0.06);
+  --hn-shadow-lg: 0 18px 50px rgb(21 34 26 / 0.14), 0 4px 12px rgb(21 34 26 / 0.06);
+}
+
+/* Colors, dark. The same names, so a component never checks the mode itself. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hn-bg: #0f1511;
+    --hn-surface: #161f19;
+    --hn-surface-2: #1d2922;
+    --hn-ink: #e9efea;
+    --hn-ink-2: #c6d2ca;
+    --hn-muted: #a0b0a6;
+    --hn-line: #2c3a31;
+    --hn-line-strong: #5f7566;
+
+    --hn-leaf: #86c9a3;
+    --hn-leaf-hover: #a2d8b8;
+    --hn-on-leaf: #0b1a11;
+    --hn-leaf-text: #8fd0ab;
+    --hn-leaf-tint: #1c3226;
+    --hn-leaf-tint-ink: #bfe5cf;
+
+    --hn-berry: #f08a9a;
+    --hn-berry-hover: #f4a3b0;
+    --hn-on-berry: #2a0a10;
+    --hn-berry-text: #f49aa8;
+    --hn-berry-tint: #3a2229;
+    --hn-berry-tint-ink: #ffd3da;
+
+    --hn-cold: #8ab8dc;
+    --hn-cold-text: #9cc6e6;
+    --hn-cold-tint: #1b2b38;
+    --hn-cold-tint-ink: #cfe4f4;
+
+    --hn-warn-bg: #33290f;
+    --hn-warn-ink: #ffe29a;
+    --hn-warn-line: #b58100;
+
+    --hn-focus: #ffd166;
+
+    --hn-deep: #0e2a1f;
+    --hn-deep-2: #17402d;
+
+    --hn-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --hn-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+    --hn-shadow-lg: 0 18px 50px rgb(0 0 0 / 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --hn-bg: #0f1511;
+  --hn-surface: #161f19;
+  --hn-surface-2: #1d2922;
+  --hn-ink: #e9efea;
+  --hn-ink-2: #c6d2ca;
+  --hn-muted: #a0b0a6;
+  --hn-line: #2c3a31;
+  --hn-line-strong: #5f7566;
+  --hn-leaf: #86c9a3;
+  --hn-leaf-hover: #a2d8b8;
+  --hn-on-leaf: #0b1a11;
+  --hn-leaf-text: #8fd0ab;
+  --hn-leaf-tint: #1c3226;
+  --hn-leaf-tint-ink: #bfe5cf;
+  --hn-berry: #f08a9a;
+  --hn-berry-hover: #f4a3b0;
+  --hn-on-berry: #2a0a10;
+  --hn-berry-text: #f49aa8;
+  --hn-berry-tint: #3a2229;
+  --hn-berry-tint-ink: #ffd3da;
+  --hn-cold: #8ab8dc;
+  --hn-cold-text: #9cc6e6;
+  --hn-cold-tint: #1b2b38;
+  --hn-cold-tint-ink: #cfe4f4;
+  --hn-warn-bg: #33290f;
+  --hn-warn-ink: #ffe29a;
+  --hn-warn-line: #b58100;
+  --hn-focus: #ffd166;
+  --hn-deep: #0e2a1f;
+  --hn-deep-2: #17402d;
+  --hn-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --hn-shadow: 0 4px 14px rgb(0 0 0 / 0.35);
+  --hn-shadow-lg: 0 18px 50px rgb(0 0 0 / 0.5);
+}
+:root[data-theme="light"] { color-scheme: light; }
+
+/* ---------- Base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--hn-bg);
+  color: var(--hn-ink);
+  font-family: var(--hn-font-body);
+  font-size: var(--hn-text-base);
+  line-height: var(--hn-leading);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--hn-font-display); color: var(--hn-ink); text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+a { color: var(--hn-cold-text); text-underline-offset: 0.2em; }
+::selection { background: var(--hn-leaf-tint); color: var(--hn-leaf-tint-ink); }
+
+/* A visible focus ring everywhere, in a color that stands out on light and dark surfaces. */
+:focus-visible {
+  outline: var(--hn-focus-width) solid var(--hn-focus);
+  outline-offset: var(--hn-focus-offset);
+}
+.hn-on-deep :focus-visible, .hn-header :focus-visible { outline-color: var(--hn-focus-on-dark); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.skip-link {
+  position: absolute; left: 8px; top: -64px; z-index: 100; padding: 10px 14px; font-weight: 700;
+  background: var(--hn-surface); color: var(--hn-ink); border-radius: var(--hn-radius-sm);
+  box-shadow: var(--hn-shadow); text-decoration: none;
+}
+.skip-link:focus { top: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- Wordmark and header ---------- */
+.hn-wordmark {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font-family: var(--hn-font-display); font-weight: 800; font-stretch: 90%;
+  letter-spacing: -0.02em; color: inherit; text-decoration: none; line-height: 1;
+}
+.hn-wordmark svg { color: var(--hn-marigold); width: 1.15em; height: 1.15em; flex-shrink: 0; }
+.hn-wordmark:hover { opacity: 0.9; }
+
+/* A header bar in deep green. Apps add their own layout inside it. */
+.hn-header {
+  background: linear-gradient(120deg, var(--hn-deep), var(--hn-deep-2));
+  color: var(--hn-on-deep);
+}
+
+/* ---------- Buttons ---------- */
+.hn-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+  min-height: 48px; padding: 0.7em 1.25em; border-radius: var(--hn-radius);
+  border: 1.5px solid transparent; font-weight: 700; font-size: var(--hn-text-base);
+  line-height: 1.2; text-align: center; text-decoration: none; cursor: pointer;
+  transition: background var(--hn-ease), border-color var(--hn-ease), transform var(--hn-ease), box-shadow var(--hn-ease);
+}
+.hn-btn:active:not(:disabled) { transform: translateY(1px); }
+.hn-btn--primary { background: var(--hn-leaf); color: var(--hn-on-leaf); box-shadow: var(--hn-shadow-sm); }
+.hn-btn--primary:hover:not(:disabled) { background: var(--hn-leaf-hover); }
+.hn-btn--secondary { background: transparent; color: var(--hn-ink); border-color: var(--hn-line-strong); }
+.hn-btn--secondary:hover:not(:disabled) { background: var(--hn-surface-2); border-color: var(--hn-leaf-text); }
+.hn-btn--danger { background: transparent; color: var(--hn-berry-text); border-color: var(--hn-berry-text); }
+.hn-btn--danger:hover:not(:disabled) { background: var(--hn-berry-tint); }
+.hn-btn--on-deep { background: var(--hn-marigold); color: #2a1d00; }
+.hn-btn--on-deep:hover:not(:disabled) { background: #f7d27a; }
+.hn-btn--ghost-on-deep { background: transparent; color: var(--hn-on-deep); border-color: rgb(246 250 242 / 0.55); }
+.hn-btn--ghost-on-deep:hover:not(:disabled) { background: rgb(246 250 242 / 0.12); }
+
+/* ---------- Cards ---------- */
+.hn-card {
+  background: var(--hn-surface); border: 1px solid var(--hn-line);
+  border-radius: var(--hn-radius-lg); box-shadow: var(--hn-shadow-sm);
+}
+
+/* ---------- Status pills ---------- */
+.hn-pill {
+  display: inline-flex; align-items: center; gap: 0.35em; padding: 0.25em 0.7em;
+  border-radius: var(--hn-radius-pill); font-size: var(--hn-text-xs); font-weight: 700;
+  line-height: 1.2; white-space: nowrap;
+  background: var(--hn-surface-2); color: var(--hn-ink-2); border: 1px solid var(--hn-line);
+}
+.hn-pill--leaf { background: var(--hn-leaf-tint); color: var(--hn-leaf-tint-ink); border-color: transparent; }
+.hn-pill--berry { background: var(--hn-berry-tint); color: var(--hn-berry-tint-ink); border-color: transparent; }
+.hn-pill--cold { background: var(--hn-cold-tint); color: var(--hn-cold-tint-ink); border-color: transparent; }
+.hn-pill--warn { background: var(--hn-warn-bg); color: var(--hn-warn-ink); border-color: var(--hn-warn-line); }
+
+/* ---------- Notes (honesty banners, errors, info) ---------- */
+.hn-note {
+  display: flex; gap: 0.7em; align-items: flex-start; padding: 0.8em 1em;
+  border-radius: var(--hn-radius); border: 1.5px solid var(--hn-warn-line);
+  background: var(--hn-warn-bg); color: var(--hn-warn-ink); font-size: var(--hn-text-sm);
+}
+.hn-note svg { flex-shrink: 0; margin-top: 0.15em; }
+.hn-note--error { background: var(--hn-berry-tint); color: var(--hn-berry-tint-ink); border-color: var(--hn-berry-text); }
+.hn-note--info { background: var(--hn-cold-tint); color: var(--hn-cold-tint-ink); border-color: var(--hn-cold); }
+
+/* ---------- Form controls ---------- */
+.hn-input {
+  display: block; width: 100%; min-height: 48px; padding: 0.7em 0.9em;
+  border: 1.5px solid var(--hn-line-strong); border-radius: var(--hn-radius);
+  background: var(--hn-surface); color: var(--hn-ink);
+  transition: border-color var(--hn-ease), box-shadow var(--hn-ease);
+}
+.hn-input:hover { border-color: var(--hn-leaf-text); }
+.hn-input::placeholder { color: var(--hn-muted); opacity: 1; }
+
+/* ---------- Small loading spinner ---------- */
+.hn-spinner {
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  border: 3px solid var(--hn-line); border-top-color: var(--hn-leaf-text);
+  animation: hn-spin 0.9s linear infinite;
+}
+@keyframes hn-spin { to { transform: rotate(360deg); } }

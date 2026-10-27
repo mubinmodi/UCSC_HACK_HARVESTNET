@@ -334,7 +334,7 @@ function IncomingOffers({
   return (
     <Section title="Incoming offers" icon={<CalendarClock aria-hidden="true" size={20} />}>
       <ErrorNote message={approvalsError ? `Approval requests: ${approvalsError}` : null} />
-      {board.incoming_offers.length === 0 && <p className="muted">No offers right now.</p>}
+      {board.incoming_offers.length === 0 && <p className="muted empty">No offers right now.</p>}
       <div className="offer-list">
         {board.incoming_offers.map((offer) => (
           <OfferCard key={`${offer.lot_id}:${offer.version}`} offer={offer} foodBankId={board.food_bank_id} approval={findApproval(approvals, offer.lot_id, offer.version)} onChanged={onChanged} />
@@ -447,7 +447,7 @@ function OfferDetails({ offer, foodBankId, onChanged }: { offer: IncomingOffer; 
 function Disagreements({ items }: { items: Disagreement[] }) {
   return (
     <Section title="Disagreements" icon={<MessageSquareWarning aria-hidden="true" size={20} />}>
-      {items.length === 0 && <p className="muted">No preserved disagreements involve you.</p>}
+      {items.length === 0 && <p className="muted empty">No preserved disagreements involve you.</p>}
       {items.map((d, i) => (
         <DisagreementCard key={`${d.lot_id}-${i}`} item={d} />
       ))}

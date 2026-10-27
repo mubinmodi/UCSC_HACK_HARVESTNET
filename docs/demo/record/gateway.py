@@ -1,6 +1,6 @@
 """Local stand-in for the AWS Caddy gateway (deploy/aws/Caddyfile), on 127.0.0.1 only.
 
-One origin serves the three built frontends and proxies the same routes the real gateway does:
+One origin serves the built frontends (the landing page at / and each app at /<app>/) and proxies the same routes the real gateway does:
 /api/* -> core, /platform/* and /human/* -> approvals, POST /systems/demo/<bank>/cooler -> systems.
 Standard library only. It binds to localhost and refuses anything else.
 """
@@ -60,11 +60,14 @@ def make_handler(dist, core, approvals, systems):
             return self.static(path.split('?')[0].split('#')[0])
 
         def static(self, path):
-            if path == '/':
-                path = '/index.html'
+            # Like the AWS Caddyfile, the landing app answers "/" and anything no other app serves.
             target = (dist / path.lstrip('/')).resolve()
             if target.is_dir():
                 target = target / 'index.html'
+            if path == '/' or not target.is_file():
+                target = (dist / 'landing' / path.lstrip('/')).resolve()
+                if target.is_dir():
+                    target = target / 'index.html'
             if dist not in target.parents or not target.is_file():
                 return self.send_error(404)
             data = target.read_bytes()
@@ -82,7 +85,7 @@ def make_handler(dist, core, approvals, systems):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--port', type=int, default=8080)
-    p.add_argument('--dist', required=True, help='folder holding household/, donor-dashboard/, results-strip/')
+    p.add_argument('--dist', required=True, help='folder holding household/, donor-dashboard/, results-strip/ and landing/')
     p.add_argument('--core', default='http://127.0.0.1:8050')
     p.add_argument('--approvals', default='http://127.0.0.1:8030')
     p.add_argument('--systems', default='http://127.0.0.1:8010')

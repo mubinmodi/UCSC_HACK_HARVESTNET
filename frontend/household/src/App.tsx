@@ -274,11 +274,13 @@ export default function App() {
         {lang === 'es' ? 'Saltar al contenido' : 'Skip to content'}
       </a>
       <div className="shell">
-        <header className="brand">
+        <header className="brand hn-on-deep">
           <div>
             <p className="brand-name">
-              <Sprout aria-hidden="true" />
-              <span>HarvestNet</span>
+              <a className="hn-wordmark" href="/">
+                <Sprout aria-hidden="true" />
+                <span>HarvestNet</span>
+              </a>
             </p>
             <p className="tagline">{t.tagline}</p>
           </div>
