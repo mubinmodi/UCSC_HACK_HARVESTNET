@@ -6,8 +6,6 @@ import contextlib
 import copy
 import io
 import json
-import os
-import sys
 import tempfile
 import unittest
 from datetime import timedelta
@@ -15,6 +13,8 @@ from importlib import resources
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+
+import platform_source  # noqa: F401  (Lane C on the import path)
 
 from harvestnet_core.api import API
 from harvestnet_core.engine import Engine, run_fixture
@@ -25,8 +25,6 @@ from harvestnet_agents.profiles import load_profiles
 
 from test_core import fixture
 
-# The cooler-failure scenario reads Lane C's organization systems in process.
-sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
 
 NOW = '2026-10-13T12:00:00-07:00'
 TOKENS = {'market': 'donor-test', 'city': 'city-test'}

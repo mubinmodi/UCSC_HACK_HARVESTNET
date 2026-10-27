@@ -1,9 +1,11 @@
 import json
-import os
 import threading
 import unittest
 import urllib.request
 from pathlib import Path
+
+import platform_source  # noqa: F401  (Lane C on the import path)
+
 from harvestnet_core.api import API
 from harvestnet_core.engine import Engine,run_fixture
 from harvestnet_core.server import make_server
@@ -36,10 +38,7 @@ class HTTPTests(unittest.TestCase):
         status,r=self.request('GET','/requests/'+r['request_code'])
         self.assertEqual(r['fair_share_lb'],4);self.assertEqual(r['pickups'],[])
 
-    @unittest.skipUnless(os.environ.get('HARVESTNET_PLATFORM_SOURCE'),'pinned platform package not configured')
     def test_actual_lane_c_human_capability_relay_reaches_core(self):
-        import sys
-        sys.path.insert(0,os.environ['HARVESTNET_PLATFORM_SOURCE'])
         from harvestnet_platform.approvals import ApprovalStore,CoreAPI
         f=fixture();f['humans']=[]
         run_fixture(f,records=self.e.records)
@@ -54,10 +53,7 @@ class HTTPTests(unittest.TestCase):
         self.assertTrue(self.e.records.all('pickup'))
         store.db.close()
 
-    @unittest.skipUnless(os.environ.get('HARVESTNET_PLATFORM_SOURCE'),'pinned platform package not configured')
     def test_real_mixed_batch_outcomes_identical_over_five_a2a_hosts(self):
-        import sys
-        sys.path.insert(0,os.environ['HARVESTNET_PLATFORM_SOURCE'])
         from http.server import ThreadingHTTPServer
         from harvestnet_platform.transport import ORGANIZATIONS,Receiver,A2ATransport,handler_for
         from harvestnet_platform.join import compare_fixture

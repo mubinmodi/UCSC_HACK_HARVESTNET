@@ -6,7 +6,7 @@ API shapes live in [`docs/contracts/`](../contracts/README.md), terms in [`CONTE
 
 ## Run it
 
-Run everything from the repository root. The core imports `harvestnet_agents` (Lane B) and `harvestnet_platform` (Lane C), so first `cd agents && uv sync`, then use `agents/.venv/bin/python` with `PYTHONPATH=agents/src`. Rules, baselines and replay need no model SDK. `HARVESTNET_PLATFORM_SOURCE=.` switches on the tests that run Lane C's code in process (they skip without it), and `demo_replay` reads it too. The Postgres test runs only when `HARVESTNET_TEST_DATABASE_URL` names a dedicated test database.
+Run everything from the repository root. The core imports `harvestnet_agents` (Lane B) and `harvestnet_platform` (Lane C), so first `cd agents && uv sync`, then use `agents/.venv/bin/python` with `PYTHONPATH=agents/src`. Rules, baselines and replay need no model SDK. The tests that run Lane C's code in process always run: `core_tests/platform_source.py` puts `HARVESTNET_PLATFORM_SOURCE` on the import path, or the repository root when it is unset. `demo_replay` reads the variable too. The Postgres test runs only when `HARVESTNET_TEST_DATABASE_URL` names a dedicated test database.
 
 ```sh
 export PYTHONPATH=agents/src HARVESTNET_PLATFORM_SOURCE=.

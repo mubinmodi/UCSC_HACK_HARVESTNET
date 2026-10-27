@@ -5,15 +5,12 @@ a fresh recording. If this fails after a deliberate change, rerun
 ``python -m harvestnet_core.demo_replay`` and commit both files. All data is synthetic.
 """
 import json
-import os
 import re
-import sys
 import unittest
 
-from harvestnet_core import demo_replay
+import platform_source  # noqa: F401  (Lane C on the import path)
 
-# The cooler failure reads Lane C's organization systems in process.
-sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
+from harvestnet_core import demo_replay
 
 
 class DemoReplay(unittest.TestCase):
