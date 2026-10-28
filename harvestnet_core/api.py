@@ -480,11 +480,12 @@ class API:
 
     def op_choose_food_banks(self, call):
         code,body=call.params['request_code'],call.body
-        request=self.records.get('request',code)
+        self.records.get('request',code)
         ids=body['food_bank_ids'] if 'food_bank_ids' in body else body['chosen_food_bank_ids']
         if not isinstance(ids,list) or len(ids)!=len(set(ids)) or any(bank_id not in self.engine.banks for bank_id in ids):
             raise ValueError("choose known, distinct food banks")
         with self.records.transaction():
+            request=self.records.get('request',code)
             request['chosen_food_bank_ids']=ids
             self.records.put('request',code,request)
         return 200,{"request_code":code,"chosen_food_bank_ids":ids,"status":"saved","message":SAVED_MESSAGE.get(request.get('language'),SAVED_MESSAGE['en'])}
@@ -504,13 +505,15 @@ class API:
         body=call.body
         owner=body['food_bank_id']
         self.authorize(owner,call.token)
-        request=self.records.get('request',body['request_code'])
-        pending=[pickup for pickup in self.records.all('pickup') if pickup['request_code']==body['request_code'] and pickup['food_bank_id']==owner and pickup['status']=='committed']
-        if not pending:
-            raise Conflict("no open pickup at this food bank")
-        if any(not (dt(pickup['window']['start'])<=dt(self.engine.now)<dt(pickup['window']['end'])) for pickup in pending):
-            raise Conflict("pickup is outside its confirmed window")
         with self.records.transaction():
+            # Read the pickups and the household's balance inside the transaction that updates them,
+            # so two staff confirming at once never count one pickup twice.
+            request=self.records.get('request',body['request_code'])
+            pending=[pickup for pickup in self.records.all('pickup') if pickup['request_code']==body['request_code'] and pickup['food_bank_id']==owner and pickup['status']=='committed']
+            if not pending:
+                raise Conflict("no open pickup at this food bank")
+            if any(not (dt(pickup['window']['start'])<=dt(self.engine.now)<dt(pickup['window']['end'])) for pickup in pending):
+                raise Conflict("pickup is outside its confirmed window")
             for pickup in pending:
                 pickup['status']='collected'
                 self.records.put('pickup',pickup['pickup_id'],pickup)
@@ -584,15 +587,17 @@ class API:
 
     def op_submit_counter(self, call):
         lot_id,body=call.params['lot_id'],call.body
-        lot=self.records.get('lot',lot_id)
-        draft=lot['draft']
+        self.records.get('lot',lot_id)
         self.authorize(body['organization_id'],call.token)
-        if body['version']!=draft['version'] or lot['status']=='committed':
-            raise Conflict("stale or committed version")
         from harvestnet_agents.negotiation import amendment_from_dict,parse_draft
-        parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
-        move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
         with self.records.transaction():
+            # The version check and the queued counter share one transaction.
+            lot=self.records.get('lot',lot_id)
+            draft=lot['draft']
+            if body['version']!=draft['version'] or lot['status']=='committed':
+                raise Conflict("stale or committed version")
+            parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
+            move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
             self.records.put('queued_move',lot_id+':'+body['organization_id'],{"lot_id":lot_id,**move})
         negotiate_pending(self.engine,lot_id)
         return 202,{"lot_id":lot_id,"status":"queued_for_turn","based_on_version":draft['version'],"move":move,"message":"Counter queued for your organization's next turn."}
@@ -662,13 +667,15 @@ class API:
     def op_update_food_bank_status(self, call):
         bank_id,body=call.params['food_bank_id'],call.body
         self.authorize(bank_id,call.token)
-        bank=self.records.get('bank',bank_id)
         from harvestnet_agents.negotiation import parse_facts
-        updated={**bank,**{field:body[field] for field in ('storage','pickup_windows','truck','cooler') if field in body}}
-        parse_facts('food_bank',{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"demand":self.engine.demand(bank_id),**updated})
-        for slot in updated['storage']: number(slot['cold_free_lb']); number(slot['dry_free_lb'])
-        updated['status_version']=bank.get('status_version',0)+1
-        with self.records.transaction(): self.records.put('bank',bank_id,updated)
+        with self.records.transaction():
+            # Read the status inside the transaction that bumps its version: no lost update.
+            bank=self.records.get('bank',bank_id)
+            updated={**bank,**{field:body[field] for field in ('storage','pickup_windows','truck','cooler') if field in body}}
+            parse_facts('food_bank',{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"demand":self.engine.demand(bank_id),**updated})
+            for slot in updated['storage']: number(slot['cold_free_lb']); number(slot['dry_free_lb'])
+            updated['status_version']=bank.get('status_version',0)+1
+            self.records.put('bank',bank_id,updated)
         return 200,{"food_bank_id":bank_id,"status_version":updated['status_version'],"updated_at":self.engine.now,"message":"Your organization's facts are updated."}
 
     def op_get_food_bank_dashboard(self, call):

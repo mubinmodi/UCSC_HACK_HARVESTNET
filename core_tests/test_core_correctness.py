@@ -1,7 +1,10 @@
 """Regression tests for core correctness fixes (timezones, transactions, declines, audit checks,
 API errors, purge, baselines). Each was written to fail before its fix. All data is synthetic."""
+import contextlib
 import copy
+import inspect
 import json
+import tempfile
 import unittest
 from datetime import timedelta, timezone
 from pathlib import Path
@@ -72,6 +75,67 @@ class RegionLocalTime(unittest.TestCase):
             self.assertEqual(api.call('POST', f"/pickups/{pickup['pickup_id']}/release", {'request_code': 'C4N6'})[0], 200)
             return sorted((p['request_code'], p['pounds'], instants(p['window'])) for p in records.all('pickup') if p['status'] == 'committed')
         self.assertEqual(released(False), released(True))
+
+
+def race(records, frame, other):
+    """Run ``other`` (a second process on the same database) just before ``records`` opens the
+    first transaction called from function ``frame``: after any read that came before it."""
+    real, done = records.transaction, []
+
+    @contextlib.contextmanager
+    def transaction():
+        if not done and any(f.function == frame for f in inspect.stack()[1:6]):
+            done.append(True)
+            other()
+        with real() as txn:
+            yield txn
+    records.transaction = transaction
+
+
+class ReadsInsideTransactions(unittest.TestCase):
+    """Two processes share one database. A check made before the transaction is stale by the time it writes."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.path = str(Path(self.folder.name, 'core.sqlite'))
+        # More households than produce: a second split would still find households below fair share.
+        self.f = load('more-households-than-produce')
+        f = copy.deepcopy(self.f)
+        f['household_replies'] = []
+        records = Records(self.path)
+        run_fixture(f, records=records)
+        self.pickups = records.all('pickup')
+        self.lot_id = self.f['surplus_offers'][0]['lot_id']
+        self.received = records.get('request', 'K7P4')['received_this_week_lb']
+        records.close()
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def test_two_processes_split_a_lot_once(self):
+        records = Records(self.path)
+        with records.transaction():
+            for p in records.all('pickup'):
+                records.delete('pickup', p['pickup_id'])
+        first, second = Engine(self.f, records), Engine(self.f, Records(self.path))
+        race(first.records, 'distribute', lambda: second.distribute(self.lot_id))
+        first.distribute(self.lot_id)
+        pickups = first.records.all('pickup')
+        self.assertTrue(pickups)
+        self.assertAlmostEqual(sum(p['pounds'] for p in pickups), sum(p['pounds'] for p in self.pickups))
+        # The fixture run's notices plus exactly one more split.
+        self.assertEqual(len(first.records.events_of_kind('pickup_notice')), 2 * len(self.pickups))
+
+    def test_two_staff_confirming_at_once_count_the_pickup_once(self):
+        pickup = next(p for p in self.pickups if p['request_code'] == 'K7P4')
+        now = pickup['window']['start']
+        body = {'food_bank_id': pickup['food_bank_id'], 'request_code': 'K7P4'}
+        tokens = {pickup['food_bank_id']: 'staff'}
+        first = API(Engine(self.f, Records(self.path)), clock=lambda: now, staff_tokens=tokens)
+        second = API(Engine(self.f, Records(self.path)), clock=lambda: now, staff_tokens=tokens)
+        race(first.records, 'op_confirm_pickup', lambda: self.assertEqual(second.call('POST', '/pickup-confirmations', body, token='staff')[0], 200))
+        self.assertEqual(first.call('POST', '/pickup-confirmations', body, token='staff')[0], 409)
+        self.assertEqual(first.records.get('request', 'K7P4')['received_this_week_lb'], self.received + pickup['pounds'])
 
 
 if __name__ == '__main__':
