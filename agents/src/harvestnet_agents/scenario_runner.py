@@ -18,7 +18,12 @@ and applies each organization's move to the shared draft. It never decides for a
   until a stop rule;
 - the stop rules come from the design (docs/MVP_DESIGN.md §8): **ask a human** (any
   ``ask_human`` move), **keep the disagreement** (``rounds_without_new_terms`` rounds with
-  no counter), and **deadline** (no commitment by the donor's deadline means unclaimed);
+  no counter, or counters that bring back terms already seen at the same point in the turn
+  order: a ``counter_cycle``), and **deadline** (no commitment by the donor's deadline means
+  unclaimed). The harness clock moves ``DEFAULT_MINUTES_PER_TURN`` per turn, so the deadline
+  can fire;
+- quiet rounds where an organization's latest move was invalid are not a disagreement: the
+  run stops as ``negotiator_failure`` (rule ``invalid_moves``), naming the organization;
 - once every organization named in a version has requested its holds, the runner asks
   each named organization's human, using the fixture's scripted human decisions.
   **Agreement** is only when every named organization's human approves that exact
@@ -76,17 +81,18 @@ from .negotiation import (
     SetPounds,
     Turn,
     amendment_to_dict,
+    draft_terms,
 )
 from .lane_b_rule_checks import RuleCheckResult, run_lane_b_rule_checks
 from .llm_negotiators import LLMNegotiator, SpendingCap
 from .profiles import ProfileSet
 from .rules_negotiators import TurnError, _Negotiator, rules_negotiator
 from .serialize import jsonable
-from .scenario import Fault, Scenario, SurplusOffer, draft_to_dict, facts_for, offer_draft
+from .scenario import Fault, Scenario, SurplusOffer, facts_for, offer_draft
 
 __all__ = [
+    "DEFAULT_MINUTES_PER_TURN",
     "FIXTURE_CHECKS_IN_HARNESS",
-    "LANE_A_PENDING",
     "EventLog",
     "Negotiation",
     "Negotiator",
@@ -102,7 +108,15 @@ __all__ = [
 # The fixture's own rule checks read Lane A's records (holds, pickups, pathways), which
 # this runner doesn't keep. Lane A's harness runs them, and the join reports the results.
 FIXTURE_CHECKS_IN_HARNESS = "not run by Lane B's runner: Lane A's harness runs this check (see harvestnet_core.join)"
-LANE_A_PENDING = FIXTURE_CHECKS_IN_HARNESS  # the name #38 used, kept for old imports
+
+
+# How far the harness clock moves per turn (proposed; the contract doesn't say). A turn is one
+# agent exchange: its specialists' facts, its calculators and, for an LLM negotiator, a model
+# call or two, so a few minutes is realistic. At 2 minutes, the fixtures' negotiations (up to
+# about 30 turns after the 12:00 offer, then 15 minutes of scripted approvals) commit by about
+# 1:10 pm, well before their 3 pm deadline, and one that keeps going for 90 turns hits that
+# deadline instead of running forever.
+DEFAULT_MINUTES_PER_TURN = 2.0
 
 
 class Negotiator(Protocol):
@@ -125,13 +139,6 @@ class EventLog:
         event = {"seq": len(self.events) + 1, "at": at.isoformat(), "kind": kind, **jsonable(fields)}
         self.events.append(event)
         return event
-
-
-def draft_terms(draft: DraftVersion) -> dict[str, Any]:
-    """The version's terms, as hashed for approvals: the draft without its free-text reason."""
-    terms = draft_to_dict(draft)
-    terms.pop("reason", None)
-    return terms
 
 
 # --- Calculators, recorded ----------------------------------------------------------------
@@ -284,7 +291,7 @@ class Negotiation:
     """Where a negotiation stopped."""
 
     draft: DraftVersion
-    status: str  # held, waiting_for_human, preserved_disagreement, unclaimed_deadline, move_limit
+    status: str  # held, waiting_for_human, preserved_disagreement, negotiator_failure, unclaimed_deadline, move_limit
     now: datetime
     moves: list[Move] = field(default_factory=list)
     holds: list[dict[str, Any]] = field(default_factory=list)  # hold events on the final version
@@ -302,7 +309,7 @@ def negotiate(
     log: EventLog | None = None,
     calculators: RecordedCalculators | None = None,
     rounds_without_new_terms: int = 3,
-    minutes_per_turn: float = 0,
+    minutes_per_turn: float = DEFAULT_MINUTES_PER_TURN,
     max_rounds: int = 30,
     labels: Mapping[str, str] | None = None,
 ) -> Negotiation:
@@ -320,6 +327,10 @@ def negotiate(
     quiet_rounds = 0
     turn_number = 0
     now = start
+    last_invalid: dict[str, str] = {}  # organization -> problem, while its latest turn was an invalid move
+    # Terms already seen, with the position in turn order of the organization that made them,
+    # mapped to their version: the same terms again at the same point in the order is a cycle.
+    seen_terms = {_terms_key(draft, len(turn_order) - 1): draft.version}
 
     def stop(status: str, rule: str, reason: str) -> Negotiation:
         log.add("stop", now, lot_id=draft.lot_id, version=draft.version, rule=rule, status=status, reason=reason)
@@ -352,12 +363,14 @@ def negotiate(
             if problem is not None:
                 log.add("invalid_move", now, lot_id=draft.lot_id, version=draft.version, organization_id=org, round=round_number,
                         problem=problem, move=move.to_dict() if isinstance(move, Move) else None)
+                last_invalid[org] = problem
                 continue  # an invalid move changes nothing; it counts as no new terms
 
+            last_invalid.pop(org, None)
             moves.append(move)
             event = log.add(
                 "move", now, lot_id=draft.lot_id, version=draft.version, round=round_number, organization_id=org,
-                role=roles[org].value, negotiator=labels.get(org, _negotiator_label(negotiators[org])),
+                role=roles[org].value, negotiator=labels.get(org, negotiator_label(negotiators[org])),
                 turn=turn, facts=facts, move=move.to_dict(), commits=move.commits, calculator_call_seqs=list(seqs),
                 llm=_llm_record(negotiators[org]),
             )
@@ -372,6 +385,13 @@ def negotiate(
                             proposer_id=org, reason=draft.reason, move_seq=event["seq"], amendment=amendment_to_dict(a),
                             terms=draft_terms(draft), terms_hash=terms_hash(draft_terms(draft)),
                             named_organizations=list(draft.named_organizations()))
+                    key = _terms_key(draft, turn_order.index(org))
+                    if key in seen_terms:
+                        return stop("preserved_disagreement", "counter_cycle",
+                                    f"Version {draft.version} has the same terms as version {seen_terms[key]}, at the same point in "
+                                    f"the turn order, so the counters are going round in a cycle (versions {seen_terms[key]} to "
+                                    f"{draft.version}). The involved dashboards show each organization's last reason.")
+                    seen_terms[key] = draft.version
                 case MoveKind.ACCEPT:
                     accepted.add(org)
                 case MoveKind.REQUEST_HOLD:
@@ -390,11 +410,28 @@ def negotiate(
                 log.add("held", now, lot_id=draft.lot_id, version=draft.version, organizations=sorted(named))
                 return Negotiation(draft, "held", now, moves, [h for h in holds if h["version"] == draft.version])
         quiet_rounds = 0 if changed else quiet_rounds + 1
+        if quiet_rounds >= rounds_without_new_terms and last_invalid:
+            # Not a disagreement: an organization's latest word is an invalid move, so there is no
+            # reason of its own to show. Its negotiator failed, and a human has to look.
+            failed = ", ".join(f"{o} ({p})" for o, p in sorted(last_invalid.items()))
+            return stop("negotiator_failure", "invalid_moves",
+                        f"Stalled by invalid moves: {quiet_rounds} rounds with no new terms on version {draft.version}, and the "
+                        f"latest move from {failed} was invalid. This is a negotiator failure, not a preserved disagreement; "
+                        "nothing commits.")
         if quiet_rounds >= rounds_without_new_terms:
             return stop("preserved_disagreement", "preserved_disagreement",
                         f"{quiet_rounds} rounds with no new terms on version {draft.version}. The involved dashboards show each "
                         "organization's last reason.")
     return stop("move_limit", "move_limit", f"No stop rule after {max_rounds} rounds.")
+
+
+def _terms_key(draft: DraftVersion, position: int) -> tuple[str, int]:
+    """A version's terms without its numbering and proposer, hashed, with the turn-order
+    position of the organization that made them."""
+    terms = draft_terms(draft)
+    for name in ("version", "based_on_version", "proposer_id"):
+        terms.pop(name, None)
+    return terms_hash(terms), position
 
 
 def _move_problem(move: Move, org: str, role: Role, draft: DraftVersion) -> str | None:
@@ -416,9 +453,6 @@ def negotiator_label(negotiator: Any) -> str:
     if isinstance(negotiator, _Negotiator):
         return "rules"
     return type(negotiator).__name__
-
-
-_negotiator_label = negotiator_label
 
 
 def _llm_record(negotiator: Any) -> dict[str, Any] | None:
@@ -494,7 +528,7 @@ def run_scenario(
     *,
     negotiator_factory: NegotiatorFactory = rules_negotiator,
     compare_with_stand_in: bool | None = None,
-    minutes_per_turn: float = 0,
+    minutes_per_turn: float = DEFAULT_MINUTES_PER_TURN,
     max_rounds: int = 30,
 ) -> ScenarioRun:
     """Run one fixture's negotiation, approvals, and faults, and check Lane B's rules.
@@ -502,7 +536,7 @@ def run_scenario(
     ``calculators`` is required: Lane A's real ones in the harness, the stand-ins only in
     unit tests. ``compare_with_stand_in`` defaults to comparing whenever ``calculators``
     aren't the stand-ins themselves. ``minutes_per_turn`` is how far the harness clock
-    moves per turn (the contract doesn't say; **proposed** default 0).
+    moves per turn (the contract doesn't say; **proposed** default ``DEFAULT_MINUTES_PER_TURN``).
     """
     if calculators is None:
         raise TypeError("run_scenario needs calculators: Lane A's real ones, or the stand-ins in a unit test")
@@ -521,7 +555,7 @@ def run_scenario(
         )
     offer = scenario.offers[0]
     negotiators = {org: negotiator_factory(scenario.role_of(org), org, calc) for org in scenario.turn_order}
-    labels = {org: _negotiator_label(n) for org, n in negotiators.items()}
+    labels = {org: negotiator_label(n) for org, n in negotiators.items()}
     log.add("scenario", scenario.start, scenario_id=scenario.scenario_id, title=scenario.title, mode=scenario.mode,
             synthetic=scenario.synthetic, note=scenario.note, lot_ids=[o.lot_id for o in scenario.offers],
             organizations=[{"organization_id": o.organization_id, "role": o.role.value, "name": o.name} for o in scenario.organizations],
@@ -688,7 +722,16 @@ class _Run:
         calc.capture(fb, "cooler_failure")
         collect = [c.collect for a in mine
                    if (c := calc.pickup_feasibility(tr.arrives_at, own.pickup_windows, committed.item(a.produce_id).usable_until)).collect]
-        window = min(collect, key=lambda w: w.start) if collect else own.pickup_windows[0]
+        window = min(collect, key=lambda w: w.start) if collect else (own.pickup_windows[0] if own.pickup_windows else None)
+        if window is None:
+            # No pickup hours recorded: there is no households' pickup time to plan a move around.
+            self.log.add("cooler_failure_assessment", fault.at, lot_id=committed.lot_id, version=committed.version, food_bank_id=fb,
+                         items_to_move=[], items_staying=[], items_unsupported=[], reason_cards=[], proposal=None, fallback=[],
+                         not_assessed=True, problem=f"{own.name} has no pickup hours recorded, so there is no households' pickup "
+                         "time to plan around. Its staff decide where the produce goes; nothing is proposed or committed.",
+                         calculator_call_seqs=[e["seq"] for e in self.log.events[first:] if e["kind"] == "calculator_call"],
+                         note="Lane B's cooler-failure logic (#15) needs the households' pickup time; none is recorded.")
+            return
         truck = own.truck
         cooler_truck = None
         if truck is not None and truck.window.end > fault.at:

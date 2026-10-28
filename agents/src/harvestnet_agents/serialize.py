@@ -27,9 +27,14 @@ def jsonable(value: Any, *, timespec: str = "auto") -> Any:
     return value
 
 
+def as_datetime(value: str | datetime) -> datetime:
+    """A time as given, or parsed from its ISO string."""
+    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
+
+
 def utc_iso(value: str | datetime) -> str:
     """An aware time (or its ISO string) in UTC, written with a trailing ``Z``."""
-    when = datetime.fromisoformat(value) if isinstance(value, str) else value
+    when = as_datetime(value)
     if when.tzinfo is None:
         raise ValueError("timestamps must include a UTC offset")
     return when.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")

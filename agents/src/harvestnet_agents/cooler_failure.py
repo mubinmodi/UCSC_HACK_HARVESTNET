@@ -30,6 +30,8 @@ from datetime import datetime, timedelta
 from typing import Any, Literal, Mapping, Sequence
 
 from .profiles import ProduceProfile, ProfileSet, load_profiles
+from .serialize import as_datetime as _dt
+from .wording import clock as _clock, join as _join, lb as _lb, lb as _num, window as _window
 
 __all__ = [
     "Candidate",
@@ -490,37 +492,6 @@ def _pickup(raw: Mapping[str, Any]) -> PickupWindow:
     if window.end <= window.start:
         raise ValueError(f"pickup window ends before it starts: {raw}")
     return window
-
-
-def _dt(value: str) -> datetime:
-    return datetime.fromisoformat(value)
-
-
-# --- Wording helpers (format facts; never add new ones) ----------------------------------
-
-
-def _clock(t: datetime) -> str:
-    hour = t.hour % 12 or 12
-    suffix = "am" if t.hour < 12 else "pm"
-    return f"{hour} {suffix}" if t.minute == 0 else f"{hour}:{t.minute:02d} {suffix}"
-
-
-def _window(w: PickupWindow) -> str:
-    return f"{_clock(w.start)} to {_clock(w.end)}"
-
-
-def _num(x: float) -> str:
-    return str(int(x)) if float(x).is_integer() else f"{x:g}"
-
-
-def _lb(x: float) -> str:
-    return _num(x)
-
-
-def _join(words: Sequence[str]) -> str:
-    if len(words) <= 1:
-        return "".join(words)
-    return ", ".join(words[:-1]) + " and " + words[-1]
 
 
 def _unique(profiles: Sequence[ProduceProfile]) -> list[ProduceProfile]:

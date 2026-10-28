@@ -40,6 +40,8 @@ from datetime import time
 from enum import StrEnum
 from typing import Any
 
+from .claude_client import default_client
+
 # --- Shapes (proposed, pending ticket #1) ------------------------------------------------
 
 
@@ -816,22 +818,29 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 @dataclass
 class ClaudeExtractor:
-    """Thin adapter: one structured-output call per transcript. Spending-conscious: Sonnet
-    5.5 at low effort with a small output cap. Never run in the test suite. Needs the
-    ``claude`` extra (``uv sync --extra claude``) and an API key or ``ant auth login``.
+    """Thin adapter: one structured-output call per transcript. Spending-conscious: the model,
+    effort and output cap come from ``data/llm_config.json`` (``front_desk``: Sonnet 5.5 at low
+    effort with a small output cap), like the negotiators' models; a field given here wins.
+    Never run in the test suite. Needs the ``claude`` extra (``uv sync --extra claude``) and an
+    API key or ``ant auth login``.
 
     ``fallbacks="default"`` retries some safety declines on another model; it is a Claude
     API feature, so drop it if this runs on Bedrock or Vertex."""
 
     client: Any = None
-    model: str = "claude-sonnet-5-5"
-    max_tokens: int = 1024
-    effort: str = "low"
+    model: str | None = None
+    max_tokens: int | None = None
+    effort: str | None = None
     cap: Any = None  # a SpendingCap; default SpendingCap.from_env() (CLAUDE_RUN_CAP_USD, CLAUDE_TOTAL_CAP_USD and the spend ledger)
 
     def __post_init__(self) -> None:
-        from .llm_negotiators import SpendingCap
+        from .llm_negotiators import SpendingCap, load_llm_config
 
+        if None in (self.model, self.max_tokens, self.effort):
+            config = load_llm_config()
+            self.model = self.model or config.front_desk_model
+            self.max_tokens = self.max_tokens or config.front_desk_max_tokens
+            self.effort = self.effort or config.front_desk_effort
         if self.cap is None:
             self.cap = SpendingCap.from_env(caller="front_desk")
 
@@ -854,7 +863,7 @@ class ClaudeExtractor:
         except SpendingCapReached as exc:
             raise ExtractionError(f"spending cap: {exc}; use the text form") from exc
         try:
-            client = self.client if self.client is not None else _default_client()
+            client = self.client if self.client is not None else default_client("ClaudeExtractor")
             response = client.beta.messages.create(**request)
         except Exception:
             self.cap.release(worst)
@@ -881,11 +890,3 @@ class ClaudeExtractor:
         if not isinstance(data, dict):
             raise ExtractionError("extractor output is not an object")
         return data
-
-
-def _default_client() -> Any:
-    try:
-        import anthropic
-    except ImportError as exc:  # pragma: no cover - depends on the optional extra
-        raise RuntimeError("ClaudeExtractor needs the 'claude' extra: uv sync --extra claude") from exc
-    return anthropic.Anthropic()

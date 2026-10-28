@@ -2,11 +2,16 @@
   "kind": "llm_negotiator_config",
   "version": "0.1.0-proposed",
   "status": "proposed",
-  "note": "PROPOSED (docs/MVP_DESIGN.md section 14, ticket #13). Model per negotiator role, effort, output cap, calls per move, and the hard spending cap per run. Change here, not in code.",
+  "note": "PROPOSED (docs/MVP_DESIGN.md section 14, ticket #13). Model per negotiator role, effort, output cap, calls per move, and the hard spending cap per run; front_desk is the intake extractor's model, effort and output cap (ticket #14). Change here, not in code.",
   "models": {
     "donor": "claude-sonnet-5-5",
     "food_bank": "claude-opus-5-5",
     "advocate": "claude-opus-5-5"
+  },
+  "front_desk": {
+    "model": "claude-sonnet-5-5",
+    "effort": "low",
+    "max_tokens": 1024
   },
   "effort": "medium",
   "max_tokens": 8000,
