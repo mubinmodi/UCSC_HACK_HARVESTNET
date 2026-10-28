@@ -16,7 +16,7 @@ The lead (mubinmodi) has authorized implementation, reviewing and merging teamma
 
 ## Sources of truth
 
-- **Design:** `docs/MVP_DESIGN.md` (Decided vs Proposed), `CONTEXT.md` (glossary), `docs/adr/0001`–`0012` (0001–0005 frozen framework, 0006–0009 MVP scope cuts, 0010–0012 build decisions), `docs/CHALLENGE.md` (Cisco rules). These win over any other file.
+- **Design:** `docs/MVP_DESIGN.md` (Decided vs Proposed), `CONTEXT.md` (glossary), `docs/adr/0001`–`0013` (0001–0005 frozen framework, 0006–0009 MVP scope cuts, 0010–0013 build decisions), `docs/CHALLENGE.md` (Cisco rules). These win over any other file.
 - **Interfaces:** `docs/contracts/` (agreed; contract-v0.2).
 - **Tickets:** GitHub issues #1–#25 on `mubinmodi/UCSC_HACK_HARVESTNET`; `.scratch/harvestnet-mvp/` holds the spec, lane plan and the original ticket snapshot.
 - **Cut scope:** `future scope/`, reference only, never current behavior.

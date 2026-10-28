@@ -111,7 +111,7 @@ Agents that **decide for their own organization**: donors and food banks. The **
 
 ### The real disagreements
 
-- **Food banks compete** for limited produce and want the items their households can use.
+- **Food banks compete** for limited produce and want the items their households can use. A food bank whose households are still below fair share may **contest** another food bank's share of an item, and the other food bank concedes or takes back pounds for itself (ADR 0013). Decided (lead, October 27, 2026).
 - **Donors want the produce gone** with minimal effort, so they'd rather a food bank collects. **Food banks would rather the donor drops off**, to save their truck for other runs.
 - **The advocate** pushes produce toward the food bank whose households are furthest below fair share, even when another food bank is closer to the donor.
 
@@ -119,7 +119,8 @@ Agents that **decide for their own organization**: donors and food banks. The **
 
 - **Donor:** the produce leaves before its deadline, every item has a destination or is clearly marked unclaimed, and any drop-off fits its vehicle and time.
 - **Food bank:** each item fits its storage at arrival time and arrives before pickup hours. Its households can collect it before it spoils. Any collection fits its truck schedule.
-- **Advocate:** never accepts or rejects. On its turn, it may propose a change that shrinks the largest fair-share gap or reduces waste, citing pooled counts.
+- **Food bank in a contest:** it contests only while its own households are below fair share and nothing it can receive is unclaimed, and only up to its own gap. When another food bank contests its share, it concedes pounds beyond its own gap and may take back pounds within it. It never fights for pounds beyond fair share.
+- **Advocate:** never accepts or rejects. On its turn, it may propose a change that shrinks the largest fair-share gap or reduces waste, citing pooled counts. In a contest it may back either food bank, whichever is further below fair share.
 
 ### When a human must approve (Proposed)
 
@@ -272,6 +273,7 @@ stateDiagram-v2
 | Agreement | Every named party approves the same version, so it becomes a commitment |
 | Ask a human | Any condition doubt, or any change to a committed plan |
 | Keep the disagreement | 3 rounds with no new terms. The involved donor and food bank dashboards show the options and each agent's reason |
+| Keep the disagreement (contest) | A contest and a take-back repeat the same terms. The dashboards of both food banks show both versions and both reasons (ADR 0013) |
 | Deadline | No commitment by the donor's deadline means the produce is unclaimed, with reasons recorded. **Nothing is ever committed automatically.** |
 
 ## 9. Workflows
