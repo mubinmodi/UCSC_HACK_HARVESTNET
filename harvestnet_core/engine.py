@@ -327,8 +327,10 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 move=engine.rules_for(role,org).move(typed).to_dict()
             def record_provenance(**extra):
                 # Runs after every provider call, so a re-ask keeps both calls' cost and counts.
-                from .workflows import record_provenance as record_move_provenance
-                record_move_provenance(engine,lot_id,org,move_provider,**extra)
+                # A host's named calculations are re-run with the core's calculators for the number check.
+                from .workflows import record_provenance as record_move_provenance, replay_calculations
+                metadata=record_move_provenance(engine,lot_id,org,move_provider,**extra)
+                replay_calculations(engine,typed,pool,(metadata or {}).get('calculator_calls'))
             record_provenance()
             if queued:
                 with engine.records.transaction():

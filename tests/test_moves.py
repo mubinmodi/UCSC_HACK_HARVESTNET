@@ -110,7 +110,8 @@ class MoveRequestTests(unittest.TestCase):
         reply = answer(receiver, request, signer('city'))
         body = core_verifier().verify(reply)
         self.assertEqual((body['kind'], body['in_reply_to'], body['event_id'], body['turn']), (MOVE_REPLY, 'move-1', 'city:move-1', 'city'))
-        self.assertEqual(body['host'], {'organization_id': 'city', 'transport': 'a2a_jsonrpc', 'policy': 'real_policy_adapter', 'policy_metadata': None})
+        self.assertEqual(body['host'], {'organization_id': 'city', 'transport': 'a2a_jsonrpc', 'policy': 'real_policy_adapter',
+                                        'policy_metadata': None, 'calculator_calls': None})
         # An identical retry returns the saved move, signed again (a new nonce the core has not seen).
         again = answer(receiver, request, signer('city'))
         self.assertEqual(strip_auth(again), body)
@@ -139,6 +140,23 @@ class MoveRequestTests(unittest.TestCase):
             self.assertEqual(moves.pop_metadata(), {'move_source': 'a2a', 'transport': 'a2a_jsonrpc', 'host_policy': 'real_policy_adapter',
                                                     'source': 'fallback', 'model_calls': 0, 'number_check_failures': 0,
                                                     'cost_usd': 0.0, 'fallback_reason': 'spending cap'})
+        finally:
+            hosts.close()
+
+    def test_the_hosts_calculations_travel_with_the_move_by_name_only(self):
+        class Calculating:
+            calls = None
+            def __call__(self, org, data):
+                self.calls = [{'name': 'gap_after_plan', 'args': {'gap_lb': 31.0, 'planned_lb': 0.0}}]
+                return own_move(org, data)
+            def pop_calculator_calls(self):
+                calls, self.calls = self.calls, None
+                return calls
+        hosts = Hosts(policy=Calculating())
+        try:
+            moves = provider(hosts.endpoints, Fallback())
+            moves('city', wire('city'))
+            self.assertEqual(moves.pop_metadata()['calculator_calls'], [{'name': 'gap_after_plan', 'args': {'gap_lb': 31.0, 'planned_lb': 0.0}}])
         finally:
             hosts.close()
 

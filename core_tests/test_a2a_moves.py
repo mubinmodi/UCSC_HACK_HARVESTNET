@@ -28,8 +28,11 @@ STAFF = {org: f'test-staff-{org}' for org in ORGANIZATIONS}
 QUIET = lambda *args, **kwargs: None  # noqa: E731
 
 
-def scenario():
-    return json.loads(Path('core_fixtures/normal-afternoon.json').read_text())
+FIXTURES = sorted(Path('core_fixtures').glob('*.json'))
+
+
+def scenario(path='core_fixtures/normal-afternoon.json'):
+    return json.loads(Path(path).read_text())
 
 
 def serve(handler):
@@ -71,7 +74,8 @@ def reply_body(org, envelope, move):
 class LiveStack:
     """The core API server and the five organization hosts, on localhost ports."""
 
-    def __init__(self, policies=None, replace=None):
+    def __init__(self, policies=None, replace=None, fixture=None):
+        self.fixture = fixture or scenario()
         self.keys = generate_keys()  # throwaway per-sender transport keys for this test
         self.env = host_env(self.keys)
         self.stops, self.receivers, endpoints = [], {}, {}
@@ -84,7 +88,7 @@ class LiveStack:
                 handler = handler_for(self.receivers[org], Verifier(org, own), 'http://localhost', Signer(org, self.keys[org]))
             endpoints[org], stop = serve(handler)
             self.stops.append(stop)
-        self.engine = Engine(scenario())
+        self.engine = Engine(copy.deepcopy(self.fixture))
         environ = {'HARVESTNET_MOVE_TRANSPORT': 'a2a', 'AGENT_ENDPOINTS': json.dumps(endpoints),
                    'TRANSPORT_SIGNING_KEY': self.env['TRANSPORT_SIGNING_KEY_CORE'],
                    'TRANSPORT_VERIFY_KEYS': self.env['TRANSPORT_VERIFY_KEYS_CORE'],
@@ -97,8 +101,9 @@ class LiveStack:
         self.base = f'http://127.0.0.1:{server.server_port}'
         self.stops.append(lambda: (server.shutdown(), server.server_close(), thread.join()))
 
-    def offer(self):
-        status, created = http(self.base, 'POST', '/surplus-offers', copy.deepcopy(scenario()['surplus_offers'][0]), STAFF['market'])
+    def offer(self, offer=None):
+        offer = copy.deepcopy(offer or self.fixture['surplus_offers'][0])
+        status, created = http(self.base, 'POST', '/surplus-offers', offer, STAFF[offer['donor_id']])
         assert status == 201, created
         return created['lot_id']
 
@@ -250,6 +255,78 @@ class LiveA2AMoveTests(unittest.TestCase):
             self.assertEqual([move for move, _ in sources_of(stack.events(lot_id))], self.expected_moves)
         finally:
             stack.close()
+
+
+class EveryFixtureTests(unittest.TestCase):
+    """The five core fixtures, every offer: the same moves, numbers and evaluation either way."""
+
+    def test_every_offer_gets_the_same_moves_over_a2a_as_in_process(self):
+        for path in FIXTURES:
+            with self.subTest(fixture=path.name):
+                f = scenario(path)
+                stack = LiveStack(fixture=f)
+                engine = Engine(copy.deepcopy(f))
+                api = API(engine, clock=lambda: NOW, staff_tokens=STAFF)
+                try:
+                    for offer in f['surplus_offers']:
+                        if offer.get('recall_notice'):
+                            continue
+                        lot_id = stack.offer(offer)
+                        status, created = api.call('POST', '/surplus-offers', copy.deepcopy(offer), token=STAFF[offer['donor_id']])
+                        pairs = sources_of(stack.events(lot_id))
+                        self.assertEqual([m for m, _ in pairs], [m for m, _ in sources_of(engine.records.events(created['lot_id']))])
+                        self.assertEqual({s['move_source'] for _, s in pairs}, {'a2a'})
+                        # The hosts' calculations are re-run by the core, so no reason fails the number check.
+                        self.assertEqual(stack.engine.records.get('lot', lot_id).get('number_check_failures', 0),
+                                         engine.records.get('lot', created['lot_id']).get('number_check_failures', 0))
+                finally:
+                    stack.close()
+                    engine.records.close()
+
+    def test_evaluation_numbers_are_the_same_with_moves_from_the_hosts(self):
+        from harvestnet_core.engine import run_fixture
+        from harvestnet_core.evaluation import metrics
+        from harvestnet_core.records import Records
+        stack = LiveStack()  # its five hosts; the harness runs without the API
+        try:
+            for path in FIXTURES:
+                with self.subTest(fixture=path.name):
+                    f = scenario(path)
+                    results = []
+                    for provider in (None, stack.provider):
+                        records = Records()
+                        run = run_fixture(copy.deepcopy(f), provider, records=records)
+                        results.append(metrics(f, run, records))
+                        records.close()
+                    self.assertEqual(results[0], results[1])
+        finally:
+            stack.close()
+
+
+class ReplayCalculationsTests(unittest.TestCase):
+    def test_only_calculations_from_known_numbers_reach_the_number_check(self):
+        from harvestnet_agents.llm_negotiators import NumberPool
+        from harvestnet_agents.negotiation import parse_agent_input
+        from harvestnet_core.workflows import replay_calculations
+        engine = Engine(scenario())
+        try:
+            draft = engine.create_offer(copy.deepcopy(scenario()['surplus_offers'][0]))
+            raw = {'role': 'food_bank', 'draft': draft, 'facts': engine.facts('city', draft),
+                   'turn': {'organization_id': 'city', 'number': 2, 'now': NOW, 'accepted_by': []}}
+            _role, typed = parse_agent_input(raw)
+            pool = NumberPool()
+            pool.add(typed)
+            gap = raw['facts']['demand']['below_fair_share_lb']
+            self.assertFalse(pool.has_number(987.0))
+            replay_calculations(engine, typed, pool, [
+                {'name': 'adjust_pounds', 'args': {'current_lb': 0.0, 'change_lb': 987.0}},  # 987 is in nothing it was given
+                {'name': 'gap_after_plan', 'args': {'gap_lb': gap, 'planned_lb': draft['items'][0]['pounds']}},
+                {'name': 'no_such_calculator', 'args': {}},
+            ])
+            self.assertFalse(pool.has_number(987.0))  # a manufactured number never becomes a calculator result
+            self.assertEqual(engine.calc.calls[-1].name, 'gap_after_plan')  # the core's own calculator ran it
+        finally:
+            engine.records.close()
 
 
 class MoveTransportConfigTests(unittest.TestCase):

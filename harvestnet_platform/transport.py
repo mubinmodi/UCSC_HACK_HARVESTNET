@@ -145,6 +145,24 @@ def policy_metadata(policy):
     return known_policy_metadata(pop() if callable(pop) else None)
 
 
+MAX_CALCULATOR_CALLS = 500
+
+
+def calculator_calls(calls):
+    """A policy's calculator calls for its move, as ``[{name, args}]``, or ``None`` if malformed.
+    They name calculations only; the core re-runs each with its own calculators."""
+    if not isinstance(calls, list) or len(calls) > MAX_CALCULATOR_CALLS or not all(
+            isinstance(c, dict) and set(c) == {'name', 'args'} and isinstance(c['name'], str) and isinstance(c['args'], dict)
+            for c in calls):
+        return None
+    return copy.deepcopy(calls)
+
+
+def policy_calculator_calls(policy):
+    pop = getattr(policy, 'pop_calculator_calls', None)
+    return calculator_calls(pop() if callable(pop) else None)
+
+
 class Receiver:
     def __init__(self, organization, policy=stand_in, db_path=':memory:', policy_label=None):
         if organization not in ORGANIZATIONS:
@@ -194,13 +212,13 @@ class Receiver:
             latest = self.db.execute('SELECT COALESCE(MAX(sequence),0) FROM receipts WHERE event=?', (event,)).fetchone()[0]
             if seq != latest + 1:
                 raise ValueError('Out-of-order message; retry missing sequence first')
-            move = metadata = None
+            move = metadata = calls = None
             if actor == self.organization:
                 move = validate_move(self.policy(self.organization, copy.deepcopy(agent_input)), self.organization, draft['version'])
-                metadata = policy_metadata(self.policy)
+                metadata, calls = policy_metadata(self.policy), policy_calculator_calls(self.policy)
             response = {'organization_id': self.organization, 'event_id': event, 'sequence': seq, 'move': move}
             if kind == MOVE_REQUEST:
-                response.update(policy=self.policy_label, policy_metadata=metadata)
+                response.update(policy=self.policy_label, policy_metadata=metadata, calculator_calls=calls)
             self.db.execute('INSERT INTO receipts VALUES (?,?,?,?)', (event,seq,received,canonical(response)))
             self.db.commit()
             return response
@@ -251,7 +269,8 @@ def answer(receiver, envelope, signer=None, transport='a2a_jsonrpc'):
     reply = {'kind': MOVE_REPLY, 'event_id': f"{receiver.organization}:{envelope['event_id']}", 'sequence': 1,
              'turn': receiver.organization, 'in_reply_to': envelope['event_id'], 'move': result['move'],
              'host': {'organization_id': receiver.organization, 'transport': transport,
-                      'policy': result['policy'], 'policy_metadata': result['policy_metadata']}}
+                      'policy': result['policy'], 'policy_metadata': result['policy_metadata'],
+                      'calculator_calls': result['calculator_calls']}}
     # A retry returns the saved move, signed again with a new nonce.
     return signer.sign(reply, TURN_PUBLISHER)
 

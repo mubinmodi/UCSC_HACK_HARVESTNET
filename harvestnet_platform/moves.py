@@ -20,8 +20,8 @@ import threading
 import time
 import uuid
 from .http import request_json, seconds
-from .transport import (MOVE_REPLY, MOVE_REQUEST, ORGANIZATIONS, known_policy_metadata, rpc_request,
-                        turn_organization, validate_move)
+from .transport import (MOVE_REPLY, MOVE_REQUEST, ORGANIZATIONS, calculator_calls, known_policy_metadata,
+                        rpc_request, turn_organization, validate_move)
 from .transport_auth import TURN_PUBLISHER, AuthError, Signer, Verifier
 
 HOST_TRANSPORTS = ('a2a_jsonrpc', 'agntcy_native')
@@ -133,6 +133,10 @@ class A2AMoveProvider:
         metadata = {'move_source': 'a2a', 'transport': host['transport'], 'host_policy': host.get('policy')}
         # The host's own report (a Claude policy's source, calls and cost), known fields only.
         metadata.update(known_policy_metadata(host.get('policy_metadata')) or {})
+        # The calculations the host made for its move, named only; the core re-runs them itself.
+        calls = calculator_calls(host.get('calculator_calls'))
+        if calls:
+            metadata['calculator_calls'] = calls
         self.local.metadata = metadata
         self.log(f"move: {organization} {move['action']} on version {version}, from its own host over {host['transport']}", flush=True)
         return move

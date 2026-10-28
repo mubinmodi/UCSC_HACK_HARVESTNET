@@ -41,7 +41,9 @@ def record_provenance(engine,lot_id,org,provider,**extra):
         return None
     metadata=provider.pop_metadata()
     if metadata:
-        engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**metadata,**extra})
+        # The host's calculator calls are re-run (replay_calculations), not kept in the records.
+        recorded={k:v for k,v in metadata.items() if k!='calculator_calls'}
+        engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**recorded,**extra})
         count=metadata.get('number_check_failures',0)
         if count:
             engine.records.event(lot_id,engine.now,'number_check_failure',{'count':count,'organization_id':org,'problems':['reported by validated LLM policy']})
@@ -50,6 +52,25 @@ def record_provenance(engine,lot_id,org,provider,**extra):
                 current['number_check_failures']=current.get('number_check_failures',0)+count
                 engine.records.put('lot',lot_id,current)
     return metadata
+
+
+def replay_calculations(engine,typed,pool,calls):
+    """Re-run, with the core's own calculators, the calculations a host named for its move
+    (``calculator_calls``, in the LLM negotiators' calculator tool shape), so the outgoing-message
+    number check sees the calculator results it would see in process. The results are the core's,
+    never the host's: each call's numbers and times must already be in the pool (the draft, the
+    facts, the precomputed results or an earlier call), as for a Claude negotiator's own tool calls,
+    and a call that fails that check or the calculator adds nothing."""
+    from types import SimpleNamespace
+    from harvestnet_agents.llm_negotiators import LLMNegotiator,_check_tool_inputs
+    tools=SimpleNamespace(calculators=engine.calc)  # LLMNegotiator._call reads only its calculators
+    for call in calls or ():
+        try:
+            _check_tool_inputs(call['name'],call['args'],pool)
+            result=LLMNegotiator._call(tools,call['name'],call['args'],typed)
+        except (ValueError,KeyError,TypeError,AttributeError):
+            continue
+        pool.add(result)
 
 
 def move_source(org,move,provided,queued):
@@ -132,6 +153,7 @@ def negotiate_pending(engine,lot_id,provider=None):
             asked=provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session})
             # Where it came from: the organization's own host over A2A, or the labeled fallback.
             provided.append(record_provenance(engine,lot_id,org,provider))
+            replay_calculations(engine,typed,pool,(provided[-1] or {}).get('calculator_calls'))
             return asked
         move=ask()
         for call in engine.calc.calls[call_start:]: pool.add(call.result)

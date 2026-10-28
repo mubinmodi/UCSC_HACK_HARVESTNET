@@ -56,7 +56,7 @@ SQLite is the labeled single-host option. PostgreSQL takes an advisory transacti
 | `records.py` | Transactional JSON records and the append-only event log. Events never contain an email address. |
 | `protocol.py` | The rules for holds, versions, approvals and commitment. |
 | `engine.py` | The scripted harness (`run_fixture`): a seeded clock, owner-by-owner turns, scripted humans, pickups and household replies. |
-| `workflows.py` | Negotiation for live offers (`negotiate_pending`) without scripted humans, the outgoing-message number check, and the `move_source` and `policy_provenance` events that say where each live move came from. |
+| `workflows.py` | Negotiation for live offers (`negotiate_pending`) without scripted humans, the outgoing-message number check (with a host's named calculations re-run by the core's calculators, `replay_calculations`), and the `move_source` and `policy_provenance` events that say where each live move came from. |
 | `move_transport.py` | The live server's move provider: in process, or each organization's own host over signed A2A (`harvestnet_platform.moves`), with the labeled in-process fallback and the own-facts check. |
 | `checks.py` | Audit checks recomputed from stored evidence (approvals, holds, conservation, fair share over the household's whole week), never a constant. Booking uses each owner's real capacity (`Engine.audit_capacities`). |
 | `calculators.py` | The agreed calculators plus capacity, gap-after-plan and arrival helpers (`docs/contracts/calculators.md`). |
