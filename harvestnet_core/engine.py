@@ -145,6 +145,17 @@ class Engine:
         bank = self.records.get("bank", owner)
         return {STORAGE_COLD: min((s["cold_free_lb"] for s in bank["storage"]),default=0), STORAGE_DRY:min((s["dry_free_lb"] for s in bank["storage"]),default=0), "truck":bank["truck"]["capacity_lb"] if bank.get("truck") else 0}
 
+    def audit_capacities(self, lot_id, owners=()):
+        """Every holding owner's real capacity, for the audit's booking check: read from the lot
+        that names it, this lot first, never a default of zero for an owner of another lot."""
+        this = self.records.get("lot", lot_id)
+        caps = {}
+        for lot, extra in [(this, set(owners))] + [(l, set()) for l in self.records.all("lot") if l["draft"]["lot_id"] != lot_id]:
+            for owner in set(named(lot["draft"])) | set(lot["holds"]) | extra:
+                for resource, value in self.capacities(owner, lot["draft"]).items():
+                    caps.setdefault((owner, resource), value)
+        return caps
+
     def validate(self, draft, holds):
         parse_draft(draft)
         transports = {t["food_bank_id"]:t for t in draft["transports"]}
@@ -261,6 +272,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
     if observer: observer.attach(engine)
     result={"commitments":[],"pathways":[],"rule_checks":{},"mode":fixture["mode"],"synthetic":fixture["synthetic"],"scenario_id":fixture["scenario_id"],"calculator_label":engine.calc.label,"policy_label":getattr(move_provider,'label','real rules-based negotiators' if move_provider is None else 'configured policy adapter'),"scripted_humans":True,"events":[],"faults":[]}
     checks=[]
+    result["lot_rule_checks"]={}
     pending_faults=list(fixture.get("faults",[]))
     for offer in fixture["surplus_offers"]:
         engine.now=offer["reported_at"]
@@ -423,8 +435,9 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
         if changes.changes_for(engine.records,lot_id) or changes.failed_coolers(engine):
             checks.append(changes.rule_checks(engine,lot_id))
         else:
-            caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}
-            checks.append(rule_checks(engine.records,lot_id,pathways,caps))
+            checks.append(rule_checks(engine.records,lot_id,pathways,engine.audit_capacities(lot_id)))
+        # Each lot's own checks, so the evaluation judges each commitment by its own lot.
+        result["lot_rule_checks"][lot_id]=checks[-1]
         if observer: observer.lot_finished(engine,lot_id)
         result["commitments"].extend(engine.records.get("lot",lot_id)["commitments"])
         result["pathways"].extend(pathways)

@@ -183,5 +183,52 @@ class DeclinesAreFinal(unittest.TestCase):
         self.assertEqual(kept, {declined['version']: 'declined', proposed['version']: 'awaiting_approvals'})
 
 
+def two_lots():
+    """Normal afternoon plus a second offer from the same donor that nobody can take (condition doubt)."""
+    f = load('normal-afternoon')
+    second = copy.deepcopy(f['surplus_offers'][0])
+    second.update(lot_id='lot-market-1013-b')
+    second['items'] = [{**second['items'][0], 'quantity': 10, 'condition_doubt': 'bruising reported'}]
+    f['surplus_offers'].append(second)
+    records = Records()
+    return f, run_fixture(copy.deepcopy(f), records=records), records
+
+
+class AuditChecks(unittest.TestCase):
+    """The audit checks are as strong as their names."""
+
+    def test_holds_on_another_lot_are_checked_against_their_owners_real_capacity(self):
+        _, run, _ = two_lots()
+        # The second lot names only the donor; the food banks' holds on the first lot still fit their storage.
+        self.assertTrue(run['rule_checks']['no_double_booking'])
+        self.assertTrue(run['rule_checks']['zero_invalid_commitments'])
+
+    def test_fair_share_counts_the_households_whole_week(self):
+        from harvestnet_core.checks import rule_checks
+        f, run, records = two_lots()
+        engine = Engine(f, records)
+        lot_id = f['surplus_offers'][0]['lot_id']
+        request = records.get('request', 'K7P4')
+        # Another lot's pickup that, with this lot's, takes the household past its fair share.
+        mine = sum(p['pounds'] for p in records.all('pickup') if p['request_code'] == 'K7P4' and p['status'] != 'released')
+        extra = request['fair_share_lb'] - request.get('initial_received_lb', 0) - mine + 1
+        with records.transaction():
+            records.put('pickup', 'pk-other-1', {'pickup_id': 'pk-other-1', 'request_code': 'K7P4', 'lot_id': 'lot-market-1013-b', 'food_bank_id': 'city',
+                                                 'pounds': extra, 'items': [{'produce_id': 'apples', 'pounds': extra}], 'status': 'committed'})
+        pathways = engine.pathways(lot_id)
+        self.assertFalse(rule_checks(records, lot_id, pathways, {})['fair_share_respected'])
+
+    def test_invalid_commitments_counts_each_commitment_by_its_own_lot(self):
+        from harvestnet_core.evaluation import metrics
+        f, run, records = two_lots()
+        self.assertEqual(metrics(f, run, records)['invalid_commitments'], 0)
+        # Suppose only the second lot (which committed nothing) failed its checks.
+        run['lot_rule_checks']['lot-market-1013-b']['zero_invalid_commitments'] = False
+        run['rule_checks']['zero_invalid_commitments'] = False
+        self.assertEqual(metrics(f, run, records)['invalid_commitments'], 0)
+        run['lot_rule_checks']['lot-market-1013']['zero_invalid_commitments'] = False
+        self.assertEqual(metrics(f, run, records)['invalid_commitments'], 1)
+
+
 if __name__ == '__main__':
     unittest.main()

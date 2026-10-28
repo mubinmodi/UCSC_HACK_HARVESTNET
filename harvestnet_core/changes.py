@@ -357,8 +357,7 @@ def rule_checks(engine, lot_id):
     records = engine.records
     lot = records.get('lot', lot_id)
     orgs = set(named(lot['draft'])) | {o for c in changes_for(records, lot_id) for o in c['organizations']}
-    caps = {(o, r): v for o in orgs for r, v in engine.capacities(o, lot['draft']).items()}
-    core = core_checks(records, lot_id, pathways(engine, lot_id), caps)
+    core = core_checks(records, lot_id, pathways(engine, lot_id), engine.audit_capacities(lot_id, orgs))
     change = change_checks(engine, lot_id)
     merged = {k: core[k] and change.get(k, True) for k in core}
     merged.update({k: v for k, v in change.items() if k not in core})

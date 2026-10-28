@@ -37,7 +37,8 @@ def rule_checks(records, lot_id, pathways, capacities):
     for p in pathways:
         totals[p["produce_id"]] += number(p["pounds"])
     conservation = all(abs(totals[i["produce_id"]] - i["pounds"]) < 1e-6 for i in lot["draft"]["items"])
-    pickups = [p for p in records.all("pickup") if p["lot_id"] == lot_id and p["status"] != "released"]
+    # Fair share is a household's whole week: its live pickups from every lot, not only this one.
+    pickups = [p for p in records.all("pickup") if p["status"] != "released"]
     received = defaultdict(float)
     for p in pickups:
         received[p["request_code"]] += p["pounds"]

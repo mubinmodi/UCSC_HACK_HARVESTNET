@@ -191,6 +191,17 @@ def produce_split(records, calc=None):
     return out
 
 
+def invalid_commitments(run, records, arrivals):
+    """Commitments (first and changed) that fail their own lot's invalid-commitment or booking check.
+
+    Each commitment is judged by the checks of the lot it belongs to, so one bad lot never marks
+    another lot's commitments invalid. A run saved before per-lot checks falls back to the run-wide ones."""
+    bad=lambda c: not (c.get('zero_invalid_commitments',False) and c.get('no_double_booking',False))
+    if 'lot_rule_checks' not in run:
+        return sum(bad(run['rule_checks']) for _ in arrivals)
+    return sum(bad(c) for lot_id,c in run['lot_rule_checks'].items() for e in records.events(lot_id) if e['kind'] in ('commitment','change_commitment'))
+
+
 def metrics(fixture, run, records):
     requests=records.all('request')
     collected=[p for p in records.all('pickup') if p['status']=='collected']
@@ -200,10 +211,9 @@ def metrics(fixture, run, records):
     arrivals=[e for e in run['events'] if e['kind'] in ('commitment','change_commitment')]
     first=[e for e in arrivals if e['kind']=='commitment']
     start=min((dt(o['reported_at']) for o in fixture['surplus_offers']),default=dt(fixture['clock']['start']))
-    checks=run['rule_checks']
     coverage=coverage_by_food_bank(fixture,requests)
     # The old produce_wasted_lb, kept under its own name so the definition change is visible.
-    result={**split,"uncollected_by_scenario_households_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
+    result={**split,"uncollected_by_scenario_households_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":invalid_commitments(run,records,arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
     if fixture.get('faults'):
         result['cooler_failure']=cooler_failure_report(run)
     return result
