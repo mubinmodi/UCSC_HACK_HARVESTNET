@@ -166,7 +166,8 @@ def test_the_advocate_schema_only_allows_counter_or_pass():
     schema = submit_move_tool(Role.ADVOCATE)["input_schema"]
     assert schema["properties"]["kind"]["enum"] == ["counter", "pass"]
     assert "holds" not in schema["properties"]
-    assert {t["name"] for t in tools_for(Role.ADVOCATE)} == {"gap_after_plan", "adjust_pounds", "capacity_fit", "submit_move"}
+    assert {t["name"] for t in tools_for(Role.ADVOCATE)} == {"gap_after_plan", "adjust_pounds", "capacity_fit", "proportional_split",
+                                                              "submit_move"}
 
 
 def test_an_advocate_that_tries_to_vote_is_refused_and_must_counter():
@@ -560,7 +561,7 @@ def test_every_rules_based_counter_passes_its_own_counter_check():
             m = self.inner.move(agent_input)
             if m.kind is MoveKind.COUNTER and hasattr(self.inner, "counter_problems"):
                 amended = agent_input.draft.amend(m.amendment, proposer_id=m.organization_id, reason=m.reason)
-                refused.extend(self.inner.counter_problems(agent_input, amended))
+                refused.extend(self.inner.counter_problems(agent_input, amended, amendment=m.amendment))
             return m
 
     fixtures = [Path(__file__).parents[2] / "docs" / "contracts" / "examples" / "scenario-normal-afternoon.json",
@@ -569,10 +570,9 @@ def test_every_rules_based_counter_passes_its_own_counter_check():
     for path in fixtures:
         run = run_scenario(load_scenario(path), StandInCalculators(),
                            negotiator_factory=lambda role, org, calc: Checked(rules_negotiator(role, org, calc)))
-        # More households than produce: food banks below fair share contest each other's shares,
-        # and the standoff is kept as a preserved disagreement (ADR 0013).
-        expected = ("preserved_disagreement",) if path.stem == "more-households-than-produce" else ("committed", "waiting_for_human")
-        assert run.status in expected, (path.name, run.status)
+        # More households than produce: food banks below fair share contest each other's shares and
+        # concede toward need, converging on a proportional split that commits (ADR 0013).
+        assert run.status in ("committed", "waiting_for_human"), (path.name, run.status)
         contested += sum(1 for e in run.events if e["kind"] == "move" and e["role"] == "food_bank"
                          and (e["move"].get("amendment") or {}).get("to_food_bank_id") == e["organization_id"])
     assert contested > 0  # so the rules' contests and take-backs passed their own counter check too

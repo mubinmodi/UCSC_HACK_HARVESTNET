@@ -78,8 +78,9 @@ from .negotiation import (
     Role,
     SetPounds,
     Turn,
+    Claim,
     amendment_to_dict,
-    contest_of,
+    claim_of,
     draft_terms,
 )
 from .lane_b_rule_checks import RuleCheckResult, run_lane_b_rule_checks
@@ -153,6 +154,7 @@ _INPUT_NAMES = {
     "arrival_time": ("departs_at", "travel_minutes"),
     "adjust_pounds": ("current_lb", "change_lb"),
     "to_pounds": ("produce_id", "quantity", "unit", "lb_per_unit"),
+    "proportional_split": ("held_lb", "gaps_lb"),
 }
 
 
@@ -232,6 +234,9 @@ class RecordedCalculators:
 
     def to_pounds(self, produce_id, quantity, unit, lb_per_unit=None):
         return self._call("to_pounds", produce_id, quantity, unit, lb_per_unit)
+
+    def proportional_split(self, held_lb, gaps_lb):
+        return self._call("proportional_split", held_lb, gaps_lb)
 
     def _call(self, name: str, *args: Any) -> Any:
         inputs = dict(zip(_INPUT_NAMES[name], args))
@@ -323,6 +328,7 @@ def negotiate(
     holds: list[dict[str, Any]] = []
     declined: set[tuple[str, str]] = set()  # (food bank, item) a food bank countered down
     contests: list[tuple[str, str, str]] = []  # (food bank, food bank it took pounds from, item), ADR 0013
+    claims: list[Claim] = []  # every contest and take-back, with the gap it stated, for every negotiator to read
     moves: list[Move] = []
     quiet_rounds = 0
     turn_number = 0
@@ -352,7 +358,7 @@ def negotiate(
             turn = Turn(org, turn_number, now, tuple(sorted(accepted)))
             seqs = calculators.capture(org, "move") if calculators is not None else []
             try:
-                move = negotiators[org].move(AgentInput(draft, facts, turn))
+                move = negotiators[org].move(AgentInput(draft, facts, turn, claims=tuple(claims)))
                 problem = _move_problem(move, org, roles[org], draft)
             except (TurnError, MoveError, DraftError, CalculatorError) as exc:
                 move, problem = None, f"{type(exc).__name__}: {exc}"
@@ -372,7 +378,7 @@ def negotiate(
             event = log.add(
                 "move", now, lot_id=draft.lot_id, version=draft.version, round=round_number, organization_id=org,
                 role=roles[org].value, negotiator=labels.get(org, negotiator_label(negotiators[org])),
-                turn=turn, facts=facts, move=move.to_dict(), commits=move.commits, calculator_call_seqs=list(seqs),
+                turn=turn, facts=facts, claims=list(claims), move=move.to_dict(), commits=move.commits, calculator_call_seqs=list(seqs),
                 llm=_llm_record(negotiators[org]),
             )
             match move.kind:
@@ -380,7 +386,8 @@ def negotiate(
                     a = move.amendment
                     if isinstance(a, SetPounds) and a.food_bank_id == org and a.pounds < draft.pounds(a.produce_id, org):
                         declined.add((org, a.produce_id))
-                    if roles[org] is Role.FOOD_BANK and (c := contest_of(org, a)) is not None:
+                    if (c := claim_of(org, roles[org], a, next_draft.version)) is not None:
+                        claims.append(c)
                         contests.append((org, c.from_food_bank_id, c.produce_id))
                     draft = next_draft
                     accepted, changed = set(), True

@@ -136,7 +136,9 @@ class ReadsInsideTransactions(unittest.TestCase):
         second = API(Engine(self.f, Records(self.path)), clock=lambda: now, staff_tokens=tokens)
         race(first.records, 'op_confirm_pickup', lambda: self.assertEqual(second.call('POST', '/pickup-confirmations', body, token='staff')[0], 200))
         self.assertEqual(first.call('POST', '/pickup-confirmations', body, token='staff')[0], 409)
-        self.assertEqual(first.records.get('request', 'K7P4')['received_this_week_lb'], self.received + pickup['pounds'])
+        # A confirmation collects every open pickup the household has at that food bank, counted once.
+        at_bank = sum(p['pounds'] for p in self.pickups if p['request_code'] == 'K7P4' and p['food_bank_id'] == pickup['food_bank_id'])
+        self.assertAlmostEqual(first.records.get('request', 'K7P4')['received_this_week_lb'], self.received + at_bank)
 
 
 class DeclinesAreFinal(unittest.TestCase):

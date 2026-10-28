@@ -1133,3 +1133,14 @@ The lead asked Claude to address every finding of an adversarial review of the p
 4. **Redeploy to AWS afterward.**
 
 The review's numbers came from synthetic, rules-based runs. Evaluation results from before ADR 0013 describe the old mechanism and must be re-measured. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after this edit.
+
+## User direction (October 27, 2026): contests concede toward need, recorded by Claude
+
+The first implementation of ADR 0013 (PR #83) kept every standoff, as the ADR then said. Under scarcity every food bank holds only pounds within its own gap, so each contest met a take-back of the same pounds and the lot ended as a preserved disagreement. In the synthetic more-households-than-produce scenario, rules-based went from 0 to 52 lb wasted and from 4 households reached to 0. The lead replaced "a standoff is kept, not broken" with "concede toward need" (principle Decided; details Proposed):
+
+1. A contest states its claim: the contester's own fair-share gap, as `claimant_gap_lb` on the shift, from its own calculator.
+2. The food bank that loses pounds concedes pounds beyond its gap. Within it, it takes back only enough to reach its proportional share of the item they both hold, split in proportion to the two gaps (`proportional_split`). The contester accepts that split, and may contest once more, down to its share, if the other took back more.
+3. The advocate backs the side below its proportional share and passes once the split is proportional. A low-access area breaks exact ties only. It still never votes.
+4. A preserved disagreement remains only when a side refuses the proportional split and the terms repeat.
+
+Claude amended ADR 0013, MVP_DESIGN sections 6 and 8, CONTEXT.md "Contest", and the READMEs. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after this edit.

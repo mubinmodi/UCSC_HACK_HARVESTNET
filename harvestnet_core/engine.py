@@ -14,7 +14,7 @@ from harvestnet_agents.terms import terms_hash
 from .protocol import Protocol, Conflict, dt, number, named
 from .records import Records
 from .checks import rule_checks
-from .workflows import checked_move, contests_in, cycle_key
+from .workflows import checked_move, claims_in, contests_in, cycle_key
 
 
 class Engine:
@@ -307,7 +307,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
             if (turn-1)%len(fixture["turn_order"])==0:
                 round_start_version=draft["version"]
             if observer: observer.turn_started(engine,lot_id,org)
-            input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined,contests_in(engine,lot_id)),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)}}
+            input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined,contests_in(engine,lot_id)),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)},"claims":claims_in(engine,lot_id)}
             if observer: observer.facts_ready(engine,lot_id,org,input)
             queued_id=lot_id+':'+org
             try:

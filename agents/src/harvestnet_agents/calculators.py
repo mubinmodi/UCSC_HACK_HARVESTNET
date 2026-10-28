@@ -24,13 +24,16 @@ The named calculators:
 - ``adjust_pounds``: a share after adding or removing pounds (never below zero), so
   no negotiator, rules-based or LLM, does arithmetic in its own words.
 - ``to_pounds``: unit conversion through produce profiles (#12).
+- ``proportional_split``: the pounds of one item two food banks hold, split in proportion to
+  their fair-share gaps (ADR 0013, concede toward need), in whole tenths of a pound.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timedelta
-from typing import Any, Literal, Protocol, Sequence
+from typing import Any, Literal, Mapping, Protocol, Sequence
 
 from .fair_share import FairShareTable, fair_share, load_fair_share_table
 from .negotiation import StorageSlot, TimeWindow
@@ -46,9 +49,11 @@ __all__ = [
     "GapResult",
     "HouseholdBalance",
     "PickupCheck",
+    "ProportionalSplit",
     "StandInCalculators",
     "StorageAt",
     "result_to_dict",
+    "split_in_proportion",
 ]
 
 
@@ -104,6 +109,56 @@ class PickupCheck:
 
 
 @dataclass(frozen=True)
+class ProportionalSplit:
+    """The pounds of one item two (or more) food banks hold, split in proportion to their gaps."""
+
+    total_lb: float  # the pounds they hold between them
+    shares_lb: dict[str, float]  # each one's proportional share, in whole pounds, capped at its gap
+    short_lb: dict[str, float]  # how far each one's holding is below its share (0 if at or above it)
+    unassigned_lb: float  # pounds beyond every gap, or under a pound left by rounding (it stays where it is)
+
+
+# Shares are counted in whole pounds (proposed): a food bank hands out pounds, not ounces, and a
+# coarser unit keeps the split from being chased a tenth of a pound at a time.
+SPLIT_UNIT_LB = 1
+
+
+def split_in_proportion(held_lb: Mapping[str, float], gaps_lb: Mapping[str, float]) -> ProportionalSplit:
+    """``proportional_split``, shared by the stand-ins and the core's calculators so both give
+    the same answer. Shares are whole pounds (``SPLIT_UNIT_LB``), each at most its gap; the
+    pounds left after rounding down go to the largest remainders (ties: food bank id). With
+    pounds enough for every gap, each share is its gap and the rest is unassigned."""
+    if set(held_lb) != set(gaps_lb) or not gaps_lb:
+        raise CalculatorError("proportional_split needs the pounds held and the gap of the same food banks")
+    for x in (*held_lb.values(), *gaps_lb.values()):
+        if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or x < 0:
+            raise CalculatorError("pounds held and gaps must be finite, nonnegative numbers")
+    ids = sorted(gaps_lb)
+    total = round(sum(float(held_lb[k]) for k in ids), 9)
+    need = sum(float(gaps_lb[k]) for k in ids)
+    if need <= 0:
+        shares = {k: 0.0 for k in ids}
+    elif total >= need:
+        shares = {k: float(gaps_lb[k]) for k in ids}
+    else:
+        per = 1 / SPLIT_UNIT_LB
+        count = math.floor(round(total * per, 6))
+        quota = {k: count * gaps_lb[k] / need for k in ids}
+        cap = {k: math.floor(round(gaps_lb[k] * per, 6)) for k in ids}
+        units = {k: min(math.floor(round(quota[k], 6)), cap[k]) for k in ids}
+        left = count - sum(units.values())
+        for k in sorted(ids, key=lambda k: (-(quota[k] - units[k]), k)):
+            if left <= 0:
+                break
+            if units[k] < cap[k]:
+                units[k] += 1
+                left -= 1
+        shares = {k: float(units[k] * SPLIT_UNIT_LB) for k in ids}
+    short = {k: round(max(0.0, shares[k] - held_lb[k]), 9) for k in ids}
+    return ProportionalSplit(total, shares, short, round(max(0.0, total - sum(shares.values())), 9))
+
+
+@dataclass(frozen=True)
 class CalculatorCall:
     name: str
     inputs: dict[str, Any]
@@ -124,6 +179,7 @@ class Calculators(Protocol):
     def arrival_time(self, departs_at: datetime, travel_minutes: float) -> datetime: ...
     def adjust_pounds(self, current_lb: float, change_lb: float) -> float: ...
     def to_pounds(self, produce_id: str, quantity: float, unit: str, lb_per_unit: float | None = None) -> float: ...
+    def proportional_split(self, held_lb: Mapping[str, float], gaps_lb: Mapping[str, float]) -> ProportionalSplit: ...
 
 
 @dataclass
@@ -202,6 +258,10 @@ class StandInCalculators:
         except UnitConversionError as exc:
             raise CalculatorError(str(exc)) from exc
         return self._log("to_pounds", {"produce_id": produce_id, "quantity": quantity, "unit": unit, "lb_per_unit": lb_per_unit}, result)
+
+    def proportional_split(self, held_lb: Mapping[str, float], gaps_lb: Mapping[str, float]) -> ProportionalSplit:
+        result = split_in_proportion(held_lb, gaps_lb)
+        return self._log("proportional_split", {"held_lb": dict(held_lb), "gaps_lb": dict(gaps_lb)}, result)
 
     def _log(self, name: str, inputs: dict[str, Any], result: Any) -> Any:
         self.calls.append(CalculatorCall(name=name, inputs=inputs, result=result))

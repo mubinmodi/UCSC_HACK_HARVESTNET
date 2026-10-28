@@ -14,6 +14,7 @@ This follows Lane B's stand-in `Calculators` interface (#11, `agents/src/harvest
 |---|---|---|
 | `fair_share` | `household_size` | `pounds` per `period` (`week`), `unit`, `table_version`, `is_placeholder` |
 | `household_portions` | `pounds_available` of one item at one food bank; `households` (`request_code`, `household_size`, `received_lb`) | `portions` (`request_code`, `pounds`, `fair_share_lb`, `still_below_lb`), `left_over_lb`, `table_version` |
+| `proportional_split` (Proposed, ADR 0013) | `held_lb` and `gaps_lb`: pounds of one item each food bank holds, and each one's fair-share gap | `total_lb`, `shares_lb` (whole pounds, each at most its gap, in proportion to the gaps), `short_lb` (how far each holding is below its share), `unassigned_lb` |
 | `storage_at` (storage over time) | `storage` intervals (`window`, `cold_free_lb`, `dry_free_lb`), and a time `at` | `cold_free_lb`, `dry_free_lb`, `recorded` |
 | `pickup_feasibility` | `arrives_at`, the food bank's `pickup_windows`, the item's `usable_until` | `feasible`, `collect` window or `null`, `problem`, `last_pickup_end` |
 | `to_pounds` (unit conversion) | `produce_id`, `quantity`, `unit`, `lb_per_unit` (the donor's stated pack weight, or `null`) | `pounds` |

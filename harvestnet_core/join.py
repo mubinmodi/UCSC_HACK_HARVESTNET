@@ -132,7 +132,7 @@ class HarnessLog:
             'move', self._clock(), lot_id=lot_id, version=agent_input['draft']['version'],
             round=(turn['number'] - 1) // self.turns + 1, organization_id=org, role=agent_input['role'],
             negotiator=negotiator_label(negotiator) if negotiator is not None else 'move provider',
-            turn=turn, facts=agent_input['facts'], move=move,
+            turn=turn, facts=agent_input['facts'], claims=agent_input.get('claims', []), move=move,
             # A harness move never commits: only every named human's approval does (protocol.approve).
             commits=False, calculator_call_seqs=list(self.move_seqs))
         self.last_move, self.last_move_seq = move, event['seq']

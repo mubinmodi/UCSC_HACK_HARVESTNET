@@ -47,17 +47,27 @@ def cycle_key(draft,position):
     return terms_hash(terms),position
 
 
-def contests_in(engine,lot_id):
-    """Every contest or take-back in the lot's shared records: a food bank's counter that moved
-    one item from another food bank to itself (ADR 0013). The advocate may back either side."""
+def claims_in(engine,lot_id):
+    """Every contest or take-back in the lot's shared records, oldest first, with the gap it
+    stated: a food bank's counter that moved one item from another food bank to itself (ADR
+    0013). Every negotiator reads them, so the other food bank can weigh the claim."""
     out=[]
     for e in engine.records.events(lot_id):
         if e['kind']!='amendment':
             continue
         a,org=e['data'].get('amendment') or {},e['data'].get('organization_id')
         if a.get('kind')=='shift_pounds' and engine.roles.get(org)=='food_bank' and a.get('to_food_bank_id')==org and a.get('from_food_bank_id')!=org:
-            c={'food_bank_id':org,'from_food_bank_id':a['from_food_bank_id'],'produce_id':a['produce_id']}
-            if c not in out: out.append(c)
+            out.append({'food_bank_id':org,'from_food_bank_id':a['from_food_bank_id'],'produce_id':a['produce_id'],
+                        'gap_lb':a.get('claimant_gap_lb'),'version':e['data']['draft']['version']})
+    return out
+
+
+def contests_in(engine,lot_id):
+    """Each pair of food banks contesting an item, once: what the advocate's facts carry."""
+    out=[]
+    for c in claims_in(engine,lot_id):
+        pair={'food_bank_id':c['food_bank_id'],'from_food_bank_id':c['from_food_bank_id'],'produce_id':c['produce_id']}
+        if pair not in out: out.append(pair)
     return out
 
 
@@ -73,7 +83,7 @@ def negotiate_pending(engine,lot_id,provider=None):
         if lot['status']=='committed': return lot
         org=engine.fixture['turn_order'][(turn-1)%len(engine.fixture['turn_order'])]
         if (turn-1)%len(engine.fixture['turn_order'])==0: previous_version=d['version']
-        raw={'role':engine.roles[org],'draft':d,'facts':engine.facts(org,d,(),contests_in(engine,lot_id)),'turn':{'organization_id':org,'number':turn,'now':engine.now,'accepted_by':sorted(accepts)}}
+        raw={'role':engine.roles[org],'draft':d,'facts':engine.facts(org,d,(),contests_in(engine,lot_id)),'turn':{'organization_id':org,'number':turn,'now':engine.now,'accepted_by':sorted(accepts)},'claims':claims_in(engine,lot_id)}
         role,typed=parse_agent_input(raw)
         from harvestnet_agents.llm_negotiators import NumberPool,precompute
         pool=NumberPool();pool.add(typed);call_start=len(engine.calc.calls)

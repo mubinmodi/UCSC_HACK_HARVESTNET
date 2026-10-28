@@ -93,8 +93,8 @@ The final state of a draft agreement: every named organization has approved the 
 _Avoid_: Deal, consensus, approval
 
 **Contest**:
-A food bank's counter that moves pounds of one item from another food bank's share to its own, citing its own households' fair-share gap. The other food bank answers for itself, and no pounds move in a commitment without its staff approver (ADR 0013).
-_Avoid_: Claim (a hold is not a claim either), steal, override, bump
+A food bank's counter that moves pounds of one item from another food bank's share to its own, stating its own households' fair-share gap (its claim, `claimant_gap_lb`). The other food bank answers for itself by conceding toward need: the pounds of that item they both hold are split in proportion to the two gaps. No pounds move in a commitment without its staff approver (ADR 0013).
+_Avoid_: Claim as a name for the contest itself (a hold is not a claim either), steal, override, bump
 
 **Reason card**:
 A short explanation, built only from recorded facts, of why one candidate food bank was chosen or rejected, for example after a cooler failure.

@@ -167,11 +167,16 @@ def _food_bank_counter_problems(org: str, raw: Mapping[str, Any], e: Event, log:
     gap = (e.get("facts") or {}).get("demand", {}).get("below_fair_share_lb")
     if contest is None or terms is None or gap is None:
         return []
-    remaining = gap - parse_draft(terms).planned_lb(org)
+    draft = parse_draft(terms)
+    remaining = gap - draft.planned_lb(org)
+    out = []
     if contest.pounds > remaining + POUNDS_TOLERANCE:
-        return [f"its contest moves {contest.pounds:g} lb of {contest.produce_id} from {contest.from_food_bank_id}, more than "
-                f"its own remaining fair-share gap of {max(0.0, remaining):g} lb (ADR 0013)"]
-    return []
+        out.append(f"its contest moves {contest.pounds:g} lb of {contest.produce_id} from {contest.from_food_bank_id}, more than "
+                   f"its own remaining fair-share gap of {max(0.0, remaining):g} lb (ADR 0013)")
+    # A contest states its claim: the mover's own fair-share gap this week, from its own facts.
+    if contest.claimant_gap_lb is not None and abs(contest.claimant_gap_lb - gap) > 1e-6:
+        out.append(f"its contest states a {contest.claimant_gap_lb:g} lb gap, but its own facts give {gap:g} lb (ADR 0013)")
+    return out
 
 
 def _facts_problems(org: str, role: str, facts: Mapping[str, Any], request_codes: Sequence[str]) -> list[str]:
@@ -227,7 +232,8 @@ def numbers_trace_to_inputs(log: _Log) -> list[str]:
             out.append(f"move {e['seq']}: version {e['version']} is not in the log")
             continue
         pool = NumberPool()
-        for source in (terms, e["facts"], e["turn"], log.outputs(e["calculator_call_seqs"])):
+        # The claims other food banks stated (ADR 0013) are structured records every negotiator reads.
+        for source in (terms, e["facts"], e["turn"], e.get("claims", []), log.outputs(e["calculator_call_seqs"])):
             pool.add(source)
         pool.add(_draft_totals(parse_draft(terms), log), ("draft_totals_lb",))  # pounds, by construction
         out.extend(f"move {e['seq']} ({e['organization_id']}): {p}" for p in _move_number_problems(e["move"], pool))

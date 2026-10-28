@@ -42,6 +42,9 @@ __all__ = [
     "AdvocateFacts",
     "AgentInput",
     "Allocation",
+    "Claim",
+    "claim_of",
+    "parse_claim",
     "Amendment",
     "DemandCounts",
     "DonorFacts",
@@ -177,13 +180,19 @@ class SetPounds:
 
 @dataclass(frozen=True)
 class ShiftPounds:
-    """Move pounds of one item from one food bank to another."""
+    """Move pounds of one item from one food bank to another.
+
+    A food bank's contest or take-back (a shift to itself) states its claim in
+    ``claimant_gap_lb``: its own households' fair-share gap leaving aside its own pounds of
+    this item, from its own calculator (ADR 0013, proposed field). The other food bank weighs
+    that against its own gap. It is not part of the draft's terms."""
 
     produce_id: str
     from_food_bank_id: str
     to_food_bank_id: str
     pounds: float
     kind: Literal["shift_pounds"] = "shift_pounds"
+    claimant_gap_lb: float | None = None
 
 
 @dataclass(frozen=True)
@@ -300,8 +309,9 @@ class DraftVersion:
                     raise DraftError("a shift moves a positive number of pounds")
                 if lb > self.pounds(p, src) + POUNDS_TOLERANCE:
                     raise DraftError(f"{src} has only {self.pounds(p, src)} lb of {p} to shift")
-                allocations = _set(allocations, p, src, max(0.0, self.pounds(p, src) - lb))
-                allocations = _set(allocations, p, dst, self.pounds(p, dst) + lb)
+                # Rounded to a billionth of a pound, so a split such as 2 + 14.3 reads back as 16.3.
+                allocations = _set(allocations, p, src, round(max(0.0, self.pounds(p, src) - lb), 9))
+                allocations = _set(allocations, p, dst, round(self.pounds(p, dst) + lb, 9))
             case SetTransport(food_bank_id=fb, mover=m, departs_at=d, arrives_at=a):
                 transports = [tr for tr in transports if tr.food_bank_id != fb] + [Transport(fb, Mover(m), d, a)]
             case _:
@@ -446,11 +456,31 @@ class OrgMessage:
 
 
 @dataclass(frozen=True)
+class Claim:
+    """A contest or take-back in the shared records, with the claim it stated (ADR 0013): the
+    food bank that shifted pounds of one item to itself, from whom, and its stated gap."""
+
+    food_bank_id: str
+    from_food_bank_id: str
+    produce_id: str
+    gap_lb: float | None  # ShiftPounds.claimant_gap_lb; None if the counter stated no claim
+    version: int  # the version the counter created
+
+
+@dataclass(frozen=True)
 class AgentInput:
     draft: DraftVersion
     facts: Facts
     turn: Turn
     messages: tuple[OrgMessage, ...] = ()  # other organizations' words this round
+    claims: tuple[Claim, ...] = ()  # every contest and take-back on this lot so far, oldest first
+
+    def stated_gap(self, food_bank_id: str, produce_id: str) -> float | None:
+        """The latest gap ``food_bank_id`` stated in a claim on this item, or None."""
+        for c in reversed(self.claims):
+            if c.food_bank_id == food_bank_id and c.produce_id == produce_id and c.gap_lb is not None:
+                return c.gap_lb
+        return None
 
 
 # --- Moves -------------------------------------------------------------------------------
@@ -542,13 +572,16 @@ def amendment_to_dict(a: Amendment) -> dict[str, Any]:
         case SetPounds():
             return {"kind": a.kind, "produce_id": a.produce_id, "food_bank_id": a.food_bank_id, "pounds": a.pounds}
         case ShiftPounds():
-            return {
+            out = {
                 "kind": a.kind,
                 "produce_id": a.produce_id,
                 "from_food_bank_id": a.from_food_bank_id,
                 "to_food_bank_id": a.to_food_bank_id,
                 "pounds": a.pounds,
             }
+            if a.claimant_gap_lb is not None:
+                out["claimant_gap_lb"] = a.claimant_gap_lb
+            return out
         case SetTransport():
             return {
                 "kind": a.kind,
@@ -565,7 +598,9 @@ def amendment_from_dict(raw: Mapping[str, Any]) -> Amendment:
     if kind == "set_pounds":
         return SetPounds(raw["produce_id"], raw["food_bank_id"], float(raw["pounds"]))
     if kind == "shift_pounds":
-        return ShiftPounds(raw["produce_id"], raw["from_food_bank_id"], raw["to_food_bank_id"], float(raw["pounds"]))
+        gap = raw.get("claimant_gap_lb")
+        return ShiftPounds(raw["produce_id"], raw["from_food_bank_id"], raw["to_food_bank_id"], float(raw["pounds"]),
+                           claimant_gap_lb=None if gap is None else float(gap))
     if kind == "set_transport":
         return SetTransport(raw["food_bank_id"], Mover(raw["mover"]), _dt(raw["departs_at"]), _dt(raw["arrives_at"]))
     raise DraftError(f"unknown amendment kind {kind!r}")
@@ -655,10 +690,22 @@ def parse_turn(raw: Mapping[str, Any]) -> Turn:
 
 
 def parse_agent_input(raw: Mapping[str, Any]) -> tuple[Role, AgentInput]:
-    """Load ``{"role", "draft", "facts", "turn", "messages"?}``: one recorded negotiator input."""
+    """Load ``{"role", "draft", "facts", "turn", "messages"?, "claims"?}``: one recorded negotiator input."""
     role = Role(raw["role"])
     messages = tuple(OrgMessage(m["organization_id"], m["text"]) for m in raw.get("messages", []))
-    return role, AgentInput(parse_draft(raw["draft"]), parse_facts(role, raw["facts"]), parse_turn(raw["turn"]), messages)
+    claims = tuple(parse_claim(c) for c in raw.get("claims", []))
+    return role, AgentInput(parse_draft(raw["draft"]), parse_facts(role, raw["facts"]), parse_turn(raw["turn"]), messages, claims)
+
+
+def parse_claim(raw: Mapping[str, Any]) -> Claim:
+    gap = raw.get("gap_lb")
+    return Claim(raw["food_bank_id"], raw["from_food_bank_id"], raw["produce_id"], None if gap is None else float(gap), int(raw["version"]))
+
+
+def claim_of(organization_id: str, role: Role | str, amendment: Amendment | None, version: int) -> Claim | None:
+    """The claim a counter makes, if it is a food bank's contest or take-back (ADR 0013)."""
+    c = contest_of(organization_id, amendment) if Role(role) is Role.FOOD_BANK else None
+    return None if c is None else Claim(organization_id, c.from_food_bank_id, c.produce_id, c.claimant_gap_lb, version)
 
 
 def _window(raw: Mapping[str, Any]) -> TimeWindow:
