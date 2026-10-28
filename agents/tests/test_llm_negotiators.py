@@ -565,8 +565,15 @@ def test_every_rules_based_counter_passes_its_own_counter_check():
 
     fixtures = [Path(__file__).parents[2] / "docs" / "contracts" / "examples" / "scenario-normal-afternoon.json",
                 *sorted((Path(__file__).parents[2] / "core_fixtures").glob("*.json"))]
+    contested = 0
     for path in fixtures:
         run = run_scenario(load_scenario(path), StandInCalculators(),
                            negotiator_factory=lambda role, org, calc: Checked(rules_negotiator(role, org, calc)))
-        assert run.status in ("committed", "waiting_for_human"), (path.name, run.status)
+        # More households than produce: food banks below fair share contest each other's shares,
+        # and the standoff is kept as a preserved disagreement (ADR 0013).
+        expected = ("preserved_disagreement",) if path.stem == "more-households-than-produce" else ("committed", "waiting_for_human")
+        assert run.status in expected, (path.name, run.status)
+        contested += sum(1 for e in run.events if e["kind"] == "move" and e["role"] == "food_bank"
+                         and (e["move"].get("amendment") or {}).get("to_food_bank_id") == e["organization_id"])
+    assert contested > 0  # so the rules' contests and take-backs passed their own counter check too
     assert refused == []

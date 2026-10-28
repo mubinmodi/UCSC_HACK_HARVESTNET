@@ -38,17 +38,42 @@ def declined_by(lot):
     return sorted(o for o,r in lot['approvals'].items() if r['decision']=='decline')
 
 
+def cycle_key(draft,position):
+    """A version's terms without its numbering, proposer and reason, with the turn-order
+    position of whoever made them: the same key twice is a cycle of counters (the agents
+    runner's ``counter_cycle`` rule), kept as a preserved disagreement (ADR 0013)."""
+    from harvestnet_agents.terms import terms_hash
+    terms={k:v for k,v in draft.items() if k not in ('version','based_on_version','proposer_id','reason')}
+    return terms_hash(terms),position
+
+
+def contests_in(engine,lot_id):
+    """Every contest or take-back in the lot's shared records: a food bank's counter that moved
+    one item from another food bank to itself (ADR 0013). The advocate may back either side."""
+    out=[]
+    for e in engine.records.events(lot_id):
+        if e['kind']!='amendment':
+            continue
+        a,org=e['data'].get('amendment') or {},e['data'].get('organization_id')
+        if a.get('kind')=='shift_pounds' and engine.roles.get(org)=='food_bank' and a.get('to_food_bank_id')==org and a.get('from_food_bank_id')!=org:
+            c={'food_bank_id':org,'from_food_bank_id':a['from_food_bank_id'],'produce_id':a['produce_id']}
+            if c not in out: out.append(c)
+    return out
+
+
 def negotiate_pending(engine,lot_id,provider=None):
     accepts=set()
     no_change=0
     previous_version=None
+    seen_terms={}
+    cycle=None
     for turn in range(1,201):
         lot=engine.records.get('lot',lot_id)
         d=lot['draft']
         if lot['status']=='committed': return lot
         org=engine.fixture['turn_order'][(turn-1)%len(engine.fixture['turn_order'])]
         if (turn-1)%len(engine.fixture['turn_order'])==0: previous_version=d['version']
-        raw={'role':engine.roles[org],'draft':d,'facts':engine.facts(org,d),'turn':{'organization_id':org,'number':turn,'now':engine.now,'accepted_by':sorted(accepts)}}
+        raw={'role':engine.roles[org],'draft':d,'facts':engine.facts(org,d,(),contests_in(engine,lot_id)),'turn':{'organization_id':org,'number':turn,'now':engine.now,'accepted_by':sorted(accepts)}}
         role,typed=parse_agent_input(raw)
         from harvestnet_agents.llm_negotiators import NumberPool,precompute
         pool=NumberPool();pool.add(typed);call_start=len(engine.calc.calls)
@@ -73,8 +98,15 @@ def negotiate_pending(engine,lot_id,provider=None):
             raise ValueError('advocate cannot vote')
         engine.records.event(lot_id,engine.now,'move',move)
         if move['action']=='counter':
-            engine.protocol.amend(lot_id,d['version'],org,move['amendment'],move['reason'],engine.now)
+            updated=engine.protocol.amend(lot_id,d['version'],org,move['amendment'],move['reason'],engine.now)
             accepts.clear()
+            key=cycle_key(updated,engine.fixture['turn_order'].index(org))
+            if key in seen_terms:
+                cycle=(f"Version {updated['version']} has the same terms as version {seen_terms[key]} at the same point in the turn "
+                       "order, so the counters are going round in a cycle; the disagreement is kept for each organization's staff, "
+                       "and nothing commits automatically")
+                break
+            seen_terms[key]=updated['version']
         elif move['action']=='accept': accepts.add(org)
         elif move['action']=='request_hold':
             if move.get('resource_owner')!=org: raise ValueError('hold belongs to another owner')
@@ -101,7 +133,8 @@ def negotiate_pending(engine,lot_id,provider=None):
         if lot['status']=='committed': return lot
         lot['status']='preserved_disagreement'
         declined=declined_by(lot)
-        lot['stop_reason']=(f"{', '.join(declined)} declined version {lot['draft']['version']} and the rounds that followed produced no new terms; no automatic commitment"
+        lot['stop_reason']=(cycle if cycle else
+                            f"{', '.join(declined)} declined version {lot['draft']['version']} and the rounds that followed produced no new terms; no automatic commitment"
                             if declined else 'No approved feasible pathway after published negotiation rounds')
         engine.records.put('lot',lot_id,lot)
         engine.records.event(lot_id,engine.now,'preserved_disagreement',{'reason':lot['stop_reason']})

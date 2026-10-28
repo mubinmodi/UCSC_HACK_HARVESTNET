@@ -65,8 +65,6 @@ from datetime import datetime, timedelta
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from .calculators import CalculatorCall, CalculatorError, Calculators, StandInCalculators
-from .cooler_failure import Candidate, CoolerFailure, HeldItem, PickupWindow, assess_cooler_failure
-from .cooler_failure import Truck as CoolerTruck
 from .terms import terms_hash
 from .negotiation import (
     AdvocateFacts,
@@ -81,12 +79,13 @@ from .negotiation import (
     SetPounds,
     Turn,
     amendment_to_dict,
+    contest_of,
     draft_terms,
 )
 from .lane_b_rule_checks import RuleCheckResult, run_lane_b_rule_checks
 from .llm_negotiators import LLMNegotiator, SpendingCap
 from .profiles import ProfileSet
-from .rules_negotiators import TurnError, _Negotiator, rules_negotiator
+from .rules_negotiators import RulesFoodBank, TurnError, _Negotiator, rules_negotiator
 from .serialize import jsonable
 from .scenario import Fault, Scenario, SurplusOffer, facts_for, offer_draft
 
@@ -323,6 +322,7 @@ def negotiate(
     accepted: set[str] = set()
     holds: list[dict[str, Any]] = []
     declined: set[tuple[str, str]] = set()  # (food bank, item) a food bank countered down
+    contests: list[tuple[str, str, str]] = []  # (food bank, food bank it took pounds from, item), ADR 0013
     moves: list[Move] = []
     quiet_rounds = 0
     turn_number = 0
@@ -331,9 +331,10 @@ def negotiate(
     # Terms already seen, with the position in turn order of the organization that made them,
     # mapped to their version: the same terms again at the same point in the order is a cycle.
     seen_terms = {_terms_key(draft, len(turn_order) - 1): draft.version}
+    versions = {draft.version: draft}
 
-    def stop(status: str, rule: str, reason: str) -> Negotiation:
-        log.add("stop", now, lot_id=draft.lot_id, version=draft.version, rule=rule, status=status, reason=reason)
+    def stop(status: str, rule: str, reason: str, **extra: Any) -> Negotiation:
+        log.add("stop", now, lot_id=draft.lot_id, version=draft.version, rule=rule, status=status, reason=reason, **extra)
         return Negotiation(draft, status, now, moves, [h for h in holds if h["version"] == draft.version], reason)
 
     for round_number in range(1, max_rounds + 1):
@@ -347,7 +348,7 @@ def negotiate(
                             "unclaimed. Nothing is committed automatically.")
             facts = facts_at(org, now)
             if isinstance(facts, AdvocateFacts):
-                facts = replace(facts, declined=tuple(sorted(declined)))
+                facts = replace(facts, declined=tuple(sorted(declined)), contests=tuple(dict.fromkeys(contests)))
             turn = Turn(org, turn_number, now, tuple(sorted(accepted)))
             seqs = calculators.capture(org, "move") if calculators is not None else []
             try:
@@ -379,6 +380,8 @@ def negotiate(
                     a = move.amendment
                     if isinstance(a, SetPounds) and a.food_bank_id == org and a.pounds < draft.pounds(a.produce_id, org):
                         declined.add((org, a.produce_id))
+                    if roles[org] is Role.FOOD_BANK and (c := contest_of(org, a)) is not None:
+                        contests.append((org, c.from_food_bank_id, c.produce_id))
                     draft = next_draft
                     accepted, changed = set(), True
                     log.add("version", now, lot_id=draft.lot_id, version=draft.version, based_on_version=draft.based_on_version,
@@ -386,11 +389,16 @@ def negotiate(
                             terms=draft_terms(draft), terms_hash=terms_hash(draft_terms(draft)),
                             named_organizations=list(draft.named_organizations()))
                     key = _terms_key(draft, turn_order.index(org))
+                    versions[draft.version] = draft
                     if key in seen_terms:
+                        first = seen_terms[key]
+                        last = {m.organization_id: {"organization_id": m.organization_id, "version": m.version, "action": m.kind.value,
+                                                    "reason": m.reason} for m in moves}
                         return stop("preserved_disagreement", "counter_cycle",
-                                    f"Version {draft.version} has the same terms as version {seen_terms[key]}, at the same point in "
-                                    f"the turn order, so the counters are going round in a cycle (versions {seen_terms[key]} to "
-                                    f"{draft.version}). The involved dashboards show each organization's last reason.")
+                                    f"Version {draft.version} has the same terms as version {first}, at the same point in "
+                                    f"the turn order, so the counters are going round in a cycle (versions {first} to "
+                                    f"{draft.version}). The involved dashboards show each organization's last reason.",
+                                    options=_cycle_sides(versions, first, draft.version), reasons=list(last.values()))
                     seen_terms[key] = draft.version
                 case MoveKind.ACCEPT:
                     accepted.add(org)
@@ -423,6 +431,24 @@ def negotiate(
                         f"{quiet_rounds} rounds with no new terms on version {draft.version}. The involved dashboards show each "
                         "organization's last reason.")
     return stop("move_limit", "move_limit", f"No stop rule after {max_rounds} rounds.")
+
+
+def _cycle_sides(versions: Mapping[int, DraftVersion], first: int, last: int) -> list[dict[str, Any]]:
+    """The versions a cycle went through, newest first, one per distinct plan, each with its
+    proposer and reason: what the involved dashboards show for a kept disagreement (for a
+    contest, both food banks' versions and reasons, ADR 0013)."""
+    out, seen = [], set()
+    for v in range(last, first, -1):
+        d = versions.get(v)
+        if d is None:
+            continue
+        plan = tuple((a.produce_id, a.food_bank_id, a.pounds) for a in d.allocations)
+        if plan in seen:
+            continue
+        seen.add(plan)
+        out.append({"version": d.version, "proposer_id": d.proposer_id, "reason": d.reason,
+                    "allocations": [{"produce_id": p, "food_bank_id": fb, "pounds": lb} for p, fb, lb in plan]})
+    return out
 
 
 def _terms_key(draft: DraftVersion, position: int) -> tuple[str, int]:
@@ -589,6 +615,7 @@ class _Run:
     def __init__(self, scenario: Scenario, offer: SurplusOffer, log: EventLog, calc: RecordedCalculators, clock: dict[str, datetime]):
         self.scenario, self.offer, self.log, self.calc, self.clock = scenario, offer, log, calc, clock
         self._facts: dict[str, tuple[int, Facts]] = {}
+        self.negotiators: Mapping[str, Negotiator] = {}
         self._faults_logged: set[int] = set()
 
     def at(self, t: datetime) -> datetime:
@@ -622,6 +649,7 @@ class _Run:
 
     def go(self, negotiators, labels, minutes_per_turn, max_rounds):
         s, offer, log = self.scenario, self.offer, self.log
+        self.negotiators = negotiators
         now = self.at(max(s.start, offer.reported_at))
         if offer.recall_notice:
             log.add("stop", now, lot_id=offer.lot_id, version=None, rule="recalled", status="recalled",
@@ -712,53 +740,36 @@ class _Run:
                 self._cooler_failure(fault, committed)
 
     def _cooler_failure(self, fault: Fault, committed: DraftVersion) -> None:
+        """Workflow 4 after a commitment. The failed food bank's own agent says what is at risk
+        and asks the others; each candidate food bank's own agent answers from its own facts
+        (standing in for its answer over AGNTCY, #21, #23); the failed food bank's agent chooses,
+        with a reason card for every candidate. The runner only passes the messages."""
         s, calc, fb = self.scenario, self.calc, fault.food_bank_id
-        mine = committed.allocations_to(fb)
-        if not mine:
+        if not committed.allocations_to(fb):
             return
-        tr = committed.transport(fb)
         own = self.facts(fb, fault.at)
         first = len(self.log.events)
+        agent = self._food_bank_agent(fb)
         calc.capture(fb, "cooler_failure")
-        collect = [c.collect for a in mine
-                   if (c := calc.pickup_feasibility(tr.arrives_at, own.pickup_windows, committed.item(a.produce_id).usable_until)).collect]
-        window = min(collect, key=lambda w: w.start) if collect else (own.pickup_windows[0] if own.pickup_windows else None)
-        if window is None:
+        failure = agent.cooler_failure(own, committed, fault.at)
+        if failure is None:
             # No pickup hours recorded: there is no households' pickup time to plan a move around.
             self.log.add("cooler_failure_assessment", fault.at, lot_id=committed.lot_id, version=committed.version, food_bank_id=fb,
                          items_to_move=[], items_staying=[], items_unsupported=[], reason_cards=[], proposal=None, fallback=[],
-                         not_assessed=True, problem=f"{own.name} has no pickup hours recorded, so there is no households' pickup "
-                         "time to plan around. Its staff decide where the produce goes; nothing is proposed or committed.",
+                         answers=[], not_assessed=True, problem=f"{own.name} has no pickup hours recorded, so there is no households' "
+                         "pickup time to plan around. Its staff decide where the produce goes; nothing is proposed or committed.",
                          calculator_call_seqs=[e["seq"] for e in self.log.events[first:] if e["kind"] == "calculator_call"],
                          note="Lane B's cooler-failure logic (#15) needs the households' pickup time; none is recorded.")
             return
-        truck = own.truck
-        cooler_truck = None
-        if truck is not None and truck.window.end > fault.at:
-            cooler_truck = CoolerTruck(refrigerated=truck.refrigerated, available_from=max(fault.at, truck.window.start))
-        candidates = []
+        answers = []
         for other in s.turn_order:
             if other == fb or s.role_of(other) is not Role.FOOD_BANK:
                 continue
-            theirs = self.facts(other, fault.at)
+            theirs = self.facts(other, fault.at)  # that food bank's own facts, for its own agent
             calc.capture(other, "cooler_failure_answer")
-            free = calc.storage_at(theirs.storage, fault.at).cold_free_lb
-            held_cold = sum(a.pounds for a in committed.allocations_to(other)
-                            if a.produce_id not in calc.profiles or calc.profiles.get(a.produce_id).needs_cold)
-            room = calc.capacity_fit(free, held_cold).room_left_lb
-            minutes = s.travel_minutes_between_food_banks.get(fb, {}).get(other)
-            candidates.append(Candidate(
-                food_bank_id=other, name=theirs.name, response="answered" if minutes is not None else "no_answer",
-                cold_space_lb=room, pickup_windows=tuple(PickupWindow(w.start, w.end) for w in theirs.pickup_windows),
-                travel_minutes=minutes,
-            ))
-        failure = CoolerFailure(
-            food_bank_id=fb, food_bank_name=own.name, lot_id=committed.lot_id, current_version=committed.version,
-            detected_at=fault.at, items=tuple(HeldItem(a.produce_id, a.pounds) for a in mine),
-            households_pickup=PickupWindow(window.start, window.end),
-            own_pickup_windows=tuple(PickupWindow(w.start, w.end) for w in own.pickup_windows), truck=cooler_truck,
-        )
-        d = assess_cooler_failure(failure, candidates, profiles=calc.profiles)
+            answers.append(self._food_bank_agent(other).answer_cold_space_request(theirs, committed, fault.at))
+        calc.capture(fb, "cooler_failure_choice")
+        d = agent.choose_cooler_receiver(failure, answers, s.travel_minutes_between_food_banks.get(fb, {}))
         p = d.proposal
         self.log.add(
             "cooler_failure_assessment", fault.at, lot_id=committed.lot_id, version=committed.version, food_bank_id=fb,
@@ -766,11 +777,21 @@ class _Run:
             reason_cards=[{"food_bank_id": c.food_bank_id, "name": c.name, "outcome": c.outcome, "text": c.text} for c in d.reason_cards],
             proposal=None if p is None else {**jsonable(p), "committed": p.committed},
             fallback=d.fallback,
+            answers=[{**jsonable(a), "answered_by": a.food_bank_id} for a in answers],
             calculator_call_seqs=[e["seq"] for e in self.log.events[first:] if e["kind"] == "calculator_call"],
-            note="Lane B's cooler-failure logic (#15). Each candidate's answer is taken from its own recorded facts, standing in for "
-                 "its agent's answer over AGNTCY (#21, #23). The proposal awaits the receiving food bank's own decision and fresh "
-                 "approvals; nothing commits here.",
+            note="Lane B's cooler-failure logic (#15). Each candidate food bank's own agent answered from its own facts (answers), "
+                 "standing in for its answer over AGNTCY (#21, #23), and the failed food bank's agent chose from those answers. The "
+                 "proposal awaits the receiving food bank's own decision and fresh approvals; nothing commits here.",
         )
+
+    def _food_bank_agent(self, org: str) -> RulesFoodBank:
+        """The food bank's own rules agent: its negotiator, or the rules agent an LLM negotiator
+        falls back on. A negotiator with neither gets a rules agent for that organization only."""
+        n = self.negotiators.get(org)
+        for agent in (n, getattr(n, "rules", None)):
+            if isinstance(agent, RulesFoodBank):
+                return agent
+        return RulesFoodBank(org, self.calc)
 
     # The outcome: every pound allocated or visibly unclaimed, with a reason
 

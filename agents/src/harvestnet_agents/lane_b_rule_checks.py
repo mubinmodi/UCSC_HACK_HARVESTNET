@@ -7,7 +7,9 @@ merge as ``{**lane_a_checks, **lane_b_checks}``:
 
 - ``no_central_decider`` (ADR 0001): every move is the mover's own, on its own turn, in
   its own role, from its own facts (never another organization's, never a household's
-  request code); a food bank's counter changes only its own share; every hold is on the
+  request code); a food bank's counter changes only its own share, except a contest or
+  take-back that shifts one item from one other food bank to itself, within its own
+  fair-share gap (ADR 0013); every hold is on the
   mover's own resources; every approval is that organization's own human's; every new
   version comes from one organization's counter.
 - ``every_move_has_reason``: every move, version, and stop has a non-empty reason.
@@ -39,12 +41,23 @@ from datetime import datetime
 from typing import Any, Callable, Mapping, Sequence
 
 from .llm_negotiators import NumberPool, text_number_problems
-from .negotiation import DraftVersion, Mover, parse_draft
+from .negotiation import (
+    POUNDS_TOLERANCE,
+    DraftError,
+    DraftVersion,
+    Mover,
+    amendment_from_dict,
+    contest_of,
+    food_bank_amendment_problem,
+    parse_draft,
+)
 from .profiles import ProfileSet, load_profiles
 
 __all__ = ["LANE_B_RULE_CHECKS", "RuleCheckResult", "run_lane_b_rule_checks"]
 
 Event = Mapping[str, Any]
+# The advocate gets pooled counts and the shared records of declines and contests, nothing else.
+ADVOCATE_FACT_FIELDS = frozenset({"gaps", "declined", "contests"})
 
 
 @dataclass(frozen=True)
@@ -112,10 +125,7 @@ def no_central_decider(log: _Log) -> list[str]:
             out.append(f"{where}: no negotiator named, so it may not be the organization's own")
         out.extend(f"{where}: {p}" for p in _facts_problems(org, e["role"], e["facts"], log.request_codes))
         if e["role"] == "food_bank" and "amendment" in move:
-            a = move["amendment"]
-            touched = {a.get("food_bank_id"), a.get("from_food_bank_id")} - {None}
-            if touched != {org}:
-                out.append(f"{where}: a food bank's counter changes another food bank's share ({sorted(touched)})")
+            out.extend(f"{where}: {p}" for p in _food_bank_counter_problems(org, move["amendment"], e, log))
         if move.get("holds") and move.get("resource_owner") != org:
             out.append(f"{where}: holds another organization's resources")
     for e in log.of("facts"):
@@ -141,14 +151,37 @@ def no_central_decider(log: _Log) -> list[str]:
     return out
 
 
+def _food_bank_counter_problems(org: str, raw: Mapping[str, Any], e: Event, log: _Log) -> list[str]:
+    """A food bank's counter changes only its own share, except in exactly one shape: a contest
+    (or take-back) shifting one item from one other food bank to itself (ADR 0013), and then no
+    further than its own fair-share gap under the version it's about, from its own facts."""
+    try:
+        amendment = amendment_from_dict(raw)
+    except (DraftError, KeyError, TypeError, ValueError) as exc:
+        return [f"a food bank's counter has an unreadable amendment ({exc})"]
+    problem = food_bank_amendment_problem(org, amendment)
+    if problem is not None:
+        return [problem]
+    contest = contest_of(org, amendment)
+    terms = log.versions.get((e["lot_id"], e["version"]), {}).get("terms")
+    gap = (e.get("facts") or {}).get("demand", {}).get("below_fair_share_lb")
+    if contest is None or terms is None or gap is None:
+        return []
+    remaining = gap - parse_draft(terms).planned_lb(org)
+    if contest.pounds > remaining + POUNDS_TOLERANCE:
+        return [f"its contest moves {contest.pounds:g} lb of {contest.produce_id} from {contest.from_food_bank_id}, more than "
+                f"its own remaining fair-share gap of {max(0.0, remaining):g} lb (ADR 0013)"]
+    return []
+
+
 def _facts_problems(org: str, role: str, facts: Mapping[str, Any], request_codes: Sequence[str]) -> list[str]:
     out = []
     if role == "donor" and facts.get("donor_id") != org:
         out.append(f"given the donor facts of {facts.get('donor_id')}")
     if role == "food_bank" and facts.get("food_bank_id") != org:
         out.append(f"given the food bank facts of {facts.get('food_bank_id')}")
-    if role == "advocate" and (set(facts) - {"gaps", "declined"}):
-        out.append(f"the advocate got more than counts: {sorted(set(facts) - {'gaps', 'declined'})}")
+    if role == "advocate" and (set(facts) - ADVOCATE_FACT_FIELDS):
+        out.append(f"the advocate got more than counts: {sorted(set(facts) - ADVOCATE_FACT_FIELDS)}")
     text = json.dumps(facts)
     leaked = [c for c in request_codes if c in text]
     if leaked:

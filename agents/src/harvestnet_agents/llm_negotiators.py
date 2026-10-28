@@ -28,8 +28,12 @@ decides only for its own organization (ADR 0001) and never invents a number (ADR
      must say "beyond fair share" in its reason, as the rules-based bids do;
    - a counter's meaning is checked with the rules-based negotiator's ``counter_problems``:
      a food bank can't ask for more than its own storage (at arrival and until pickup ends),
-     pickup hours and truck allow, and the advocate proposes pounds only toward a food bank
-     still below fair share, no further than its gap, and only from above another's gap;
+     pickup hours and truck allow; it changes only its own share, except a contest or take-back
+     (ADR 0013: one item shifted from another food bank to itself, only while below fair share,
+     no further than its gap, and only when nothing unclaimed is produce it can receive); and the
+     advocate proposes pounds only toward a food bank still below fair share, no further than its
+     gap, and only from above another's gap or, in a recorded contest, from the side less below
+     fair share;
    - **every number** in the reason, amendment, and holds traces to the draft, the
      organization's facts, the turn, the precomputed calculator results, or a
      calculator tool result from this move, and to a field of the right kind (``NumberPool``):
@@ -747,6 +751,13 @@ receive and hand out in time. Once this version plans your whole gap, you may as
 produce beyond fair share, so it goes out rather than waste, but only what your storage (at arrival \
 and until pickup ends), pickup hours, truck, and produce profiles allow. Say "beyond fair share" in \
 the reason of any request that takes you past your gap.
+- Contest (ADR 0013): while your households are still below fair share and nothing unclaimed is \
+produce you can receive, you may counter with a shift_pounds of one item from another food bank's \
+share to your own (from_food_bank_id: that food bank, to_food_bank_id: you), no more than your \
+remaining fair-share gap and only what your storage, pickup hours and truck allow. Cite your own gap; \
+you don't know the other food bank's. When another food bank's counter took pounds from your share, \
+concede pounds beyond your fair-share gap, and you may take back, the same way, pounds within it. \
+Never set another food bank's pounds or transport, and never shift pounds between two other food banks.
 - Reject produce graded not fit for people. Ask your manager about any condition doubt.
 - Request holds on your own storage and truck only when everyone named has accepted this version. \
 Pass when you have no share and nothing to ask for.""",
@@ -757,6 +768,9 @@ or pass.
 - Propose an amendment toward the food bank whose households are furthest below fair share after \
 this version, using unclaimed pounds or pounds planned above another food bank's gap, and no more \
 than its remaining gap. Asking for pounds beyond fair share is each food bank's own call, not yours.
+- In a contest listed in your facts (two food banks claiming the same item, ADR 0013), you may back \
+either side: shift that item from the other food bank to whichever of the two is further below fair \
+share, up to its remaining gap, and say why. You still have no vote; each food bank answers for itself.
 - Don't repeat an item a food bank already declined. Mention low-access areas (USDA Food Access \
 Research Atlas) where the facts say so. Pass when you have nothing to propose.""",
 }
@@ -1014,6 +1028,9 @@ class LLMNegotiator:
                 move, problems = check_move(submitted.input, self.role, agent_input, seen_pool, getattr(self.rules, "review", lambda _: []),
                                             getattr(self.rules, "counter_problems", None))
                 if move is not None:
+                    note_sent = getattr(self.rules, "note_sent", None)
+                    if note_sent is not None:  # our rules memory follows the move we actually send
+                        note_sent(agent_input, move)
                     self.last_decision = LLMDecision(move, "llm", self.model, state.calls, state.failures, tuple(state.problems), tuple(state.tool_calls), state.cost)
                     return self.last_decision
                 state.fail(*problems)

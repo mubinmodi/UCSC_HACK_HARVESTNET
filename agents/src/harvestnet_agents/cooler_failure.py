@@ -35,6 +35,7 @@ from .wording import clock as _clock, join as _join, lb as _lb, lb as _num, wind
 
 __all__ = [
     "Candidate",
+    "ColdSpaceAnswer",
     "CoolerFailure",
     "CoolerFailureDecision",
     "FallbackOutcome",
@@ -86,6 +87,17 @@ class CoolerFailure:
     households_pickup: PickupWindow  # when the affected households planned to collect
     own_pickup_windows: tuple[PickupWindow, ...]  # the failing food bank's own pickup hours
     truck: Truck | None
+
+
+@dataclass(frozen=True)
+class ColdSpaceAnswer:
+    """One food bank's own answer to a request for cold space, built by its own agent from its
+    own facts: the cold space it has free for the moved produce, and its pickup hours."""
+
+    food_bank_id: str
+    name: str
+    cold_space_lb: float
+    pickup_windows: tuple[PickupWindow, ...]
 
 
 @dataclass(frozen=True)

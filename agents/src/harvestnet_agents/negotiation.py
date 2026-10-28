@@ -68,7 +68,9 @@ __all__ = [
     "Truck",
     "Turn",
     "amendment_from_dict",
+    "contest_of",
     "draft_terms",
+    "food_bank_amendment_problem",
     "amendment_to_dict",
     "parse_agent_input",
     "parse_draft",
@@ -418,6 +420,10 @@ class AdvocateFacts:
     # (food_bank_id, produce_id) pairs a food bank already countered down, from the shared
     # records, so the advocate doesn't keep proposing what that food bank can't take.
     declined: tuple[tuple[str, str], ...] = ()
+    # (food_bank_id, from_food_bank_id, produce_id) for every contest or take-back in the shared
+    # records: a food bank's counter that moved pounds of one item from another food bank to
+    # itself (ADR 0013). The advocate may back either side of one.
+    contests: tuple[tuple[str, str, str], ...] = ()
 
 
 Facts = DonorFacts | FoodBankFacts | AdvocateFacts
@@ -505,6 +511,30 @@ class Move:
                 for h in self.holds
             ]
         return out
+
+
+def contest_of(organization_id: str, amendment: Amendment | None) -> ShiftPounds | None:
+    """The amendment, if it is a contest or take-back by ``organization_id``: a shift of one item
+    from another food bank's share to its own (ADR 0013). Else None."""
+    if isinstance(amendment, ShiftPounds) and amendment.to_food_bank_id == organization_id \
+            and amendment.from_food_bank_id != organization_id:
+        return amendment
+    return None
+
+
+def food_bank_amendment_problem(organization_id: str, amendment: Amendment) -> str | None:
+    """Why a food bank's counter changes a share it may not change, or None. A food bank changes
+    its own share, and may contest another's in exactly one shape: a shift of one item from one
+    other food bank to itself (ADR 0013). Setting another food bank's pounds or its transport, or
+    shifting between two other food banks, is refused (ADR 0001)."""
+    match amendment:
+        case SetPounds(food_bank_id=fb) | SetTransport(food_bank_id=fb):
+            if fb != organization_id:
+                return f"a food bank's counter sets another food bank's share ({fb})"
+        case ShiftPounds(from_food_bank_id=src, to_food_bank_id=dst):
+            if organization_id not in (src, dst):
+                return f"a food bank's counter shifts pounds between two other food banks ({src} to {dst})"
+    return None
 
 
 def amendment_to_dict(a: Amendment) -> dict[str, Any]:
@@ -611,6 +641,7 @@ def parse_facts(role: Role | str, raw: Mapping[str, Any]) -> Facts:
             for g in raw["gaps"]
         ),
         declined=tuple((d["food_bank_id"], d["produce_id"]) for d in raw.get("declined", [])),
+        contests=tuple((c["food_bank_id"], c["from_food_bank_id"], c["produce_id"]) for c in raw.get("contests", [])),
     )
 
 

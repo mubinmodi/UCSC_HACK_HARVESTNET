@@ -22,8 +22,15 @@ What each says yes to (docs/MVP_DESIGN.md section 6, Proposed):
   (docs/MVP_DESIGN.md section 8; user direction, October 11, 2026). Those bids are
   bounded only by its own facts and calculators, and their reasons say "beyond fair
   share".
+- **Food bank in a contest** (ADR 0013): while its households are below fair share and
+  nothing unclaimed is something it can receive, it may **contest** another food bank's
+  share, shifting pounds of one item from that food bank to itself, up to its own gap and
+  within the same limits as its bids. When a contest takes pounds from its share, it
+  concedes pounds beyond its own gap and may **take back** pounds within it. It sees only
+  its own facts and the shared draft, never another food bank's gap.
 - **Advocate**: never accepts, rejects, holds, or vetoes. It proposes one amendment
-  toward the food bank with the largest fair-share gap, or passes.
+  toward the food bank with the largest fair-share gap, or passes. In a contest it may
+  back either side, whichever food bank is further below fair share.
 
 Each organization requests holds on its own resources once every organization named in
 the version has accepted it. Nothing here commits anything: commitment needs every
@@ -36,14 +43,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from .calculators import Calculators, StandInCalculators
+from .cooler_failure import (
+    Candidate,
+    ColdSpaceAnswer,
+    CoolerFailure,
+    CoolerFailureDecision,
+    HeldItem,
+    PickupWindow,
+    assess_cooler_failure,
+)
+from .cooler_failure import Truck as CoolerTruck
 from .negotiation import (
     AdvocateFacts,
     AgentInput,
     Amendment,
     DonorFacts,
+    DraftError,
     DraftVersion,
     FoodBankFacts,
     FoodBankGap,
@@ -295,6 +313,20 @@ class _Arrival:
 
 
 @dataclass(frozen=True)
+class _Seen:
+    version: int  # the version we last moved on
+    before: DraftVersion | None  # the draft after our turn before that one
+    after: DraftVersion  # the draft after the move we sent on ``version``
+
+
+@dataclass(frozen=True)
+class _Loss:
+    produce_id: str
+    to_food_bank_id: str  # the food bank whose line of the item grew since our last turn
+    lost_lb: float  # a calculator result: our line then, less our line now
+
+
+@dataclass(frozen=True)
 class _Receivable:
     arrival: _Arrival
     pickup: Any  # the pickup_feasibility result
@@ -327,19 +359,61 @@ class RulesFoodBank(_Negotiator):
     hold pounds beyond fair share, we take some of those back (never fair-share pounds)
     before asking for the drop-off again, and we remember, for this lot, that the donor
     turned down our drop-off at that load: no more extra bids that rely on its drop-off.
-    That memory is only what this organization saw in the shared draft (proposed)."""
+    That memory is only what this organization saw in the shared draft (proposed).
+
+    Contests (ADR 0013, decision order proposed): after its problems and bids, a food bank
+    whose households are still below fair share first takes back pounds a contest took from
+    its share since its last turn, then contests another food bank's share. Both are a
+    ``ShiftPounds`` of one item from one other food bank to itself, no more than its remaining
+    gap, and limited like a bid (``_receivable``). A take-back is also no more than the pounds
+    it lost. A contest takes from the largest other line of the shortest-lived item it can
+    receive (ties: food bank id). When its households already have their fair share, it
+    concedes what it lost and says so. It never fights for pounds beyond fair share. What it
+    lost is read from its own memory of the shared draft after its last turn, per lot."""
 
     role = Role.FOOD_BANK
+    contests = True  # ADR 0013; the evaluation's baselines turn it off, to stay the old mechanism
 
     def __init__(self, organization_id: str, calculators: Calculators | None = None):
         super().__init__(organization_id, calculators)
         self._drop_off_refused_at: dict[str, float] = {}  # lot id -> our planned pounds when the donor said no
+        self._seen: dict[str, _Seen] = {}  # lot id -> the shared draft around our last turn
 
     def move(self, agent_input: AgentInput) -> Move:
         facts = agent_input.facts
         self._check_turn(agent_input, FoodBankFacts, getattr(facts, "food_bank_id", None))
         draft = agent_input.draft
         self._note_drop_off_refusal(draft, facts)
+        before = self._before(draft)
+        move = self._decide(agent_input, facts, before)
+        self.note_sent(agent_input, move, before)
+        return move
+
+    def note_sent(self, agent_input: AgentInput, move: Move, before: DraftVersion | None = None) -> None:
+        """Remember the shared draft as it stands after the move we sent on this version, so
+        next turn we can tell which of our pounds another organization moved. Whoever sends a
+        move for us (our LLM negotiator) calls this with the move it actually sent."""
+        draft = agent_input.draft
+        if before is None:
+            before = self._before(draft)
+        after = draft
+        if move.kind is MoveKind.COUNTER and move.amendment is not None:
+            try:
+                after = draft.amend(move.amendment, proposer_id=self.organization_id, reason=move.reason)
+            except DraftError:
+                after = draft
+        self._seen[draft.lot_id] = _Seen(draft.version, before, after)
+
+    def _before(self, draft: DraftVersion) -> DraftVersion | None:
+        """The shared draft after our previous turn on this lot (the same answer if asked twice
+        on one version), or None on our first turn."""
+        seen = self._seen.get(draft.lot_id)
+        if seen is None:
+            return None
+        return seen.before if seen.version == draft.version else seen.after
+
+    def _decide(self, agent_input: AgentInput, facts: FoodBankFacts, before: DraftVersion | None) -> Move:
+        draft = agent_input.draft
         problems = self.review(agent_input)
         if problems:
             p = problems[0]
@@ -347,12 +421,20 @@ class RulesFoodBank(_Negotiator):
         bid = self._bid(draft, facts)
         if bid is not None:
             return bid
+        losses = self._losses(draft, before)
+        if self.contests:
+            gap = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, draft.planned_lb(self.organization_id))
+            if gap.remaining_gap_lb > 0:
+                claim = self._take_back(draft, facts, losses, gap.remaining_gap_lb) or self._contest(draft, facts, gap.remaining_gap_lb)
+                if claim is not None:
+                    return claim
+        concede = self._concession(draft, facts, losses)
         me = self.organization_id
         if me not in draft.named_food_banks():
-            return self._move(draft, MoveKind.PASS, self._pass_reason(draft, facts))
+            return self._move(draft, MoveKind.PASS, concede + self._pass_reason(draft, facts))
         if set(draft.named_organizations()) <= set(agent_input.turn.accepted_by):
-            return self._holds(draft, facts)
-        return self._move(draft, MoveKind.ACCEPT, self._accept_reason(draft, facts))
+            return self._holds(draft, facts, concede)
+        return self._move(draft, MoveKind.ACCEPT, concede + self._accept_reason(draft, facts))
 
     def review(self, agent_input: AgentInput) -> list[Problem]:
         """Every problem with this food bank's share, in decision order. Empty: it fits."""
@@ -663,7 +745,131 @@ class RulesFoodBank(_Negotiator):
                 why = f"our truck holds {_lb(facts.truck.capacity_lb)} lb"
             if why is not None:
                 problems.append(f"our truck can't do that collection: {why}")
+        problems.extend(self._contest_problems(draft, facts, amended))
         return problems
+
+    def _contest_problems(self, draft: DraftVersion, facts: FoodBankFacts, amended: DraftVersion) -> list[str]:
+        """Why a counter changes another food bank's share in a way we may not (ADR 0001, 0013).
+        We may give our own pounds away; we may take another food bank's pounds of an item only
+        to our own share, only while our households are below fair share, no further than our
+        gap, and only when nothing unclaimed is produce we can receive."""
+        me = self.organization_id
+        problems, contested = [], False
+        for fb in dict.fromkeys([*draft.named_food_banks(), *amended.named_food_banks()]):
+            if fb == me:
+                continue
+            if amended.transport(fb) != draft.transport(fb):
+                problems.append(f"you can't set {draft.name_of(fb)}'s transport; only it can")
+            for item in draft.items:
+                pid = item.produce_id
+                change = amended.pounds(pid, fb) - draft.pounds(pid, fb)
+                ours = amended.pounds(pid, me) - draft.pounds(pid, me)
+                if change < -POUNDS_TOLERANCE:
+                    if ours > POUNDS_TOLERANCE:
+                        contested = True
+                    else:
+                        problems.append(f"you can take {draft.name_of(fb)}'s {self._item_name(pid).lower()} only to your own "
+                                        "share, as a contest; you can't set or move another food bank's pounds elsewhere")
+                elif change > POUNDS_TOLERANCE and ours >= -POUNDS_TOLERANCE:
+                    problems.append(f"you can't add pounds to {draft.name_of(fb)}'s share except by giving it your own")
+        if not contested:
+            return problems
+        before = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, draft.planned_lb(me))
+        after = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, amended.planned_lb(me))
+        if before.remaining_gap_lb <= 0:
+            problems.append(f"your households already have their fair share under version {draft.version}, so you can't contest "
+                            "another food bank's share; beyond fair share, ask only for unclaimed pounds")
+        elif after.above_gap_lb > POUNDS_TOLERANCE:
+            problems.append(f"a contest goes no further than your households' fair-share gap: contest at most "
+                            f"{_lb(before.remaining_gap_lb)} lb")
+        for item in draft.items:
+            can = self._receivable(draft, facts, item) if draft.unallocated_lb(item.produce_id) > POUNDS_TOLERANCE else None
+            if can is not None and can.limit_lb > 0:
+                problems.append(f"{_lb(draft.unallocated_lb(item.produce_id))} lb of {self._item_name(item.produce_id).lower()} "
+                                "is unclaimed and you can receive it: ask for unclaimed pounds before contesting another food bank's share")
+        return problems
+
+    # Contests (ADR 0013)
+
+    def _losses(self, draft: DraftVersion, before: DraftVersion | None) -> list[_Loss]:
+        """Pounds of our share that moved to another food bank's share since our last turn."""
+        if before is None:
+            return []
+        me, out = self.organization_id, []
+        for item in draft.items:
+            pid = item.produce_id
+            then, now = before.pounds(pid, me), draft.pounds(pid, me)
+            if now >= then - POUNDS_TOLERANCE:
+                continue
+            gains = {fb: draft.pounds(pid, fb) - before.pounds(pid, fb) for fb in draft.named_food_banks() if fb != me}
+            gainers = sorted((fb for fb, g in gains.items() if g > POUNDS_TOLERANCE), key=lambda fb: (-gains[fb], fb))
+            if gainers:
+                out.append(_Loss(pid, gainers[0], self.calculators.adjust_pounds(then, -now)))
+        return sorted(out, key=lambda l: (draft.item(l.produce_id).usable_until, l.produce_id))
+
+    def _gap_phrase(self, draft: DraftVersion, facts: FoodBankFacts, shortfall: float) -> str:
+        planned = draft.planned_lb(self.organization_id)
+        return (f"Our {facts.demand.households} households are {_lb(shortfall)} lb below their fair share this week"
+                + (f" after the {_lb(planned)} lb already planned for us" if planned else ""))
+
+    def _claim(self, draft: DraftVersion, item: LotItem, can: _Receivable, source: str, pounds: float, opening: str, ask: str) -> Move:
+        label = "cold" if can.cold else "dry"
+        reason = (f"{opening} Arriving at {_clock(can.arrival.at)}, we have {_lb(can.room_lb)} lb of {label} space for it, and "
+                  f"households can collect it {_window(can.pickup.collect)}, before it spoils. {ask}")
+        return self._move(draft, MoveKind.COUNTER, reason, ShiftPounds(item.produce_id, source, self.organization_id, pounds))
+
+    def _take_back(self, draft: DraftVersion, facts: FoodBankFacts, losses: Sequence[_Loss], shortfall: float) -> Move | None:
+        """Take back pounds a contest took from our share, within our fair-share gap."""
+        for loss in losses:
+            item, other = draft.item(loss.produce_id), draft.name_of(loss.to_food_bank_id)
+            line = draft.pounds(loss.produce_id, loss.to_food_bank_id)
+            can = self._receivable(draft, facts, item)
+            if can is None or line <= 0:
+                continue
+            back = min(shortfall, loss.lost_lb, line, can.limit_lb)
+            if back <= 0:
+                continue
+            name = self._item_name(item.produce_id).lower()
+            opening = (f"Since our last turn, {_lb(loss.lost_lb)} lb of our {name} moved to {other}'s share. "
+                       f"{self._gap_phrase(draft, facts, shortfall)}, so those pounds are within our households' fair-share gap.")
+            return self._claim(draft, item, can, loss.to_food_bank_id, back, opening,
+                               f"We take back {_lb(back)} lb of {name} from {other}, within our fair-share gap.")
+        return None
+
+    def _contest(self, draft: DraftVersion, facts: FoodBankFacts, shortfall: float) -> Move | None:
+        """Contest another food bank's share: nothing unclaimed is produce we can receive (our
+        bids came first), so take pounds of the shortest-lived item we can receive from the
+        largest other line of it, up to our gap."""
+        me = self.organization_id
+        for item in sorted(draft.items, key=lambda i: (i.usable_until, i.produce_id)):
+            lines = sorted((a for a in draft.allocations if a.produce_id == item.produce_id and a.food_bank_id != me and a.pounds > 0),
+                           key=lambda a: (-a.pounds, a.food_bank_id))
+            if not lines:
+                continue
+            can = self._receivable(draft, facts, item)
+            if can is None or can.limit_lb <= 0:
+                continue
+            a, name, other = lines[0], self._item_name(item.produce_id).lower(), draft.name_of(lines[0].food_bank_id)
+            amount = min(shortfall, can.limit_lb, a.pounds)
+            opening = (f"{self._gap_phrase(draft, facts, shortfall)}, and nothing unclaimed in version {draft.version} is produce "
+                       f"we can receive and hand out in time. {other} has {_lb(a.pounds)} lb of {name} in this version.")
+            return self._claim(draft, item, can, a.food_bank_id, amount, opening,
+                               f"We contest {_lb(amount)} lb of it for our households, within our fair-share gap; "
+                               f"{other} answers for its own share.")
+        return None
+
+    def _concession(self, draft: DraftVersion, facts: FoodBankFacts, losses: Sequence[_Loss]) -> str:
+        """What we say about pounds a contest took and we don't take back (empty if none)."""
+        if not losses:
+            return ""
+        gap = self.calculators.gap_after_plan(facts.demand.below_fair_share_lb, draft.planned_lb(self.organization_id))
+        moved = "; ".join(f"{_lb(l.lost_lb)} lb of our {self._item_name(l.produce_id).lower()} moved to "
+                          f"{draft.name_of(l.to_food_bank_id)}'s share" for l in losses)
+        if gap.remaining_gap_lb <= 0:
+            return (f"Since our last turn, {moved}. Our households still have their fair share in what is planned for us, so "
+                    "those pounds were beyond fair share and we concede them. ")
+        return (f"Since our last turn, {moved}. Our households are {_lb(gap.remaining_gap_lb)} lb below their fair share, but "
+                "our storage, pickup hours and transport don't let us take those pounds back. ")
 
     def _bid_for(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem, shortfall: float | None) -> Move | None:
         """A bid for one unclaimed item: toward our gap (``shortfall``), or beyond fair share
@@ -716,6 +922,53 @@ class RulesFoodBank(_Negotiator):
         times, _ = self._collection(draft, facts, produce_ids, draft.planned_lb(self.organization_id))
         return None if times is None else _Arrival(times[1], None)
 
+    # Cooler failure (Workflow 4): each food bank answers for itself; the failed one chooses
+
+    def answer_cold_space_request(self, facts: FoodBankFacts, committed: DraftVersion, at: datetime) -> ColdSpaceAnswer:
+        """Our own answer when another food bank's cooler fails and it asks who has cold space:
+        cold space free at ``at`` by our storage records, less the cold-dependent pounds already
+        committed to us, and our pickup hours. Only our own facts and the shared draft."""
+        if facts.food_bank_id != self.organization_id:
+            raise TurnError(f"{self.organization_id} can only answer from its own specialists' facts")
+        free = self.calculators.storage_at(facts.storage, at).cold_free_lb
+        held_cold = sum(a.pounds for a in committed.allocations_to(self.organization_id) if self._needs_cold_storage(a.produce_id))
+        room = self.calculators.capacity_fit(free, held_cold).room_left_lb
+        return ColdSpaceAnswer(self.organization_id, facts.name, room,
+                               tuple(PickupWindow(w.start, w.end) for w in facts.pickup_windows))
+
+    def cooler_failure(self, facts: FoodBankFacts, committed: DraftVersion, at: datetime) -> CoolerFailure | None:
+        """What our failed cooler puts at risk, from our own facts: our committed items, when our
+        households planned to collect them, and our truck. None when we have no pickup hours
+        recorded, so there is no households' pickup time to plan a move around."""
+        me, mine, tr = self.organization_id, committed.allocations_to(self.organization_id), committed.transport(self.organization_id)
+        collect = [c.collect for a in mine
+                   if (c := self.calculators.pickup_feasibility(tr.arrives_at, facts.pickup_windows,
+                                                                committed.item(a.produce_id).usable_until)).collect]
+        window = min(collect, key=lambda w: w.start) if collect else (facts.pickup_windows[0] if facts.pickup_windows else None)
+        if window is None:
+            return None
+        truck = None
+        if facts.truck is not None and facts.truck.window.end > at:
+            truck = CoolerTruck(refrigerated=facts.truck.refrigerated, available_from=max(at, facts.truck.window.start))
+        return CoolerFailure(
+            food_bank_id=me, food_bank_name=facts.name, lot_id=committed.lot_id, current_version=committed.version,
+            detected_at=at, items=tuple(HeldItem(a.produce_id, a.pounds) for a in mine),
+            households_pickup=PickupWindow(window.start, window.end),
+            own_pickup_windows=tuple(PickupWindow(w.start, w.end) for w in facts.pickup_windows), truck=truck,
+        )
+
+    def choose_cooler_receiver(self, failure: CoolerFailure, answers: Sequence[ColdSpaceAnswer],
+                               travel_minutes: Mapping[str, float]) -> CoolerFailureDecision:
+        """As the food bank whose cooler failed: weigh every other food bank's own answer with our
+        recorded travel minutes to it, and choose, with a reason card for each (#15). A food bank
+        we have no recorded route to counts as not answering, since we can't plan a run there."""
+        candidates = [Candidate(food_bank_id=a.food_bank_id, name=a.name,
+                                response="answered" if travel_minutes.get(a.food_bank_id) is not None else "no_answer",
+                                cold_space_lb=a.cold_space_lb, pickup_windows=a.pickup_windows,
+                                travel_minutes=travel_minutes.get(a.food_bank_id))
+                      for a in answers]
+        return assess_cooler_failure(failure, candidates, profiles=self.profiles)
+
     # Accepting, holding, passing
 
     def _accept_reason(self, draft: DraftVersion, facts: FoodBankFacts) -> str:
@@ -738,7 +991,7 @@ class RulesFoodBank(_Negotiator):
             parts.append(f"{draft.name_of(draft.donor_id)} drops it off at {_clock(tr.arrives_at)}.")
         return " ".join(parts)
 
-    def _holds(self, draft: DraftVersion, facts: FoodBankFacts) -> Move:
+    def _holds(self, draft: DraftVersion, facts: FoodBankFacts, concede: str = "") -> Move:
         me, tr = self.organization_id, draft.transport(self.organization_id)
         ends = [
             self.calculators.pickup_feasibility(tr.arrives_at, facts.pickup_windows, draft.item(a.produce_id).usable_until).collect.end
@@ -753,7 +1006,7 @@ class RulesFoodBank(_Negotiator):
             holds.append(HoldRequest("truck", me, draft.planned_lb(me), tr.departs_at, tr.arrives_at))
         what = "; ".join(f"{h.resource.replace('_', ' ')} {_lb(h.pounds)} lb, {_clock(h.start)} to {_clock(h.end)}" for h in holds)
         return self._move(draft, MoveKind.REQUEST_HOLD,
-                          f"Everyone named has accepted version {draft.version}. Holding our own resources ({what}), "
+                          f"{concede}Everyone named has accepted version {draft.version}. Holding our own resources ({what}), "
                           "pending our manager's approval.", holds=holds)
 
     def _pass_reason(self, draft: DraftVersion, facts: FoodBankFacts) -> str:
@@ -776,7 +1029,10 @@ class RulesAdvocate(_Negotiator):
     Decision order (proposed): the target is the largest remaining gap (ties: low-access
     area first, then more households, then id). Offer it unclaimed pounds, shortest-lived
     item first, skipping items it already declined. If nothing is unclaimed, shift pounds
-    from the food bank furthest above its own gap. Otherwise pass."""
+    from the food bank furthest above its own gap. Otherwise, in a contest recorded in the
+    shared records (``AdvocateFacts.contests``, ADR 0013), back whichever of the two food
+    banks is further below fair share: shift the contested item from the other one to it, up
+    to its remaining gap (several contests: the largest such gap first). Otherwise pass."""
 
     role = Role.ADVOCATE
 
@@ -821,8 +1077,49 @@ class RulesAdvocate(_Negotiator):
             return self._move(draft, MoveKind.COUNTER, reason,
                               ShiftPounds(line.produce_id, source.food_bank_id, target.food_bank_id, amount))
 
+        backing = self._back_a_side(draft, facts, plans)
+        if backing is not None:
+            return backing
         return self._pass(draft, f"{target.name} is still {_lb(remaining)} lb below fair share, but nothing is unclaimed "
                                  "and no food bank is planned above its own gap")
+
+    def _sides(self, facts: AdvocateFacts, plans, a: str, b: str) -> tuple[FoodBankGap, FoodBankGap] | None:
+        """(backed, other) of a contest between ``a`` and ``b``: the one further below fair share
+        is backed (ties: low-access area, more households, id). None if either has no gap."""
+        gaps = {g.food_bank_id: g for g in facts.gaps}
+        if a not in gaps or b not in gaps:
+            return None
+        backed, other = sorted((gaps[a], gaps[b]), key=lambda g: (plans[g.food_bank_id].remaining_gap_lb, g.low_access,
+                                                                   g.households, g.food_bank_id), reverse=True)
+        return backed, other
+
+    def _back_a_side(self, draft: DraftVersion, facts: AdvocateFacts, plans) -> Move | None:
+        """In a contest (ADR 0013), back whichever of the two food banks is further below fair
+        share: propose pounds of the contested item from the other one's share to it, up to its
+        remaining gap. The advocate has no vote; each food bank still answers for itself."""
+        declined = set(facts.declined)
+        options = []
+        for a, b, pid in dict.fromkeys(facts.contests):
+            sides = self._sides(facts, plans, a, b)
+            if sides is None or pid not in {i.produce_id for i in draft.items}:
+                continue
+            backed, other = sides
+            rem, line = plans[backed.food_bank_id].remaining_gap_lb, draft.pounds(pid, other.food_bank_id)
+            if rem <= plans[other.food_bank_id].remaining_gap_lb or line <= 0 or (backed.food_bank_id, pid) in declined:
+                continue
+            options.append((rem, backed, other, pid, line))
+        if not options:
+            return None
+        rem, backed, other, pid, line = max(options, key=lambda o: (o[0], o[1].low_access, o[1].households, o[1].food_bank_id, o[3]))
+        amount = min(rem, line)
+        name = self._item_name(pid).lower()
+        reason = (f"{backed.name} and {other.name} contest the {name}. {backed.name}'s {backed.households} households are "
+                  f"{_lb(rem)} lb below fair share under version {draft.version}, and {other.name}'s {other.households} are "
+                  f"{_lb(plans[other.food_bank_id].remaining_gap_lb)} lb below, so we back {backed.name}: proposing {_lb(amount)} lb "
+                  f"of {other.name}'s {name} move to it."
+                  + (" It is in a low-access area (USDA Food Access Research Atlas)." if backed.low_access else "")
+                  + f" We have no vote; {other.name} answers for its own share.")
+        return self._move(draft, MoveKind.COUNTER, reason, ShiftPounds(pid, other.food_bank_id, backed.food_bank_id, amount))
 
     def counter_problems(self, agent_input: AgentInput, amended: DraftVersion) -> list[str]:
         """Why a counter from the advocate (such as its LLM negotiator's) isn't one this advocate
@@ -859,10 +1156,26 @@ class RulesAdvocate(_Negotiator):
                         problems.append(f"{g.name} already declined {self._item_name(i.produce_id).lower()}")
                     if i.condition_grade == "not_for_people" or i.condition_doubt:
                         problems.append(f"{self._item_name(i.produce_id).lower()} is not fit to hand out, or a human must check it first")
-            if after < before - POUNDS_TOLERANCE and plan_after.remaining_gap_lb > plan_before.remaining_gap_lb + POUNDS_TOLERANCE:
+            if after < before - POUNDS_TOLERANCE and plan_after.remaining_gap_lb > plan_before.remaining_gap_lb + POUNDS_TOLERANCE \
+                    and not self._backs_a_contest(draft, facts, amended, fb, plan_before.remaining_gap_lb):
                 problems.append(f"that takes pounds {g.name}'s households need for their fair share; shift only pounds "
-                                "planned above its gap")
+                                "planned above its gap, or, in a contest, back the food bank further below fair share")
         return problems
+
+    def _backs_a_contest(self, draft: DraftVersion, facts: AdvocateFacts, amended: DraftVersion, fb: str, fb_remaining: float) -> bool:
+        """Whether every pound taken from ``fb`` goes, on a contested item, to the food bank it
+        contests with, which is further below fair share than ``fb`` (ADR 0013)."""
+        gaps = {g.food_bank_id: g for g in facts.gaps}
+        for item in draft.items:
+            pid = item.produce_id
+            if amended.pounds(pid, fb) >= draft.pounds(pid, fb) - POUNDS_TOLERANCE:
+                continue
+            gainers = [o for o in gaps if o != fb and amended.pounds(pid, o) > draft.pounds(pid, o) + POUNDS_TOLERANCE]
+            ok = [o for o in gainers if ((o, fb, pid) in facts.contests or (fb, o, pid) in facts.contests)
+                  and self.calculators.gap_after_plan(gaps[o].below_fair_share_lb, draft.planned_lb(o)).remaining_gap_lb > fb_remaining]
+            if not gainers or len(ok) != len(gainers):
+                return False
+        return True
 
     def _gap_sentence(self, draft: DraftVersion, facts: AdvocateFacts, target: FoodBankGap, plans) -> str:
         others = ", ".join(
