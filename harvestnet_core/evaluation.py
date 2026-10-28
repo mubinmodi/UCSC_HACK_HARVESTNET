@@ -52,16 +52,18 @@ class Baseline:
         self.method=method
         self.engine=Engine(fixture)
         self.claimants={}
-        rs=fixture['requests']
-        banks=[b['organization_id'] for b in fixture['food_banks']]
-        if method=='first_come_first_served':
-            self.priority=sorted(banks,key=lambda b:min((dt(r['submitted_at']) for r in rs if b in r['chosen_food_bank_ids']),default=dt(fixture['clock']['end'])))
-        elif method=='nearest_food_bank':
-            donor=fixture['donors'][0]
-            self.priority=sorted(banks,key=lambda b:(donor['travel_minutes'].get(b,float('inf')),b))
-        else:
+        if method not in ('first_come_first_served','nearest_food_bank'):
             raise ValueError('unknown baseline')
-        self.passed=set()
+        # Who has finished bidding, per lot: a food bank that passed on one lot still bids first on the next.
+        self.passed=defaultdict(set)
+
+    def bid_order(self, donor_id):
+        """The order food banks bid in on a lot from ``donor_id``: who asked first, or nearest to that donor."""
+        rs,banks=self.fixture['requests'],[b['organization_id'] for b in self.fixture['food_banks']]
+        if self.method=='first_come_first_served':
+            return sorted(banks,key=lambda b:min((dt(r['submitted_at']) for r in rs if b in r['chosen_food_bank_ids']),default=dt(self.fixture['clock']['end'])))
+        travel=self.engine.donors[donor_id]['travel_minutes']
+        return sorted(banks,key=lambda b:(travel.get(b,float('inf')),b))
 
     def __call__(self, org, wire):
         role,typed=parse_agent_input({**wire,'turn':wire['turn_context']})
@@ -69,7 +71,8 @@ class Baseline:
             return Move(org,role,typed.draft.version,MoveKind.PASS,'Baseline has no advocate amendments').to_dict()
         if role.value=='food_bank':
             # Allow earlier banks to finish requesting before the next bank bids.
-            outstanding=[b for b in self.priority if b not in self.passed]
+            passed=self.passed[typed.draft.lot_id]
+            outstanding=[b for b in self.bid_order(typed.draft.donor_id) if b not in passed]
             if outstanding and outstanding[0]!=org and not typed.draft.allocations_to(org):
                 return Move(org,role,typed.draft.version,MoveKind.PASS,'Waiting for baseline priority turn').to_dict()
         negotiator=self.engine.rules_for(role,org)
@@ -77,7 +80,7 @@ class Baseline:
             negotiator=self.claimants.setdefault(org,FirstComeFoodBank(org,self.engine.calc))
         move=negotiator.move(typed)
         if role.value=='food_bank' and move.kind in (MoveKind.ACCEPT,MoveKind.PASS,MoveKind.REJECT):
-            self.passed.add(org)
+            self.passed[typed.draft.lot_id].add(org)
         return move.to_dict()
 
 

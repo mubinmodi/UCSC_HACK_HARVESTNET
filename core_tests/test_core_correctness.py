@@ -293,5 +293,80 @@ class Purge(unittest.TestCase):
         self.assertTrue(kept and all(p['status'] == 'collected' and p['window'] is None and p['request_code'] not in codes for p in kept))
 
 
+class ApprovalRequests(unittest.TestCase):
+    """An approval request carries when it was made, and the dashboard asks only for open requests."""
+
+    def setUp(self):
+        from test_core import fixture
+        self.f = fixture()
+        self.engine = Engine(self.f)
+        self.clock = {'now': '2026-10-13T12:00:00-07:00'}
+        self.tokens = {'market': 'donor-test', 'city': 'city-test'}
+        self.api = API(self.engine, clock=lambda: self.clock['now'], staff_tokens=self.tokens)
+        self.lot_id = self.api.call('POST', '/surplus-offers', copy.deepcopy(self.f['surplus_offers'][0]), token='donor-test')[1]['lot_id']
+
+    def board(self):
+        offers = self.api.call('GET', '/food-banks/city/dashboard', token='city-test')[1]['incoming_offers']
+        return next(o for o in offers if o['lot_id'] == self.lot_id)
+
+    def test_requested_at_is_when_the_request_was_made_not_now(self):
+        self.clock['now'] = '2026-10-13T12:20:00-07:00'
+        (request,) = self.api.call('GET', '/approvals?organization_id=city', token='city-test')[1]['approvals']
+        self.assertEqual(dt(request['requested_at']), dt('2026-10-13T12:00:00-07:00'))
+
+    def test_needs_your_approval_only_while_this_organization_has_an_open_request(self):
+        self.assertTrue(self.board()['needs_your_approval'])
+        draft = self.engine.records.get('lot', self.lot_id)['draft']
+        decide = {'lot_id': self.lot_id, 'version': draft['version'], 'organization_id': 'city', 'terms_hash': terms_hash(draft), 'decision': 'decline'}
+        self.api.call('POST', '/approvals', decide, token='city-test')
+        lot = self.engine.records.get('lot', self.lot_id)
+        self.assertIn(lot['status'], ('negotiating', 'preserved_disagreement'))
+        self.assertFalse(self.board()['needs_your_approval'])
+        self.assertEqual(self.api.call('GET', '/approvals?organization_id=city', token='city-test')[1]['approvals'], [])
+
+
+class FairBaselines(unittest.TestCase):
+    """Baselines stay honest on many lots: the nearest food bank is the lot's own donor's nearest,
+    and a food bank that passed on one lot still gets its first turn on the next."""
+
+    def setUp(self):
+        from harvestnet_core.evaluation import Baseline
+        self.f = load('normal-afternoon')
+        farm = {**copy.deepcopy(self.f['donors'][0]), 'organization_id': 'farm', 'travel_minutes': {'rural': 5, 'eastside': 30, 'city': 50}}
+        self.f['donors'].append(farm)
+        self.f['organizations'].append({'organization_id': 'farm', 'name': 'Synthetic Farm', 'role': 'donor'})
+        self.baseline = Baseline(self.f, 'nearest_food_bank')
+        self.engine = self.baseline.engine
+
+    def wire(self, offer, org, facts=None):
+        lot = self.engine.records.get('lot', offer['lot_id'])
+        turn = {'organization_id': org, 'number': 2, 'now': self.engine.now, 'accepted_by': []}
+        return {'role': 'food_bank', 'draft': lot['draft'], 'facts': facts or self.engine.facts(org, lot['draft']), 'turn': org, 'turn_context': turn}
+
+    def offer(self, lot_id, donor):
+        offer = {**copy.deepcopy(self.f['surplus_offers'][0]), 'lot_id': lot_id, 'donor_id': donor}
+        self.engine.create_offer(offer)
+        return offer
+
+    def waiting(self, move):
+        return move['action'] == 'pass' and 'priority' in move['reason']
+
+    def test_nearest_food_bank_follows_the_lots_own_donor(self):
+        offer = self.offer('lot-farm-1', 'farm')
+        self.assertTrue(self.waiting(self.baseline('city', self.wire(offer, 'city'))))
+        self.assertFalse(self.waiting(self.baseline('rural', self.wire(offer, 'rural'))))
+
+    def test_who_passed_is_counted_per_lot(self):
+        first, second = self.offer('lot-a', 'market'), self.offer('lot-b', 'market')
+        # On the first lot the city has no space, so it passes and the next food bank may bid.
+        lot = self.engine.records.get('lot', 'lot-a')
+        full = self.engine.facts('city', lot['draft'])
+        full['storage'] = [{**s, 'cold_free_lb': 0, 'dry_free_lb': 0} for s in full['storage']]
+        self.assertIn(self.baseline('city', self.wire(first, 'city', full))['action'], ('pass', 'reject', 'accept'))
+        self.assertFalse(self.waiting(self.baseline('eastside', self.wire(first, 'eastside'))))
+        # The second lot starts over: the city, nearest to the donor, bids first again.
+        self.assertTrue(self.waiting(self.baseline('eastside', self.wire(second, 'eastside'))))
+
+
 if __name__ == '__main__':
     unittest.main()

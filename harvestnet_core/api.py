@@ -423,6 +423,18 @@ class API:
             options.append({"version":v['version'],"proposer_id":v['proposer_id'],"reason":v['reason'],"allocations":plan})
         return {"reason":reason,"options":options,"reasons":[{"organization_id":o,"version":m['version'],"action":m['action'],"reason":m['reason']} for o,m in last.items()]}
 
+    def awaiting_decision(self, lot, owner):
+        """Whether ``owner`` has an open approval request on this lot: its current version awaits
+        approvals, names ``owner``, has no decision from ``owner`` yet, and its deadline is ahead."""
+        d=lot['draft']
+        return lot['status']=='awaiting_approvals' and owner in named(d) and owner not in lot['approvals'] and dt(d['deadline'])>dt(self.engine.now)
+
+    def requested_at(self, lot):
+        """When the current version went out for approval: the last owner hold on that version."""
+        version=lot['draft']['version']
+        return max((e['at'] for e in self.records.events(lot['draft']['lot_id']) if e['kind']=='owner_hold' and e['data'].get('version')==version),
+                   key=dt,default=None)
+
     def release(self, pid, code):
         with self.records.transaction():
             pickup=self.records.get("pickup",pid)
@@ -694,8 +706,8 @@ class API:
         approvals=[]
         for lot in self.records.all('lot'):
             draft=lot['draft']
-            if owner in named(draft) and lot['status']!='committed' and dt(draft['deadline'])>dt(self.engine.now):
-                approvals.append({"lot_id":draft['lot_id'],"version":draft['version'],"terms_hash":terms_hash(draft),"requested_at":self.engine.now,"expires_at":draft['deadline'],"why_you":["exact_version_review"],"summary":draft['reason'],"terms":draft,"status":"awaiting_decision"})
+            if self.awaiting_decision(lot,owner):
+                approvals.append({"lot_id":draft['lot_id'],"version":draft['version'],"terms_hash":terms_hash(draft),"requested_at":self.requested_at(lot),"expires_at":draft['deadline'],"why_you":["exact_version_review"],"summary":draft['reason'],"terms":draft,"status":"awaiting_decision"})
         approvals+=changes.pending_approvals(self.records,owner)
         return 200,{"organization_id":owner,"approvals":approvals}
 
@@ -756,7 +768,7 @@ class API:
             if not allocations: continue
             transport=next((t for t in draft['transports'] if t['food_bank_id']==bank_id),None)
             suggests,why=self.suggestion(lot,bank_id)
-            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":lot['status'] in ('awaiting_approvals','negotiating')})
+            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":self.awaiting_decision(lot,bank_id)})
             if transport: arrivals.append({"lot_id":draft['lot_id'],"version":draft['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
             if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":draft['lot_id'],"reason":lot['stop_reason']})
         return 200,{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"capacity":{field:bank.get(field) for field in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bank_id),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bank_id)}
