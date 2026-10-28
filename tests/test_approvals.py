@@ -236,7 +236,12 @@ class ContractTests(unittest.TestCase):
             stop()
 
     def test_core_credentials_come_from_a_per_organization_map(self):
-        clear = {'CORE_API_URL': 'https://core.example', 'CORE_API_TOKENS': '', 'HARVESTNET_STAFF_TOKENS': '', 'CORE_API_TOKEN': ''}
+        clear = {'CORE_API_URL': 'https://core.example', 'CORE_API_TOKENS': '', 'HARVESTNET_STAFF_TOKENS': '', 'CORE_API_TOKEN': '',
+                 'CORE_APPROVALS_TOKEN': ''}
+        # The deployment's form: one decision-only credential, used for every organization's decision.
+        with patch.dict(os.environ, {**clear, 'CORE_APPROVALS_TOKEN': 'bridge', 'HARVESTNET_STAFF_TOKENS': '{"market":"m"}'}):
+            core = CoreAPI.from_env()
+            self.assertEqual((core.token_for('market'), core.token_for('rural'), core.tokens), ('bridge', 'bridge', None))
         with patch.dict(os.environ, {**clear, 'CORE_API_TOKENS': '{"market":"m","city":"c"}'}):
             core = CoreAPI.from_env()
             self.assertEqual((core.token_for('market'), core.token_for('city')), ('m', 'c'))
@@ -268,6 +273,72 @@ class ContractTests(unittest.TestCase):
         finally:
             stop_bridge()
             stop_core()
+
+    def test_a_core_refusal_leaves_no_local_decision(self):
+        store = ApprovalStore()
+        core_url, stop_core = serve(FakeCore)
+        bridge, stop_bridge = serve(handler_for(store, CoreAPI(core_url, approvals_token='bridge-placeholder'), 'events', 'http://localhost'))
+        try:
+            link = store.request('lot-409', 1, {'lb': 8}, ['market', 'city'])[0]
+            body = {'token': link['token'], 'decision': 'approve', 'version': 1, 'terms_hash': link['terms_hash'], 'human_confirmed': True}
+            FakeCore.answers.append((409, {'error': {'code': 'conflict', 'message': 'stale version'}}))
+            with self.assertRaises(HTTPError) as refused:
+                request_json(bridge + '/human/decision', body)
+            self.assertEqual(refused.exception.code, 409)
+            self.assertIsNone(store.view(link['token'])['decision'])
+            self.assertEqual(store.approved_organizations('lot-409'), [])
+            # The human can still decide differently: nothing irreversible was kept.
+            request_json(bridge + '/human/decision', {**body, 'decision': 'decline'})
+            self.assertEqual(store.view(link['token'])['decision'], 'decline')
+            # The decision went with the bridge's decision-only credential, not a staff token.
+            self.assertEqual({c['auth'] for c in FakeCore.calls}, {'Bearer bridge-placeholder'})
+        finally:
+            stop_bridge()
+            stop_core()
+
+    def test_a_recorded_approval_outlives_its_link(self):
+        now = [1000]
+        store = ApprovalStore(clock=lambda: now[0])
+        link = store.request('lot', 1, {'lb': 8}, ['market'], ttl=60)[0]
+        store.decide(link['token'], 'approve', 1, link['terms_hash'], True)
+        now[0] = 5000  # long after the link expired
+        self.assertEqual(store.approved_organizations('lot'), ['market'])
+        store.request('lot', 2, {'lb': 7}, ['market'])
+        self.assertEqual(store.approved_organizations('lot'), [])  # a new version still voids it
+
+    def test_review_page_has_a_nonce_csp_and_no_inline_handlers(self):
+        store = ApprovalStore()
+        link = store.request('lot', 1, {'note': '</script><script>alert(1)</script>'}, ['market'])[0]
+        bridge, stop = serve(handler_for(store, CoreAPI(), 'events', 'http://localhost'))
+        try:
+            from urllib.request import urlopen
+            with urlopen(bridge + '/human/review?token=' + link['token']) as response:
+                csp = response.headers['Content-Security-Policy']
+                page = response.read().decode()
+            nonce = csp.split("'nonce-")[1].split("'")[0]
+            self.assertIn("default-src 'none'", csp)
+            self.assertIn(f"script-src 'nonce-{nonce}'", csp)
+            self.assertNotIn('unsafe-inline', csp)
+            self.assertNotIn('onclick', page)
+            self.assertEqual(page.count('<script'), 1)
+            self.assertIn(f'<script nonce="{nonce}">', page)
+            with urlopen(bridge + '/human/review?token=' + link['token']) as again:
+                self.assertNotIn(nonce, again.headers['Content-Security-Policy'])  # a fresh nonce per page
+        finally:
+            stop()
+
+    def test_approval_email_webhook_gets_fields_not_free_text(self):
+        handler = handler_for(ApprovalStore(), CoreAPI(), 'events-token', 'https://demo.example',
+                              approver_emails={'city': 'staff@example.org'}, approval_webhook='https://n8n.example/webhook/approval',
+                              webhook_token='outbound-token', test_recipients=['staff@example.org'])
+        base, stop = serve(handler)
+        try:
+            with patch('harvestnet_platform.approvals.request_json', return_value={'sent': True}) as send:
+                request_json(base + '/approval-requests', {'lot_id': 'lot', 'version': 1, 'terms': {'lb': 8}, 'organizations': ['city']},
+                             token='events-token')
+            self.assertEqual(set(send.call_args.args[1]), {'to', 'organization_id', 'lot_id', 'version', 'terms_hash', 'decision_url'})
+        finally:
+            stop()
 
     def test_link_lifetime_is_configurable_and_reported_in_iso_8601(self):
         store = ApprovalStore(clock=lambda: 1_791_900_000)

@@ -31,6 +31,7 @@ Rebuild and re-upload whenever an example changes.
 | Handler | `harvestnet_api_skeleton.lambda_function.lambda_handler` |
 | Code | the zip from step 1 |
 | Memory / timeout | 128 MB / 10 seconds |
+| Reserved concurrency | `5` (a hard cap on parallel runs, so a flood of calls to the public URL cannot run up the bill) |
 | Execution role | a new role with only `AWSLambdaBasicExecutionRole` (CloudWatch logs) |
 | Environment | `HARVESTNET_CORS=url` (see step 3) |
 
@@ -46,9 +47,10 @@ Rebuild and re-upload whenever an example changes.
 
 **Pick one place for CORS headers.** With CORS configured on the Function URL, Lambda adds the headers itself. If the function also sent them, GET and POST responses would carry `Access-Control-Allow-Origin` twice, and browsers reject that. So set `HARVESTNET_CORS=url` on the function, as in step 2. (Without that variable, the function adds the headers itself, which is right only if the Function URL has no CORS settings.)
 
-In the console, creating a URL with auth type `NONE` also adds the public-access policy. With the CLI, add it yourself:
+In the console, creating a URL with auth type `NONE` also adds the public-access policy. With the CLI, add it yourself, and set the concurrency cap before the URL goes public:
 
 ```sh
+aws lambda put-function-concurrency --function-name harvestnet-api-skeleton --reserved-concurrent-executions 5
 aws lambda create-function-url-config --function-name harvestnet-api-skeleton --auth-type NONE \
   --cors '{"AllowOrigins": ["*"], "AllowMethods": ["GET", "POST", "PUT"], "AllowHeaders": ["content-type", "authorization"], "MaxAge": 600}'
 aws lambda add-permission --function-name harvestnet-api-skeleton --statement-id FunctionURLAllowPublicAccess \
@@ -69,5 +71,8 @@ Then add the address to "How to call it" in `docs/contracts/public-api.md`, and 
 ## Notes
 
 - Locally, `uv run python -m harvestnet_api_skeleton.server` serves the same routes at `http://127.0.0.1:8040`.
+- **Cost cap.** Reserved concurrency `5` means at most five calls run at once; extra calls get HTTP 429 instead of new instances. At 128 MB and a few milliseconds per call, this stays inside the Lambda free tier for demo traffic. Check it with `aws lambda get-function-concurrency --function-name harvestnet-api-skeleton`.
+- **Teardown.** `deploy/aws/teardown.sh` deletes the skeleton (function, URL, logs, role) by default, so nothing public is left running. Keep it with `--keep-skeleton`.
+- **CORS `*`** lets any website's scripts read these responses. That is fine only because every response is a synthetic example with no credentials or personal data. Restrict `AllowOrigins` to the frontend's origin before anything real is served here.
 - Anyone with the URL can call it. That's acceptable only while it serves synthetic examples. Before real logic (Lane A, #9) goes behind it, add staff sign-in and household tokens (contracts README, decision 12), and revisit auth type `NONE`.
 - Request paths can hold request codes, so the function logs nothing about requests.

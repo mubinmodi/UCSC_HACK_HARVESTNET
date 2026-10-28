@@ -102,10 +102,8 @@ class DeployWiring(unittest.TestCase):
                      capture_output=True).returncode == 0, 'docker compose not available')
 class ComposeServices(unittest.TestCase):
     def config(self, *overlays):
-        env = {'PATH': os.environ['PATH'], 'HOME': os.environ.get('HOME', '/tmp'), 'HARVESTNET_RELEASE': 'test',
-               'TRANSPORT_TOKEN': 'x', 'API_EVENTS_TOKEN': 'events', 'DEMO_SWITCH_TOKEN': 'x', 'ANTHROPIC_API_KEY': 'k',
-               'APPROVAL_PUBLIC_URL': 'https://example.invalid', 'HARVESTNET_ALLOWED_ORIGIN': 'https://example.invalid',
-               'HARVESTNET_STAFF_TOKENS': '{"city":"x"}', 'HARVESTNET_DOMAIN': 'example.invalid'}
+        from deploy_env import compose_env
+        env = compose_env(ANTHROPIC_API_KEY='k')
         files = ['compose.platform.yaml', 'deploy/aws/compose.aws.yaml', *overlays]
         args = [a for f in files for a in ('-f', f)]
         result = subprocess.run(['docker', 'compose', '-p', 'harvestnet', *args, 'config', '--format', 'json'],
@@ -121,12 +119,33 @@ class ComposeServices(unittest.TestCase):
                 self.assertEqual(env['COOLER_WATCH'], '1', bank)
                 self.assertEqual((env['SYSTEMS_URL'], env['APPROVALS_URL']), ('http://systems:8010', 'http://approvals:8030'))
                 self.assertEqual((env['API_EVENTS_TOKEN'], env['AGENT_POLICY']), ('events', 'harvestnet_core.join_adapter:policy'))
-                self.assertIn('HARVESTNET_STAFF_TOKENS', env)
+                # Only its own organization's core token: city cannot act as rural at the core.
+                self.assertEqual(env['HARVESTNET_STAFF_TOKEN'], f'staff-{bank}-x')
+                self.assertNotIn('HARVESTNET_STAFF_TOKENS', env)
+                self.assertNotIn('staff-', json.dumps({k: v for k, v in env.items() if k != 'HARVESTNET_STAFF_TOKEN'}))
                 self.assertIn('/app/runtime', json.dumps(services[bank]['volumes']))  # the saved episode survives a restart
             for other in ('donor', 'advocate'):
                 env = services[other]['environment']
-                for name in ('COOLER_WATCH', 'HARVESTNET_STAFF_TOKENS', 'API_EVENTS_TOKEN'):
+                for name in ('COOLER_WATCH', 'HARVESTNET_STAFF_TOKENS', 'HARVESTNET_STAFF_TOKEN', 'API_EVENTS_TOKEN'):
                     self.assertNotIn(name, env, f'{other} has no cooler watcher and no core or approval credentials')
+
+    def test_each_holder_gets_only_its_own_credentials(self):
+        from deploy_env import APPROVALS, STAFF
+        services = self.config('deploy/aws/compose.directory.yaml')
+        for name, service in services.items():
+            self.assertNotIn('TRANSPORT_TOKEN', service.get('environment', {}), name)  # no shared token anywhere
+        hosts = {'donor': 'market', 'city': 'city', 'rural': 'rural', 'eastside': 'eastside', 'advocate': 'advocate'}
+        for service, org in hosts.items():
+            env = services[service]['environment']
+            self.assertEqual(set(json.loads(env['TRANSPORT_VERIFY_KEYS'])), {'core', *hosts.values()} - {org}, service)
+            self.assertEqual(env['TRANSPORT_SIGNING_KEY'], f'test-placeholder-transport-key-{org}-0000000000')
+        approvals = services['approvals']['environment']
+        self.assertEqual(approvals['CORE_APPROVALS_TOKEN'], APPROVALS)
+        self.assertFalse(set(STAFF.values()) & set(approvals.values()), 'the bridge holds no staff token')
+        core = services['core']['environment']
+        self.assertEqual(json.loads(core['HARVESTNET_STAFF_TOKENS']), STAFF)  # the verifier holds the map
+        self.assertEqual(core['HARVESTNET_APPROVALS_TOKEN'], APPROVALS)
+        self.assertEqual(core['TRANSPORT_SIGNING_KEY'], 'test-placeholder-transport-key-core-0000000000')
 
     def test_the_core_gets_the_key_and_cap_and_nothing_new_is_published(self):
         services = self.config()

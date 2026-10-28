@@ -5,7 +5,7 @@ One small EC2 instance runs the whole stack with Docker Compose. `setup.sh` crea
 | Script | Does |
 |---|---|
 | `setup.sh` | Creates the resources below and deploys a git ref. Re-run it to redeploy. |
-| `teardown.sh` | Deletes everything `setup.sh` created. |
+| `teardown.sh` | Deletes everything `setup.sh` created, and the public API skeleton Lambda unless `--keep-skeleton`. |
 | `reset_data.sh` | Wipes the live demo data and starts a fresh synthetic scenario. |
 | `logs.sh [service] [lines]` | Service status, then recent container logs. |
 | `check_directory.sh [cold_lb] [pickup_at]` | Checks the live AGNTCY Directory. |
@@ -30,7 +30,7 @@ deploy/aws/setup.sh
 
 `ALERT_EMAIL` is required (it receives the budget alerts), and the ref you deploy must contain `deploy/aws/`. The first run takes about 15 to 25 minutes, mostly Docker installing on the instance. It ends by printing the URLs, the cost estimate and the teardown command, and writes them (no secrets) to `deploy/aws/outputs.json`, which Git ignores. That file is the record of the last deploy from this machine.
 
-Defaults, in `setup.sh`: `PROFILE` incubator, `REGION` us-east-2, `GIT_REF` main, `INSTANCE_TYPE` t4g.micro, `VOLUME_GB` 10, `CPU_CREDITS` standard, `HARVESTNET_DOMAIN` `<ip-with-dashes>.sslip.io`, `CLAUDE_RUN_CAP_USD` 0, `CLAUDE_TOTAL_CAP_USD` equal to the run cap. `BUDGET_USD` defaults to 15 in `setup.sh` but `env.template` sets 45 (the account also runs another stack); a loaded `.env` wins. Provider settings go into the secret only when set.
+Defaults, in `setup.sh`: `PROFILE` incubator, `REGION` us-east-2, `GIT_REF` main, `INSTANCE_TYPE` t4g.small, `VOLUME_GB` 10, `CPU_CREDITS` standard, `HARVESTNET_DOMAIN` `<ip-with-dashes>.sslip.io`, `CLAUDE_RUN_CAP_USD` 0, `CLAUDE_TOTAL_CAP_USD` equal to the run cap. `BUDGET_USD` defaults to 25 in `setup.sh` (raised from 15, because the t4g.small stack alone is about $17 a month, so a $15 alert would fire every month), but `env.template` sets 45 (the account also runs another stack); a loaded `.env` wins. Provider settings go into the secret only when set.
 
 **Values in `.env`.** The secret holder (`deploy/load_secrets.py`) accepts only single-line strings with no single quote or backslash. When you write a JSON value, wrap it in single quotes so the shell keeps its double quotes, for example `APPROVER_EMAILS_JSON='{"city":"you@example.org"}'`. Unquoted, the shell strips the double quotes and the approvals service crashes while `/api/health` still looks green; `setup.sh` also checks `/platform/health` for this reason.
 
@@ -49,19 +49,20 @@ Everything is tagged `project=harvestnet`, in us-east-2 unless noted.
 | AWS Budgets budget (global) | `harvestnet-monthly` | Emails `ALERT_EMAIL` at 50%, 80% and 100% of `BUDGET_USD` a month. Created first. |
 | S3 bucket, private | `harvestnet-deploy-<account>-<region>` | Release bundles (a `git archive` of the ref plus the built frontends). Bundles expire after 14 days. |
 | Elastic IP | `harvestnet-eip` | A fixed address, so the HTTPS name stays the same. |
-| Secrets Manager secret | `harvestnet/platform` | A staff token for each organization, the transport, events and demo-switch tokens (random, made once), the domain and URLs, the Claude caps, and any provider settings you set. |
+| Secrets Manager secret | `harvestnet/platform` | A staff token for each organization, a transport key for each sender (`TRANSPORT_KEYS`), the approvals credential, the events and demo-switch tokens (all random, made once), the domain and URLs, the Claude caps, and any provider settings you set. |
 | IAM role and instance profile | `harvestnet-ec2-role`, `harvestnet-ec2-profile` | `AmazonSSMManagedInstanceCore`, plus read access to that one secret and to `releases/*` in the bucket. |
 | Security group | `harvestnet-web` | Inbound 80 and 443 only. No SSH: reach the machine through SSM. |
-| EC2 instance | `harvestnet-app` | t4g.micro (Graviton, 1 GB memory plus 1 GB swap), Ubuntu 24.04, 10 GB encrypted gp3, standard CPU credits, IMDSv2 only. |
+| EC2 instance | `harvestnet-app` | t4g.small (Graviton, 2 GB memory plus 1 GB swap), Ubuntu 24.04, 10 GB encrypted gp3, standard CPU credits, IMDSv2 only. |
 
-It creates no NAT gateway, load balancer, RDS database, CloudFront distribution, container registry or CloudWatch log group. The `harvestnet-api-skeleton` Lambda and its role are left alone. The budget covers the whole account (linked accounts cannot use cost-allocation tags), so other spending counts toward it.
+It creates no NAT gateway, load balancer, RDS database, CloudFront distribution, container registry or CloudWatch log group. The `harvestnet-api-skeleton` Lambda and its role are not created here (see `api_skeleton/DEPLOY.md`, which caps it at 5 concurrent runs); `setup.sh` only reads its URL and warns if it has no concurrency cap. The budget covers the whole account (linked accounts cannot use cost-allocation tags), so other spending counts toward it.
 
 ## What runs on the instance
 
 All Python services share one image (`Dockerfile`), built once on the instance. Compose files: `compose.platform.yaml` (repo root), `compose.aws.yaml`, `compose.directory.yaml`.
 
 - **The five organization hosts** (`donor` hosting `market`, `city`, `rural`, `eastside`, `advocate`) run the core's real policy (`harvestnet_core.join_adapter:policy`) and register with the Directory.
-- **Cooler watchers.** The three food bank hosts also run their own watcher (`COOLER_WATCH=1`, `harvestnet_core/cooler_watch.py`). It polls that food bank's own cooler every `COOLER_WATCH_INTERVAL_SECONDS` (10). When the reading fails, it proposes the new version to the core and asks the approval service for the review emails. It never approves or commits. Each host gets the core's staff-token map and `API_EVENTS_TOKEN` and uses only its own organization's token. Operator commands: `docs/demo/REHEARSAL.md`.
+- **Cooler watchers.** The three food bank hosts also run their own watcher (`COOLER_WATCH=1`, `harvestnet_core/cooler_watch.py`). It polls that food bank's own cooler every `COOLER_WATCH_INTERVAL_SECONDS` (10). When the reading fails, it proposes the new version to the core and asks the approval service for the review emails. It never approves or commits. Each host gets only its own organization's staff token (`HARVESTNET_STAFF_TOKEN`) and `API_EVENTS_TOKEN`, so one food bank cannot act as another at the core. Operator commands: `docs/demo/REHEARSAL.md`.
+- **Credentials, one per holder.** `deploy/load_secrets.py` writes the secret into a root-only 0600 env file on the instance and derives the per-host values from two maps in it: `STAFF_TOKEN_<ORG>` from `HARVESTNET_STAFF_TOKENS`, and `TRANSPORT_SIGNING_KEY_<SENDER>` / `TRANSPORT_VERIFY_KEYS_<HOST>` from `TRANSPORT_KEYS`. Compose gives each container only its own: an organization host gets its own staff token (food banks only), its own signing key and the verification keys derived for it (it can check messages addressed to it, not forge one from anyone else; `docs/platform/TRANSPORT.md`). Only the core holds the whole staff-token map, because it checks the tokens. The approval bridge holds no staff token: it gets `CORE_APPROVALS_TOKEN`, the core's `HARVESTNET_APPROVALS_TOKEN`, which the core accepts only to record one review link's decision (`docs/platform/APPROVALS.md`).
 - **`systems`** serves the organization systems and the demo cooler switch. **`approvals`** issues review links and prepares emails. **`core`** is `python -m harvestnet_core.server` on SQLite. See `docs/platform/` for each.
 - **`directory`** is the private AGNTCY Directory: the official `dirctl` v1.7.1 daemon (gRPC server and search indexer) with SQLite and a local OCI store on one volume. Only the organization hosts reach `directory:8888`; no port is published. Each host registers its own record and refreshes changed capabilities every 30 seconds. If the Directory is down, hosts keep serving moves and the CLI labels its local fallback. A record is a capability snapshot, so owners recheck before committing. It needs outbound access to the public OASF schema service to accept records. Background: [`docs/platform/TRANSPORT.md`](../../docs/platform/TRANSPORT.md).
 - **`gateway`** (Caddy) gets a free certificate for `<elastic-ip-with-dashes>.sslip.io`, a public name that resolves to the IP inside it. For your own domain, point its A record at the Elastic IP and set `HARVESTNET_DOMAIN`.
@@ -75,11 +76,11 @@ URLs: core API `https://<host>/api/` (health at `/api/health`), review pages `/h
 
 ## Monthly cost estimate
 
-An **estimate**, not a bill: on-demand us-east-2 prices from the AWS Price List API (checked 2026-10-11), 730 hours, default settings.
+An **estimate**, not a bill: on-demand us-east-2 prices as recorded from the AWS Price List API on 2026-10-11 (not re-checked since; confirm on https://aws.amazon.com/ec2/pricing/on-demand/), 730 hours, default settings.
 
 | Item | Price used | Per month |
 |---|---|---|
-| EC2 t4g.micro | $0.0084/hour | $6.13 |
+| EC2 t4g.small | about $0.0168/hour | about $12.26 |
 | Public IPv4 (the Elastic IP) | $0.005/hour | $3.65 |
 | EBS gp3, 10 GB | $0.08/GB-month | $0.80 |
 | Secrets Manager, 1 secret | $0.40/secret-month, plus $0.05 per 10,000 calls | $0.40 |
@@ -87,9 +88,9 @@ An **estimate**, not a bill: on-demand us-east-2 prices from the AWS Price List 
 | Data transfer out | first 100 GB/month to the internet is free | $0 for a demo |
 | SSM, AWS Budgets alerts | free | $0 |
 | CPU credits | standard mode never bills extra | $0 |
-| **Total** | | **about $11/month (about $0.37/day)** |
+| **Total** | | **about $17/month (about $0.57/day)** |
 
-`INSTANCE_TYPE=t4g.small` (2 GB, $0.0168/hour) brings it to about $17. `CPU_CREDITS=unlimited` boots faster, but sustained CPU above baseline costs $0.04 per vCPU-hour. Claude and any other provider usage is separate.
+The default is t4g.small because about eleven containers (five organization hosts, systems, approvals, core, gateway, the Directory and the image build) did not fit comfortably in a t4g.micro's 1 GB. `INSTANCE_TYPE=t4g.micro` (1 GB, about $0.0084/hour) brings the total to about $11, at the risk of swapping or out-of-memory restarts. The default budget alert is $25 a month, so it fires only on spending beyond this estimate (the account-wide `env.template` value, 45, covers the other stack too). An instance launched earlier as t4g.micro keeps its type: `setup.sh` warns and prints the command to resize it. `CPU_CREDITS=unlimited` boots faster, but sustained CPU above baseline costs $0.04 per vCPU-hour. Claude and any other provider usage is separate.
 
 ## Redeploy, roll back, change settings
 
@@ -127,9 +128,10 @@ deploy/aws/teardown.sh --dry-run   # see what would be deleted
 deploy/aws/teardown.sh             # asks you to type "delete harvestnet"
 ```
 
-It deletes the instance with its disk and data, the Elastic IP, the security group, the IAM role and profile, the bucket and its bundles, the secret, the budget, and the SES SMTP IAM user `harvestnet-ses-smtp` (created by hand for n8n email). With `SES_SENDER_EMAIL` set, it also deletes that SES sender identity. The secret stays recoverable for 7 days, and re-running `setup.sh` restores it. Flags: `--yes` skips the prompt, `--purge-secret` deletes the secret at once, `--keep-budget` keeps the alert, `--include-skeleton` also deletes the `harvestnet-api-skeleton` Lambda, its URL, logs and role. It never touches other stacks in the account (for example `clinical-trials-viz`).
+It deletes the instance with its disk and data, the Elastic IP, the security group, the IAM role and profile, the bucket and its bundles, the secret, the budget, and the SES SMTP IAM user `harvestnet-ses-smtp` (created by hand for n8n email). With `SES_SENDER_EMAIL` set, it also deletes that SES sender identity. The secret stays recoverable for 7 days, and re-running `setup.sh` restores it. It also deletes the `harvestnet-api-skeleton` Lambda, its public URL, logs and role by default, so no public endpoint is left running. Flags: `--yes` skips the prompt, `--purge-secret` deletes the secret at once, `--keep-budget` keeps the alert, `--keep-skeleton` keeps the skeleton Lambda (`--include-skeleton` is still accepted and is now the default). It never touches other stacks in the account (for example `clinical-trials-viz`).
 
 ## Known limits
 
 - `sslip.io` certificates depend on a free public DNS service and on Let's Encrypt rate limits. If Caddy cannot get a certificate, use a real domain.
-- A t4g.micro has 1 GB of memory. Eight small Python services use about 35 MB each when idle (measured locally), and the Directory daemon has a 256 MB ceiling. Actual full-stack memory use on the instance is reported by `check_directory.sh`. If it runs short, use `INSTANCE_TYPE=t4g.small`.
+- A t4g.small has 2 GB of memory. Eight small Python services use about 35 MB each when idle (measured locally), and the Directory daemon has a 256 MB ceiling; the image build is the peak. Actual full-stack memory use on the instance is reported by `check_directory.sh`.
+- Transport receipts (an organization host's answer to a signed turn) come back on the same HTTP exchange and are not signed; the publisher checks their organization, event and sequence. The private `platform` network has no TLS.

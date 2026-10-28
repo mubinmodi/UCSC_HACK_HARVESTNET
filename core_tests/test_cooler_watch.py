@@ -199,8 +199,14 @@ class WatcherFromEnv(unittest.TestCase):
         import sys
         sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
         from harvestnet_platform import transport
+        # Test placeholder: a host refuses to start without its own verification keys.
+        keys = {'TRANSPORT_VERIFY_KEYS': json.dumps({'core': '0' * 64})}
+        with mock.patch.dict(os.environ, {'TRANSPORT_VERIFY_KEYS': ''}), \
+                mock.patch.object(sys, 'argv', ['transport', '--organization', 'city']), \
+                mock.patch.object(transport, 'serve') as serve, self.assertRaises(ValueError):
+            transport.main()
         for env, started in (({'COOLER_WATCH': '1'}, True), ({}, False), ({'COOLER_WATCH': '0'}, False)):
-            with self.subTest(env=env), mock.patch.dict(os.environ, env), \
+            with self.subTest(env=env), mock.patch.dict(os.environ, {**env, **keys}), \
                     mock.patch.object(sys, 'argv', ['transport', '--organization', 'city']), \
                     mock.patch.object(transport, 'serve') as serve, \
                     mock.patch('harvestnet_core.cooler_watch.start_from_env') as start:
@@ -224,6 +230,40 @@ class WatcherFromEnv(unittest.TestCase):
         self.assertEqual((watcher.food_bank_id, watcher.core_token, watcher.events_token), ('city', 'city-own', 'events'))
         self.assertEqual((watcher.core_url, watcher.approvals_url), ('http://core:8000', 'http://approvals:8030'))
         self.assertNotIn('rural-own', repr(vars(watcher)))
+
+    def test_the_deployed_host_gets_only_its_own_single_token(self):
+        from harvestnet_core.cooler_watch import watcher_from_env
+        env = {k: v for k, v in self.ENV.items() if k != 'HARVESTNET_STAFF_TOKENS'}
+        watcher = watcher_from_env('rural', {**env, 'HARVESTNET_STAFF_TOKEN': 'rural-own'})
+        self.assertEqual(watcher.core_token, 'rural-own')
+        self.assertIsNone(watcher_from_env('rural', env))
+
+    def test_fallback_directory_reports_the_mode_of_whichever_answered(self):
+        from harvestnet_core.cooler_watch import FallbackDirectory
+
+        class Primary:
+            mode, down = 'agntcy_directory', False
+
+            def search(self, **query):
+                if self.down:
+                    raise ConnectionError('directory down')
+                return {'mode': self.mode, 'records': []}
+
+        class Local:
+            mode = 'local_directory_fallback'
+
+            def search(self, **query):
+                return {'mode': self.mode, 'records': []}
+
+        primary = Primary()
+        directory = FallbackDirectory(primary, Local())
+        self.assertEqual(directory.mode, 'agntcy_directory')
+        primary.down = True
+        self.assertEqual(directory.search()['agntcy_unreachable'], 'ConnectionError')
+        self.assertEqual(directory.mode, 'local_directory_fallback')
+        primary.down = False
+        directory.search()
+        self.assertEqual(directory.mode, 'agntcy_directory')
 
     def test_not_started_without_its_configuration_or_for_a_non_food_bank(self):
         from harvestnet_core.cooler_watch import watcher_from_env

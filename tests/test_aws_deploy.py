@@ -22,7 +22,8 @@ SECRET_ENV = {
     'DEMO_SWITCH_TOKEN': 'SENTINEL-demo-switch',
 }
 EXISTING_SECRET = {
-    'TRANSPORT_TOKEN': 'SENTINEL-existing-transport', 'API_EVENTS_TOKEN': 'SENTINEL-existing-events',
+    'TRANSPORT_TOKEN': 'SENTINEL-retired-shared-transport', 'API_EVENTS_TOKEN': 'SENTINEL-existing-events',
+    'TRANSPORT_KEYS': json.dumps({'core': 'SENTINEL-existing-transport-core-key-000000000000'}),
     'DEMO_SWITCH_TOKEN': 'SENTINEL-existing-switch', 'CORE_API_URL': 'http://core:8000',
     'HARVESTNET_STAFF_TOKENS': json.dumps({'market': 'SENTINEL-existing-staff-market'}),
 }
@@ -291,7 +292,12 @@ class AwsDryRun(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assert_safe(result, calls)
             merged = json.loads((Path(out) / 'secret.json').read_text())
-        self.assertEqual(merged['TRANSPORT_TOKEN'], EXISTING_SECRET['TRANSPORT_TOKEN'])
+        self.assertNotIn('TRANSPORT_TOKEN', merged)  # the shared transport token is retired
+        transport = json.loads(merged['TRANSPORT_KEYS'])
+        self.assertEqual(set(transport), {'core', 'market', 'city', 'rural', 'eastside', 'advocate'})
+        self.assertEqual(transport['core'], 'SENTINEL-existing-transport-core-key-000000000000')  # kept
+        self.assertEqual(len(set(transport.values())), 6)
+        self.assertRegex(merged['HARVESTNET_APPROVALS_TOKEN'], r'^[0-9a-f]{64}$')
         self.assertEqual(merged['API_EVENTS_TOKEN'], EXISTING_SECRET['API_EVENTS_TOKEN'])
         self.assertEqual(merged['DEMO_SWITCH_TOKEN'], SECRET_ENV['DEMO_SWITCH_TOKEN'])
         self.assertEqual(merged['ANTHROPIC_API_KEY'], SECRET_ENV['ANTHROPIC_API_KEY'])
@@ -308,10 +314,26 @@ class AwsDryRun(unittest.TestCase):
         loader = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(loader)
         self.assertLessEqual(set(merged), loader.ALLOWED, 'the instance loader would reject these keys')
-        loader.env_file(merged)  # every value is one the loader accepts
+        content = loader.env_file(merged)  # every value is one the loader accepts
+        # Per-host values for compose: each food bank's own token, each host's own transport keys.
+        self.assertIn(f"STAFF_TOKEN_CITY='{staff['city']}'", content)
+        self.assertIn("TRANSPORT_VERIFY_KEYS_RURAL='", content)
+        self.assertIn("TRANSPORT_SIGNING_KEY_CORE='SENTINEL-existing-transport-core-key-000000000000'", content)
+        self.assertNotIn('TRANSPORT_TOKEN=', content)
 
-    def test_teardown_dry_run_lists_deletes_and_keeps_the_skeleton(self):
+    def test_teardown_dry_run_lists_deletes_and_the_public_skeleton_by_default(self):
         result, calls = self.run_script('existing', 'deploy/aws/teardown.sh', '--dry-run')
+        output = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, output)
+        self.assert_safe(result, calls)
+        for planned in ('ec2 terminate-instances', 'ec2 release-address', 'ec2 delete-security-group',
+                        'iam delete-instance-profile', 'iam delete-role --role-name harvestnet-ec2-role',
+                        's3api delete-bucket', 'secretsmanager delete-secret', 'budgets delete-budget',
+                        'lambda delete-function --function-name harvestnet-api-skeleton'):
+            self.assertIn(planned, output)
+
+    def test_teardown_keep_skeleton(self):
+        result, calls = self.run_script('existing', 'deploy/aws/teardown.sh', '--dry-run', '--keep-skeleton')
         output = result.stdout + result.stderr
         self.assertEqual(result.returncode, 0, output)
         self.assert_safe(result, calls)
@@ -322,7 +344,7 @@ class AwsDryRun(unittest.TestCase):
         self.assertNotIn('lambda delete-function', output)
         self.assertNotIn('harvestnet-api-skeleton-role', output.split('Find HarvestNet resources')[1].split('skeleton Lambda')[0])
 
-    def test_teardown_include_skeleton(self):
+    def test_teardown_include_skeleton_is_still_accepted(self):
         result, calls = self.run_script('existing', 'deploy/aws/teardown.sh', '--dry-run', '--include-skeleton')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('lambda delete-function --function-name harvestnet-api-skeleton', result.stderr)
@@ -332,10 +354,8 @@ class AwsDryRun(unittest.TestCase):
                      capture_output=True).returncode == 0, 'docker compose not available')
 class AwsComposeConfig(unittest.TestCase):
     def test_compose_files_merge(self):
-        env = {'PATH': os.environ['PATH'], 'HOME': os.environ.get('HOME', '/tmp'), 'HARVESTNET_RELEASE': 'test',
-               'TRANSPORT_TOKEN': 'x', 'API_EVENTS_TOKEN': 'x', 'DEMO_SWITCH_TOKEN': 'x',
-               'APPROVAL_PUBLIC_URL': 'https://example.invalid', 'HARVESTNET_ALLOWED_ORIGIN': 'https://example.invalid',
-               'HARVESTNET_STAFF_TOKENS': '{"market":"x"}', 'HARVESTNET_DOMAIN': 'example.invalid'}
+        from deploy_env import compose_env
+        env = compose_env()
         result = subprocess.run(['docker', 'compose', '-p', 'harvestnet', '-f', 'compose.platform.yaml',
                                  '-f', 'deploy/aws/compose.aws.yaml', 'config', '--format', 'json'],
                                 capture_output=True, text=True, cwd=ROOT, env=env)

@@ -13,8 +13,8 @@
 #   against the public OASF schema service (it refuses records when it can't reach it).
 # - P2P routing has no bootstrap peers, so this Directory stays a single, private node.
 # - The 256 MiB limit is a ceiling, not a reservation; GOMEMLIMIT makes the Go
-#   runtime collect before it reaches it. Check actual use before relying on a
-#   t4g.micro's 1 GB RAM for the full stack.
+#   runtime collect before it reaches it. The default t4g.small has 2 GB for the
+#   full stack; check_directory.sh reports actual use.
 # - Each organization host registers its own card and capabilities and re-reads its
 #   own systems every DIRECTORY_REFRESH_SECONDS (harvestnet_platform.directory). When
 #   the Directory is down, the hosts keep serving moves and retry; searches from

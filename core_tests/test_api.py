@@ -92,6 +92,31 @@ class APITests(unittest.TestCase):
         self.assertTrue(self.api.call('GET','/requests/TEST1')[1]['pickups'])
 
 
+    def test_the_approvals_credential_records_only_a_review_link_decision(self):
+        # Test placeholder credential; the bridge holds this instead of every staff token.
+        bridge='approvals-test-placeholder-credential'
+        api=API(self.e,clock=lambda:self.now,staff_tokens={'market':'donor-test','city':'city-test'},approvals_token=bridge)
+        status,created=api.call('POST','/surplus-offers',copy.deepcopy(self.f['surplus_offers'][0]),token='donor-test')
+        self.assertEqual(status,201,created)
+        lid=created['lot_id']; d=self.e.records.get('lot',lid)['draft']
+        receipt={'lot_id':lid,'version':d['version'],'organization_id':'market','terms_hash':terms_hash(d),'decision':'approve'}
+        self.assertEqual(api.call('POST','/approvals',receipt,token=bridge)[0],401)  # no link receipt ID
+        self.assertEqual(api.call('POST','/approvals',{**receipt,'receipt_id':'link-receipt-0001'},token=bridge)[0],200)
+        # Still bound to the exact current version and terms.
+        self.assertEqual(api.call('POST','/approvals',{**receipt,'organization_id':'city','terms_hash':'sha256:'+'0'*64,
+                                                       'receipt_id':'link-receipt-0002'},token=bridge)[0],409)
+        # No staff action: dashboards, counters, offers, status and the approvals list all refuse it.
+        counter={'organization_id':'city','version':d['version'],'amendment':{'kind':'set_pounds','produce_id':'apples','food_bank_id':'city','pounds':3},'reason':'x'}
+        for method,target,body in (('GET','/food-banks/city/dashboard',None),('GET','/approvals?organization_id=market',None),
+                                   ('POST','/lots/'+lid+'/counters',counter),('POST','/surplus-offers',copy.deepcopy(self.f['surplus_offers'][0])),
+                                   ('PUT','/food-banks/city/status',{'cooler':{'status':'failed'}})):
+            with self.subTest(target=target):
+                self.assertEqual(api.call(method,target,body,token=bridge)[0],401)
+        for bad in ('donor-test','short'):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                API(self.e,staff_tokens={'market':'donor-test'},approvals_token=bad)
+
+
     def test_counter_is_processed_on_owner_turn_and_invalidates_approval(self):
         status,created=self.api.call('POST','/surplus-offers',copy.deepcopy(self.f['surplus_offers'][0]),token='donor-test')
         self.assertEqual(status,201,created)

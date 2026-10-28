@@ -28,16 +28,20 @@ mkdir -p "$RUN" "$OUT"
 cd "$ROOT"
 
 make_env() { # throwaway test tokens, generated once, never printed
-  [ -f "$ENV_FILE" ] && return
+  # An env file from before per-sender transport keys is replaced (its tokens are throwaway too).
+  [ -f "$ENV_FILE" ] && grep -q '^TRANSPORT_VERIFY_KEYS_CITY=' "$ENV_FILE" && return
   umask 077
   "$PY" - > "$ENV_FILE" <<'PYEOF'
 import json, secrets
+from harvestnet_platform.transport_auth import generate_keys, host_env
 t = lambda: secrets.token_urlsafe(24)
 staff = {o: t() for o in ('market', 'city', 'rural', 'eastside', 'advocate')}
-print(f'TRANSPORT_TOKEN={t()}')
 print(f'API_EVENTS_TOKEN={t()}')
 print(f'DEMO_SWITCH_TOKEN={t()}')
+print(f'HARVESTNET_APPROVALS_TOKEN={t()}')
 print(f"HARVESTNET_STAFF_TOKENS='{json.dumps(staff)}'")
+for key, value in host_env(generate_keys()).items():  # each host's own transport keys
+    print(f"{key}='{value}'")
 PYEOF
 }
 
@@ -79,7 +83,7 @@ wait_http() { # wait_http URL
 
 up() {
   [ -x "$PY" ] || { echo "run: cd agents && uv sync" >&2; exit 1; }
-  make_env
+  PYTHONPATH="$ROOT" make_env
   set -a; . "$ENV_FILE"; set +a
   build_frontends
   export PYTHONPATH="$ROOT/agents/src:$ROOT" HARVESTNET_PLATFORM_SOURCE="$ROOT" PYTHONUNBUFFERED=1
@@ -97,19 +101,25 @@ up() {
   ( export COOLER_STATE_PATH="$RUN/data/coolers.json" DEMO_SWITCH_TOKEN
     start systems "$PY" -m harvestnet_platform.systems --port $SYSTEMS_PORT --host 127.0.0.1 )
   ( export APPROVALS_DB="$RUN/data/approvals.sqlite" APPROVAL_PUBLIC_URL="$origin" CORE_API_URL="http://127.0.0.1:$CORE_PORT" \
-      CORE_API_TOKENS="$HARVESTNET_STAFF_TOKENS" ALLOW_INTERNAL_HTTP=1 API_EVENTS_TOKEN APPROVAL_LINK_TTL_SECONDS=86400
+      CORE_APPROVALS_TOKEN="$HARVESTNET_APPROVALS_TOKEN" ALLOW_INTERNAL_HTTP=1 API_EVENTS_TOKEN APPROVAL_LINK_TTL_SECONDS=86400
     start approvals "$PY" -m harvestnet_platform.approvals --port $APPROVALS_PORT --host 127.0.0.1 )
   wait_http "http://127.0.0.1:$SYSTEMS_PORT/health" || true
   wait_http "http://127.0.0.1:$APPROVALS_PORT/health" || true
 
   for entry in "${ORG_PORTS[@]}"; do
     org="${entry%%:*}"; port="${entry##*:}"
-    ( export AGENT_POLICY=harvestnet_core.join_adapter:policy TRANSPORT_TOKEN ALLOW_INTERNAL_HTTP=1 \
+    ( upper="$(printf '%s' "$org" | tr '[:lower:]' '[:upper:]')"
+      signing="TRANSPORT_SIGNING_KEY_$upper" verify="TRANSPORT_VERIFY_KEYS_$upper"
+      own="$("$PY" -c 'import json, os, sys; print(json.loads(os.environ["HARVESTNET_STAFF_TOKENS"])[sys.argv[1]])' "$org")"
+      # Each host keeps only its own credentials, as on AWS.
+      unset HARVESTNET_STAFF_TOKENS HARVESTNET_APPROVALS_TOKEN
+      export AGENT_POLICY=harvestnet_core.join_adapter:policy ALLOW_INTERNAL_HTTP=1 \
+        TRANSPORT_SIGNING_KEY="${!signing}" TRANSPORT_VERIFY_KEYS="${!verify}" \
         RECEIPTS_DB="$RUN/data/receipts-$org.sqlite" AGENT_PUBLIC_URL="http://127.0.0.1:$port"
       case "$org" in city|rural|eastside)
         export COOLER_WATCH=1 COOLER_WATCH_INTERVAL_SECONDS=5 COOLER_WATCH_STATE="$RUN/data/cooler-watch-$org.json" \
                SYSTEMS_URL="http://127.0.0.1:$SYSTEMS_PORT" CORE_API_URL="http://127.0.0.1:$CORE_PORT" \
-               APPROVALS_URL="http://127.0.0.1:$APPROVALS_PORT" HARVESTNET_STAFF_TOKENS API_EVENTS_TOKEN ;;
+               APPROVALS_URL="http://127.0.0.1:$APPROVALS_PORT" HARVESTNET_STAFF_TOKEN="$own" API_EVENTS_TOKEN ;;
       esac
       start "org-$org" "$PY" -m harvestnet_platform.transport --organization "$org" --port "$port" --host 127.0.0.1 )
   done

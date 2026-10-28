@@ -7,7 +7,7 @@ python -m harvestnet_platform.join --fixture core_fixtures/normal-afternoon.json
   --harness harvestnet_core.join_adapter:harness --policy harvestnet_core.join_adapter:policy
 ```
 
-Run it with `agents/src` on `PYTHONPATH` and the five hosts up (`python -m harvestnet_platform.join --help` lists the flags). `AGENT_ENDPOINTS` is a JSON map of the five organization URLs and `TRANSPORT_TOKEN` authenticates the exchange.
+Run it with `agents/src` on `PYTHONPATH` and the five hosts up (`python -m harvestnet_platform.join --help` lists the flags). `AGENT_ENDPOINTS` is a JSON map of the five organization URLs. The join signs every turn as the turn publisher, `core`, with `TRANSPORT_SIGNING_KEY` (the `TRANSPORT_SIGNING_KEY_CORE` value from `python -m harvestnet_platform.transport_auth`), and each host checks it ([`TRANSPORT.md`](TRANSPORT.md), per-sender signatures).
 
 ## The two adapters
 

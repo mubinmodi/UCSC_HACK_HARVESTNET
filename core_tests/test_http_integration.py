@@ -61,16 +61,19 @@ class HTTPTests(unittest.TestCase):
         from http.server import ThreadingHTTPServer
         from harvestnet_platform.transport import ORGANIZATIONS,Receiver,A2ATransport,handler_for
         from harvestnet_platform.join import compare_fixture
+        from harvestnet_platform.transport_auth import Signer,Verifier,generate_keys,pair_key
         from harvestnet_core.join_adapter import harness,policy
+        keys=generate_keys()  # throwaway per-sender transport keys for this test
+        def verifier(org): return Verifier(org,{s:pair_key(k,org) for s,k in keys.items() if s!=org})
         servers=[];threads=[];endpoints={}
         try:
             for org in ORGANIZATIONS:
-                server=ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver(org,policy),'network-test','http://localhost'))
+                server=ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver(org,policy),verifier(org),'http://localhost'))
                 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
                 servers.append(server);threads.append(thread)
                 endpoints[org]='http://127.0.0.1:'+str(server.server_port)
             f=json.loads(Path('core_fixtures/normal-afternoon.json').read_text())
-            report=compare_fixture(f,harness,policy,A2ATransport(endpoints,'network-test'))
+            report=compare_fixture(f,harness,policy,A2ATransport(endpoints,Signer('core',keys['core'])))
             self.assertEqual(report['status'],'identical_outcomes')
             self.assertTrue(report['commitments'])
             self.assertTrue(all(report['rule_checks'].values()))

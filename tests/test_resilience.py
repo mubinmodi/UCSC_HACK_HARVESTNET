@@ -17,6 +17,7 @@ from harvestnet_platform.http import request_json
 from harvestnet_platform.join import MoveBridge
 from harvestnet_platform.systems import Systems, BANKS, SYSTEM_ORGANIZATIONS
 from harvestnet_platform.transport import Receiver, handler_for as transport_handler, rpc_request
+from test_transport import signer, verifier
 
 
 def envelope():
@@ -35,20 +36,23 @@ def notice():
 class ResilienceTests(unittest.TestCase):
     def test_http_transport_rejects_bad_shapes_without_losing_next_valid_turn(self):
         receiver = Receiver('market')
-        server = ThreadingHTTPServer(('127.0.0.1', 0), transport_handler(receiver, 'transport-test', 'http://localhost'))
+        server = ThreadingHTTPServer(('127.0.0.1', 0), transport_handler(receiver, verifier('market'), 'http://localhost'))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         url = f'http://127.0.0.1:{server.server_port}/'
         try:
-            with self.assertRaises(HTTPError) as unauthenticated:
-                request_json(url, rpc_request(envelope()))
-            self.assertEqual(unauthenticated.exception.code, 401)
-            for params in (None, [], {'message': None}, {'message': {'role': 'user', 'parts': [None]}},
-                           {'message': {'role': 'user', 'parts': [{'kind': 'data', 'data': []}]}}):
-                response = request_json(url, {'jsonrpc': '2.0', 'id': 'bad', 'method': 'message/send', 'params': params}, token='transport-test')
+            for unsigned in (envelope(), []):  # no signature, or not even an envelope
+                with self.assertRaises(HTTPError) as unauthenticated:
+                    request_json(url, rpc_request(unsigned))
+                self.assertEqual(unauthenticated.exception.code, 401)
+            for params in (None, [], {'message': None}, {'message': {'role': 'user', 'parts': [None]}}):
+                response = request_json(url, {'jsonrpc': '2.0', 'id': 'bad', 'method': 'message/send', 'params': params})
                 self.assertEqual(response['error']['code'], -32602)
+            # Signed, but the envelope inside is malformed: a validation error, not a lost turn.
+            bad = signer().sign({**envelope(), 'input': []}, 'market')
+            self.assertEqual(request_json(url, rpc_request(bad))['error']['code'], -32602)
             self.assertEqual(receiver.observed_order('restart'), [])
-            response = request_json(url, rpc_request(envelope()), token='transport-test')
+            response = request_json(url, rpc_request(signer().sign(envelope(), 'market')))
             self.assertEqual(response['result']['parts'][0]['data']['sequence'], 1)
         finally:
             server.shutdown()

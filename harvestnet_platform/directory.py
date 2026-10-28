@@ -10,6 +10,17 @@ from .systems import Systems, BANKS, organization_systems
 from .transport import ORGANIZATIONS, agent_card, role_of
 
 
+def directory_errors():
+    """What a failed AGNTCY Directory call raises: the SDK's gRPC errors (``grpc.RpcError``,
+    which some SDK calls wrap in ``RuntimeError``) and network errors (``OSError``, which
+    covers timeouts and refused connections). Anything else is a bug and is not hidden."""
+    try:
+        import grpc
+    except ImportError:
+        return (RuntimeError, OSError)
+    return (grpc.RpcError, RuntimeError, OSError)
+
+
 def capabilities(organization, systems):
     if organization not in BANKS:
         return {'role': role_of(organization), 'synthetic': True}
@@ -146,7 +157,7 @@ class DirectoryPublisher:
             if stale:
                 try:
                     self.directory.unregister(stale)
-                except Exception as exc:  # search still prefers the newest record
+                except directory_errors() as exc:  # search still prefers the newest record
                     return {'status': 'published', 'cid': cid, 'stale_cid': stale, 'unregister_error': str(exc)}
             return {'status': 'published', 'cid': cid, 'replaced_cid': stale}
 
@@ -155,7 +166,9 @@ class DirectoryPublisher:
         while not stop.is_set():
             try:
                 self.refresh()
-            except Exception as exc:  # keep serving moves; report and retry next interval
+            # Directory down, or this organization's own systems unreadable or malformed:
+            # keep serving moves; report and retry next interval.
+            except (*directory_errors(), ValueError, KeyError) as exc:
                 print(f'Directory refresh failed for {self.organization}: {exc}', flush=True)
             stop.wait(interval_seconds)
 
@@ -191,7 +204,7 @@ def grpc_status(exc):
     code = getattr(exc, 'code', None)
     try:
         return code().name if callable(code) else type(exc).__name__
-    except Exception:
+    except (AttributeError, TypeError):
         return type(exc).__name__
 
 
@@ -234,7 +247,7 @@ def main():
         result = answer(AgntcyDirectory(address), {'address': address})
     except ValueError:  # a bad query, not an outage
         raise
-    except Exception as exc:  # gRPC errors: the Directory is down or refused the call
+    except directory_errors() as exc:  # the Directory is down or refused the call
         if 'AGENT_ENDPOINTS' not in os.environ:
             raise
         # Labeled fallback, never presented as AGNTCY results. Exit 2 so scripts notice.

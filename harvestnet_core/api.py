@@ -101,13 +101,19 @@ def match_route(template, segments):
 
 class API:
     def __init__(self, engine, *, clock=None, staff_tokens=None, extractor=None, voice_rate_limit=VOICE_RATE_LIMIT, monotonic=time.monotonic,
-                 household_page_url=None):
+                 household_page_url=None, approvals_token=None):
         self.engine=engine
         self.records=engine.records
         self.clock=clock or (lambda: datetime.now(timezone.utc).isoformat())
         self.tokens=staff_tokens or {}
         if len(set(self.tokens.values())) != len(self.tokens) or any(not v for v in self.tokens.values()):
             raise ValueError("each organization needs its own nonempty token")
+        # Proposed (platform isolation): the approval bridge's own credential. It records one
+        # human's decision from a review link and nothing else; it is never a staff token.
+        if approvals_token is not None and (not isinstance(approvals_token, str) or len(approvals_token) < 16
+                                            or approvals_token in self.tokens.values()):
+            raise ValueError("the approvals credential must be its own secret of at least 16 characters")
+        self.approvals_token=approvals_token
         if isinstance(extractor, desk.ClaudeExtractor):
             # A paid model call per transcript needs a hard cap (#22).
             raise ValueError("a Claude extractor needs a spending cap: wrap it in harvestnet_core.voice.CappedExtractor")
@@ -129,6 +135,18 @@ class API:
         expected=self.tokens.get(owner)
         if not expected or not secrets.compare_digest(token or "",expected):
             raise Unauthorized("organization staff authentication required")
+
+    def authorize_decision(self, owner, token, body):
+        """Record a human decision: the organization's own staff token, or the approval bridge's
+        scoped credential for one review-link decision. The scoped credential is accepted nowhere
+        else, needs the link's receipt ID, and still goes through every version, terms-hash,
+        named-organization and deadline check in protocol.approve / changes.approve."""
+        if self.approvals_token and secrets.compare_digest(token or "", self.approvals_token):
+            rid=body.get('receipt_id')
+            if not isinstance(rid,str) or not 16<=len(rid)<=64 or owner not in self.tokens:
+                raise Unauthorized("the approvals credential records only a review link's decision, with its receipt ID")
+            return
+        self.authorize(owner,token)
 
     def purge(self):
         with self.records.transaction():
@@ -618,7 +636,7 @@ class API:
     def op_record_approval(self, call):
         body=call.body
         owner=body.get('organization_id')
-        self.authorize(owner,call.token)
+        self.authorize_decision(owner,call.token,body)
         receipt={field:body[field] for field in ('lot_id','version','organization_id','terms_hash','decision')}
         if body.get('receipt_id'): receipt['receipt_id']=body['receipt_id']
         if changes.find(self.records,receipt['lot_id'],receipt['version']):

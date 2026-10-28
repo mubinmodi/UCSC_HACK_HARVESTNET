@@ -11,6 +11,7 @@ import threading
 import uuid
 from pathlib import Path
 from .http import JsonHandler, request_json, seconds, serve
+from .transport_auth import AuthError, Signer, Verifier
 
 from .roster import BANKS, ORGANIZATIONS, ROLES  # the one roster; re-exported for callers of this module
 ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human', 'pass'}
@@ -188,7 +189,7 @@ def agent_card(organization, endpoint, capabilities=None):
             'url': endpoint.rstrip('/') + '/', 'version': '1.0.0', 'protocolVersion': '0.3.0',
             'preferredTransport': 'JSONRPC', 'capabilities': {'streaming': False},
             'defaultInputModes': ['application/json'], 'defaultOutputModes': ['application/json'],
-            'securitySchemes': {'bearer': {'type': 'http', 'scheme': 'bearer'}}, 'security': [{'bearer': []}],
+            # No shared bearer: each envelope carries its sender's HMAC signature (transport_auth.py).
             'skills': [{'id': 'organization_move', 'name': 'Propose own organization move',
                         'description': 'Respond to versioned calculator facts on a published turn', 'tags': tags}],
             'supportsAuthenticatedExtendedCard': False}
@@ -206,7 +207,11 @@ def rpc_result(request, result):
         'parts': [{'kind': 'data', 'data': result}]}}
 
 
-def handler_for(receiver, token, endpoint):
+def handler_for(receiver, verifier, endpoint):
+    """The organization host. ``verifier`` checks each envelope's sender signature (transport_auth)."""
+    if not isinstance(verifier, Verifier) or verifier.recipient != receiver.organization:
+        raise ValueError("A host needs a verifier for its own organization's messages")
+
     class Handler(JsonHandler):
         def do_GET(self):
             if self.path in ('/.well-known/agent-card.json', '/.well-known/agent.json'):
@@ -218,8 +223,6 @@ def handler_for(receiver, token, endpoint):
         def do_POST(self):
             if self.path != '/':
                 return self.send_json(405, {'error': 'Transport cannot commit organizations'})
-            if not self.authorized(token):
-                return self.send_json(401, {'error': 'Authenticated message transport required'})
             request = {}
             try:
                 request = self.read_json()
@@ -232,7 +235,11 @@ def handler_for(receiver, token, endpoint):
                 parts = message.get('parts')
                 if message.get('role') != 'user' or not isinstance(parts, list) or len(parts) != 1 or not isinstance(parts[0], dict) or parts[0].get('kind') != 'data':
                     raise ValueError('One A2A DataPart envelope required')
-                result = receiver.receive(parts[0]['data'])
+                try:
+                    envelope = verifier.verify(parts[0].get('data'))
+                except AuthError as exc:
+                    return self.send_json(401, {'error': f'Authenticated organization message required: {exc}'})
+                result = receiver.receive(envelope)
                 self.send_json(200, rpc_result(request, result))
             except (ValueError, KeyError, TypeError) as exc:
                 self.send_json(200, {'jsonrpc': '2.0', 'id': request.get('id'),
@@ -255,10 +262,10 @@ class InProcess:
 class A2ATransport:
     mode = 'a2a_jsonrpc'
 
-    def __init__(self, endpoints, token, timeout=None):
-        if set(endpoints) != set(ORGANIZATIONS) or not token:
-            raise ValueError('All organization endpoints and transport token required')
-        self.endpoints, self.token = endpoints, token
+    def __init__(self, endpoints, signer, timeout=None):
+        if set(endpoints) != set(ORGANIZATIONS) or not isinstance(signer, Signer):
+            raise ValueError("All organization endpoints and the sender's transport signer required")
+        self.endpoints, self.signer = endpoints, signer
         # A live Claude turn can take far longer than a plain HTTP call.
         self.timeout = seconds(os.getenv('AGENT_TURN_TIMEOUT_SECONDS', '60') if timeout is None else timeout)
         self.lock = threading.RLock()
@@ -269,8 +276,10 @@ class A2ATransport:
         with self.lock:
             receipts = []
             for org in ORGANIZATIONS:
-                response = request_json(self.endpoints[org].rstrip('/') + '/', rpc_request(for_organization(envelope, org)),
-                                        token=self.token, timeout=self.timeout)
+                # Signed per recipient: a fresh nonce each time, so a retry is a new message
+                # carrying the SAME envelope (the receiver's receipts make it idempotent).
+                signed = self.signer.sign(for_organization(envelope, org), org)
+                response = request_json(self.endpoints[org].rstrip('/') + '/', rpc_request(signed), timeout=self.timeout)
                 if 'error' in response:
                     raise ValueError(response['error']['message'])
                 receipt = response['result']['parts'][0]['data']
@@ -287,9 +296,12 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     args = parser.parse_args()
     policy, label = load_policy(os.getenv('AGENT_POLICY'))
-    receiver = Receiver(args.organization, policy, os.getenv('RECEIPTS_DB', ':memory:'))
+    receipts_db = os.getenv('RECEIPTS_DB', ':memory:')
+    receiver = Receiver(args.organization, policy, receipts_db)
+    # Refuse to start without this host's own verification keys: there is no shared-token fallback.
+    verifier = Verifier.from_env(args.organization, receipts_db)
     endpoint = os.getenv('AGENT_PUBLIC_URL', f'http://127.0.0.1:{args.port}')
-    print(f'Policy: {label}; transport: A2A JSON-RPC; approvals disabled', flush=True)
+    print(f'Policy: {label}; transport: A2A JSON-RPC, per-sender signed; approvals disabled', flush=True)
     address = os.getenv('AGNTCY_DIRECTORY_ADDRESS')
     if address:
         # Register this organization's own card and capabilities, and keep them current.
@@ -305,7 +317,7 @@ def main():
         # Only the AWS image carries harvestnet_core, so this stays off unless asked for.
         from harvestnet_core.cooler_watch import start_from_env
         start_from_env(args.organization)
-    serve(handler_for(receiver, os.getenv('TRANSPORT_TOKEN'), endpoint), args.port, args.host)
+    serve(handler_for(receiver, verifier, endpoint), args.port, args.host)
 
 
 if __name__ == '__main__':

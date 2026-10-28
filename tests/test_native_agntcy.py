@@ -1,4 +1,11 @@
-"""Actual native App SDK host smoke test; optional heavy dependencies."""
+"""Actual native App SDK host smoke test; optional heavy dependencies (Linux).
+
+SKIPS unless agntcy-app-sdk is installed (CI's "native-agntcy" job installs it). Locally:
+
+    uv run --with pytest --with-requirements requirements-agntcy.txt pytest -q tests/test_native_agntcy.py
+
+That downloads the pinned SDK from PyPI; some of its dependencies build only on Linux.
+"""
 import importlib.util
 import os
 import socket
@@ -11,12 +18,15 @@ from pathlib import Path
 from urllib.error import URLError, HTTPError
 from harvestnet_platform.http import request_json
 from harvestnet_platform.transport import rpc_request
-from test_transport import envelope
+import json
+from harvestnet_platform.transport_auth import pair_key
+from test_transport import TEST_KEYS, envelope, signer
 
 AVAILABLE = importlib.util.find_spec('agntcy_app_sdk') is not None
 
 
-@unittest.skipUnless(AVAILABLE,'Native AGNTCY App SDK dependencies not installed')
+@unittest.skipUnless(AVAILABLE, 'SKIPPED NATIVE AGNTCY: agntcy-app-sdk not installed; run: uv run --with pytest '
+                                '--with-requirements requirements-agntcy.txt pytest -q tests/test_native_agntcy.py (Linux)')
 class NativeAGNTCYTests(unittest.TestCase):
     def test_native_sdk_host_authenticates_and_returns_organization_move(self):
         with socket.socket() as sock:
@@ -24,7 +34,8 @@ class NativeAGNTCYTests(unittest.TestCase):
             port = sock.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
         env = {**os.environ,'ORGANIZATION_ID':'market','AGENT_PUBLIC_URL':base,
-               'TRANSPORT_TOKEN':'native-test-token','PORT':str(port),'AGENT_POLICY':'',
+               'TRANSPORT_VERIFY_KEYS':json.dumps({s:pair_key(k,'market') for s,k in TEST_KEYS.items() if s!='market'}),
+               'PORT':str(port),'AGENT_POLICY':'',
                'AGNTCY_DIRECTORY_ADDRESS':'','OTEL_SDK_DISABLED':'true','RECEIPTS_DB':':memory:'}
         with tempfile.TemporaryFile(mode='w+') as log:
             # pip --target dependencies on Windows need their .pth hooks loaded.
@@ -47,9 +58,9 @@ class NativeAGNTCYTests(unittest.TestCase):
                     self.fail('Native SDK startup timed out: '+log.read()[-4000:])
                 self.assertEqual(card['name'],'HarvestNet market')
                 with self.assertRaises(HTTPError) as denied:
-                    request_json(base+'/',rpc_request(envelope()))
+                    request_json(base+'/',rpc_request(envelope()))  # unsigned
                 self.assertEqual(denied.exception.code,401)
-                response = request_json(base+'/',rpc_request(envelope()),token='native-test-token')
+                response = request_json(base+'/',rpc_request(signer().sign(envelope(),'market')))
                 self.assertEqual(response['result']['parts'][0]['data']['move']['action'],'ask_human')
             finally:
                 process.terminate()

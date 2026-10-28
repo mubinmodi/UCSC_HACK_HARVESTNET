@@ -4,6 +4,7 @@ import unittest
 from http.server import ThreadingHTTPServer
 from harvestnet_platform.transport import ORGANIZATIONS, Receiver, A2ATransport, handler_for, role_of
 from harvestnet_platform.join import compare_fixture, require_outcomes, REQUIRED_CHECKS, MoveBridge
+from test_transport import signer, verifier
 
 
 def fixture_policy(org, data):
@@ -27,7 +28,7 @@ class JoinTests(unittest.TestCase):
         servers, threads, endpoints = [], [], {}
         try:
             for org in ORGANIZATIONS:
-                server = ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver(org,fixture_policy),'join-token','http://localhost'))
+                server = ThreadingHTTPServer(('127.0.0.1',0),handler_for(Receiver(org,fixture_policy),verifier(org),'http://localhost'))
                 thread = threading.Thread(target=server.serve_forever,daemon=True)
                 thread.start()
                 servers.append(server)
@@ -36,11 +37,11 @@ class JoinTests(unittest.TestCase):
             fixture = {'terms':{'apples':{'rural':250,'eastside':50},'romaine':{'city':200},'potatoes':{'rural':400}},
                        'human_approvals':['market','city','rural','eastside'],
                        'pathways':[{'item':'apples','pounds':300},{'item':'romaine','pounds':200},{'item':'potatoes','pounds':400}]}
-            report = compare_fixture(fixture,fixture_harness,fixture_policy,A2ATransport(endpoints,'join-token'))
+            report = compare_fixture(fixture,fixture_harness,fixture_policy,A2ATransport(endpoints,signer()))
             self.assertEqual(report['status'],'identical_outcomes')
             self.assertEqual(report['network_mode'],'a2a_jsonrpc')
             fixture['human_approvals'] = []
-            self.assertEqual(compare_fixture(fixture,fixture_harness,fixture_policy,A2ATransport(endpoints,'join-token'))['commitments'],[])
+            self.assertEqual(compare_fixture(fixture,fixture_harness,fixture_policy,A2ATransport(endpoints,signer()))['commitments'],[])
         finally:
             for server in servers:
                 server.shutdown()

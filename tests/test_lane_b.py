@@ -3,6 +3,7 @@ import copy
 import importlib.util
 import json
 import os
+import sys
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
@@ -10,10 +11,20 @@ from pathlib import Path
 from unittest.mock import patch
 from harvestnet_platform.lane_b import recorded_rules, real_rules
 from harvestnet_platform.transport import ORGANIZATIONS, Receiver, A2ATransport, handler_for, validate_move
+from test_transport import signer, verifier
+
+# Lane B (agents/) is in this repository and needs only the standard library, so these
+# tests run by default against the same commit: agents/src and its recorded negotiator
+# fixtures are used unless LANE_B_FIXTURES or an installed harvestnet_agents says otherwise.
+ROOT = Path(__file__).resolve().parents[1]
+if importlib.util.find_spec('harvestnet_agents') is None and (ROOT / 'agents' / 'src').is_dir():
+    sys.path.insert(0, str(ROOT / 'agents' / 'src'))
+FIXTURES = os.getenv('LANE_B_FIXTURES') or str(ROOT / 'agents' / 'tests' / 'fixtures' / 'negotiators')
+AVAILABLE = importlib.util.find_spec('harvestnet_agents') is not None and Path(FIXTURES).is_dir()
 
 
-@unittest.skipUnless(importlib.util.find_spec('harvestnet_agents') and os.getenv('LANE_B_FIXTURES'),
-                     'Install pinned Lane B package and set LANE_B_FIXTURES to run compatibility tests')
+@unittest.skipUnless(AVAILABLE, 'SKIPPED LANE B: harvestnet_agents (agents/src) or its negotiator fixtures '
+                                f'({FIXTURES}) are missing; restore agents/ or set LANE_B_FIXTURES')
 class LaneBTests(unittest.TestCase):
     def test_all_recorded_moves_match_direct_rules_over_five_http_hosts(self):
         from harvestnet_agents.negotiation import parse_agent_input
@@ -21,15 +32,15 @@ class LaneBTests(unittest.TestCase):
         servers, threads, endpoints = [], [], {}
         try:
             for org in ORGANIZATIONS:
-                server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(Receiver(org, recorded_rules), 'lane-b-test', 'http://localhost'))
+                server = ThreadingHTTPServer(('127.0.0.1', 0), handler_for(Receiver(org, recorded_rules), verifier(org), 'http://localhost'))
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
                 servers.append(server)
                 threads.append(thread)
                 endpoints[org] = f'http://127.0.0.1:{server.server_port}'
-            fixtures = sorted(Path(os.environ['LANE_B_FIXTURES']).glob('*.json'))
+            fixtures = sorted(Path(FIXTURES).glob('*.json'))
             self.assertGreaterEqual(len(fixtures), 25)
-            network = A2ATransport(endpoints, 'lane-b-test')
+            network = A2ATransport(endpoints, signer())
             for file in fixtures:
                 raw = json.loads(file.read_text())
                 role, typed = parse_agent_input(raw)
@@ -51,7 +62,7 @@ class LaneBTests(unittest.TestCase):
                 thread.join()
 
     def test_real_adapter_requires_core_calculators_and_explicit_matching_turn(self):
-        raw = json.loads((Path(os.environ['LANE_B_FIXTURES']) / 'donor_accepts_plan_before_deadline.json').read_text())
+        raw = json.loads((Path(FIXTURES) / 'donor_accepts_plan_before_deadline.json').read_text())
         data = {key: raw[key] for key in ('role', 'draft', 'facts', 'turn')}
         self.assertEqual(recorded_rules('market', data)['action'], 'accept')
         # Lane A's earlier wire form gives the same move.
