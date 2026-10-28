@@ -1122,3 +1122,25 @@ In the preceding Claude session, the user selected Amazon SES when asked to swit
 ## User direction (October 27, 2026): make the total Claude cap real, recorded by Claude
 
 The lead asked that `CLAUDE_TOTAL_CAP_USD` ($50, with $5 per run) be enforced in code, not only agreed. Claude added a persistent spend ledger in the agents package (`harvestnet_agents/spend_ledger.py`, `CLAUDE_SPEND_LEDGER`); `SpendingCap` now checks each call's worst case against the run cap and the total cap, and records the actual cost afterward. The LLM negotiators, the voice extractor and the paid evaluation command all go through it. `harvestnet_platform/budget.py` was unused and redundant, so it was removed with its tests. The lead's earlier spend (about $4.92 in the October 11 run, plus at most $5 from an earlier stopped run) is recorded by hand with the `add` command, not by code. Nothing was deployed and no Claude call was made.
+
+## User direction (October 27, 2026): act on the adversarial review, recorded by Claude
+
+The lead asked Claude to address every finding of an adversarial review of the project. Its three headline problems were: food banks never really disagreed (each could change only its own line, so turn order decided the split and the advocate always passed), Claude had never run as a negotiator (every evaluation shows `not_run`), and HarvestNet did not beat the first-come-first-served baseline on worst-served coverage. The lead decided:
+
+1. **Contested shares (ADR 0013).** A food bank below fair share may contest another food bank's share; the other food bank concedes pounds beyond its own gap and may take back pounds within it; the advocate may back either side; a standoff becomes a preserved disagreement. ADR 0001 is unchanged.
+2. **A real Claude run** with a $20 cap, three repeats per scenario, published as measured whatever it shows. The lead supplies the API key; Claude never types it.
+3. **Several PRs, merged by Claude** once every suite passes: core correctness, agent robustness, platform isolation, contested shares, A2A in the live path, then demo and docs.
+4. **Redeploy to AWS afterward.**
+
+The review's numbers came from synthetic, rules-based runs. Evaluation results from before ADR 0013 describe the old mechanism and must be re-measured. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after this edit.
+
+## User direction (October 27, 2026): contests concede toward need, recorded by Claude
+
+The first implementation of ADR 0013 (PR #83) kept every standoff, as the ADR then said. Under scarcity every food bank holds only pounds within its own gap, so each contest met a take-back of the same pounds and the lot ended as a preserved disagreement. In the synthetic more-households-than-produce scenario, rules-based went from 0 to 52 lb wasted and from 4 households reached to 0. The lead replaced "a standoff is kept, not broken" with "concede toward need" (principle Decided; details Proposed):
+
+1. A contest states its claim: the contester's own fair-share gap, as `claimant_gap_lb` on the shift, from its own calculator.
+2. The food bank that loses pounds concedes pounds beyond its gap. Within it, it takes back only enough to reach its proportional share of the item they both hold, split in proportion to the two gaps (`proportional_split`). The contester accepts that split, and may contest once more, down to its share, if the other took back more.
+3. The advocate backs the side below its proportional share and passes once the split is proportional. A low-access area breaks exact ties only. It still never votes.
+4. A preserved disagreement remains only when a side refuses the proportional split and the terms repeat.
+
+Claude amended ADR 0013, MVP_DESIGN sections 6 and 8, CONTEXT.md "Contest", and the READMEs. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after this edit.

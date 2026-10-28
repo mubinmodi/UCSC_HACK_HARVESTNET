@@ -70,7 +70,7 @@ No facts ever name or describe an individual household.
 **Amendments** (exactly one per counter):
 
 - `set_pounds`: `produce_id`, `food_bank_id`, `pounds` (0 removes the line).
-- `shift_pounds`: `produce_id`, `from_food_bank_id`, `to_food_bank_id`, `pounds`.
+- `shift_pounds`: `produce_id`, `from_food_bank_id`, `to_food_bank_id`, `pounds`. Proposed (ADR 0013, October 27, 2026): an optional `claimant_gap_lb` on a food bank's contest or take-back, meaning a shift to itself. It carries that food bank's own fair-share gap this week, and it isn't part of the version's terms.
 - `set_transport`: `food_bank_id`, `mover`, `departs_at`, `arrives_at`.
 
 **Holds**: each has `resource` (`lot`, `drop_off`, `storage_cold`, `storage_dry`, `truck`), `pounds` (or `null`), `start`, and `end`. The owner is always the organization making the move.

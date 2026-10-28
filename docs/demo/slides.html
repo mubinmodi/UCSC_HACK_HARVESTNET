@@ -217,7 +217,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 <section class="slide" aria-label="Results in all five scenarios">
   <h2>Results in all five scenarios</h2>
   <div id="results-all"></div>
-  <p class="small">Report whatever the numbers show. Here, rules-based negotiation is not better everywhere: with more households than produce it reaches more households but has lower worst-served coverage than first-come-first-served.</p>
+  <p class="small">Report whatever the numbers show. Here, rules-based negotiation is not better everywhere: it ties nearest food bank on waste in every scenario. With more households than produce, the food banks below fair share contest each other's shares and concede toward need (ADR 0013), so the scarce produce is split in proportion to their households' fair-share gaps.</p>
 </section>
 
 <section class="slide" aria-label="When to stop">
@@ -288,7 +288,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     {"scenario_id": "more-households-than-produce", "run_mode": "synthetic", "synthetic": true, "methods": [
       {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 19.0, "committed_to_food_banks_lb": 33.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
       {"method": "nearest_food_bank", "status": "completed", "collected_by_households_lb": 19.0, "committed_to_food_banks_lb": 33.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 33.0, "worst_served_coverage": 0.4761904761904762, "households_reached": 2, "invalid_commitments": 0},
-      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 20.0, "committed_to_food_banks_lb": 32.0, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 32.0, "worst_served_coverage": 0.3208333333333333, "households_reached": 4, "invalid_commitments": 0},
+      {"method": "rules_based", "status": "completed", "collected_by_households_lb": 28.666666666666664, "committed_to_food_banks_lb": 23.333333333333336, "produce_wasted_lb": 0.0, "uncollected_by_scenario_households_lb": 23.333333333333332, "worst_served_coverage": 0.55, "households_reached": 4, "invalid_commitments": 0},
       {"method": "llm", "status": "not_run", "collected_by_households_lb": null, "committed_to_food_banks_lb": null, "produce_wasted_lb": null, "uncollected_by_scenario_households_lb": null, "worst_served_coverage": null, "households_reached": null, "invalid_commitments": null}]},
     {"scenario_id": "cooler-failure", "run_mode": "synthetic", "synthetic": true, "methods": [
       {"method": "first_come_first_served", "status": "completed", "collected_by_households_lb": 4.0, "committed_to_food_banks_lb": 446.0, "produce_wasted_lb": 450.0, "uncollected_by_scenario_households_lb": 896.0, "worst_served_coverage": 0.05, "households_reached": 1, "invalid_commitments": 0},

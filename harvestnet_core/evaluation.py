@@ -22,7 +22,9 @@ class FirstComeFoodBank(RulesFoodBank):
     rules negotiators already respect: storage at arrival and until pickup ends, its truck,
     pickup hours before the item spoils, and the profile's keeping time. An item another food
     bank claimed first is left alone, so pounds this food bank cannot take stay unclaimed and
-    end up counted as wasted."""
+    end up counted as wasted. It never contests another food bank's share (ADR 0013)."""
+
+    contests=False
 
     def _bid(self, draft, facts):
         me=self.organization_id
@@ -35,6 +37,12 @@ class FirstComeFoodBank(RulesFoodBank):
                 name=self._item_name(pid).lower()
                 return replace(bid,reason=f"First come, first served: we claimed first, so we ask for all of the {name} that our storage, transport and pickup hours allow, whatever fair share says.")
         return None
+
+
+class NoContestFoodBank(RulesFoodBank):
+    """The rules food bank as it bid before ADR 0013: its own line only, never a contest."""
+
+    contests=False
 
 
 class Baseline:
@@ -78,6 +86,9 @@ class Baseline:
         negotiator=self.engine.rules_for(role,org)
         if self.method=='first_come_first_served' and role.value=='food_bank':
             negotiator=self.claimants.setdefault(org,FirstComeFoodBank(org,self.engine.calc))
+        elif role.value=='food_bank':
+            # The baselines keep the mechanism they were defined with: no contests (ADR 0013).
+            negotiator=self.claimants.setdefault(org,NoContestFoodBank(org,self.engine.calc))
         move=negotiator.move(typed)
         if role.value=='food_bank' and move.kind in (MoveKind.ACCEPT,MoveKind.PASS,MoveKind.REJECT):
             self.passed[typed.draft.lot_id].add(org)

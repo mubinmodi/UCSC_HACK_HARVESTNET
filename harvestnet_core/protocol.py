@@ -65,6 +65,18 @@ class Protocol:
             self.records.put("lot", draft["lot_id"], {**copy.deepcopy(extra or {}), "draft": draft, "versions": [copy.deepcopy(draft)], "status": "negotiating", "approvals": {}, "holds": {}, "commitments": []})
             self.records.event(draft["lot_id"], now, "draft", draft)
 
+    def check_owner_amendment(self, organization_id, amendment):
+        """A food bank's counter changes only its own share, or contests another's in the one
+        shape ADR 0013 allows: one item shifted from one other food bank to itself."""
+        from harvestnet_agents.negotiation import amendment_from_dict, food_bank_amendment_problem
+        try:
+            self.records.get("bank", organization_id)
+        except KeyError:
+            return  # not a food bank
+        problem = food_bank_amendment_problem(organization_id, amendment_from_dict(amendment))
+        if problem:
+            raise ValueError(problem)
+
     def amend(self, lot_id, version, organization_id, amendment, reason, now):
         from harvestnet_agents.negotiation import parse_draft, amendment_from_dict
         if 'pounds' in amendment:
@@ -74,6 +86,7 @@ class Protocol:
             draft = lot["draft"]
             if organization_id not in draft.get('names',{}):
                 raise ValueError('unknown proposing organization')
+            self.check_owner_amendment(organization_id, amendment)
             if draft["version"] != version or lot["status"] == "committed":
                 raise Conflict("stale or committed version")
             if not reason.strip():

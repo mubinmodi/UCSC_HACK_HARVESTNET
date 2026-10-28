@@ -111,7 +111,7 @@ Agents that **decide for their own organization**: donors and food banks. The **
 
 ### The real disagreements
 
-- **Food banks compete** for limited produce and want the items their households can use.
+- **Food banks compete** for limited produce and want the items their households can use. A food bank whose households are still below fair share may **contest** another food bank's share of an item, stating its own fair-share gap, and the other food bank answers for itself by **conceding toward need**: the pounds of that item they both hold are split in proportion to their two gaps (ADR 0013). Decided (lead, October 27, 2026; concede toward need replaced "a standoff is kept" the same day).
 - **Donors want the produce gone** with minimal effort, so they'd rather a food bank collects. **Food banks would rather the donor drops off**, to save their truck for other runs.
 - **The advocate** pushes produce toward the food bank whose households are furthest below fair share, even when another food bank is closer to the donor.
 
@@ -119,7 +119,8 @@ Agents that **decide for their own organization**: donors and food banks. The **
 
 - **Donor:** the produce leaves before its deadline, every item has a destination or is clearly marked unclaimed, and any drop-off fits its vehicle and time.
 - **Food bank:** each item fits its storage at arrival time and arrives before pickup hours. Its households can collect it before it spoils. Any collection fits its truck schedule.
-- **Advocate:** never accepts or rejects. On its turn, it may propose a change that shrinks the largest fair-share gap or reduces waste, citing pooled counts.
+- **Food bank in a contest:** it contests only while its own households are below fair share and nothing it can receive is unclaimed, only up to its own gap, and it states its gap in the counter. When another food bank contests its share, it concedes pounds beyond its own gap and takes back only enough to reach its proportional share of that item, split by the two gaps. A contester at or above its proportional share accepts the split. Neither side ever claims beyond fair share. Decided (the principle, lead, October 27, 2026). The weights (each food bank's fair-share gap this week) and the split in whole pounds are Proposed.
+- **Advocate:** never accepts or rejects. On its turn, it may propose a change that shrinks the largest fair-share gap or reduces waste, citing pooled counts. In a contest it backs the food bank holding less than its proportional share, with the change that restores the split, and passes on an item already split in proportion. A low-access area breaks exact ties only. Decided (principle); details Proposed.
 
 ### When a human must approve (Proposed)
 
@@ -272,6 +273,7 @@ stateDiagram-v2
 | Agreement | Every named party approves the same version, so it becomes a commitment |
 | Ask a human | Any condition doubt, or any change to a committed plan |
 | Keep the disagreement | 3 rounds with no new terms. The involved donor and food bank dashboards show the options and each agent's reason |
+| Keep the disagreement (contest) | Only when a side refuses the proportional split (for example, an LLM negotiator or a staff counter insists on more) and the terms repeat. The dashboards of both food banks show the competing versions and each one's reason (ADR 0013). Decided (lead, October 27, 2026) |
 | Deadline | No commitment by the donor's deadline means the produce is unclaimed, with reasons recorded. **Nothing is ever committed automatically.** |
 
 ## 9. Workflows

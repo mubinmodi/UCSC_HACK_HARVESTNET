@@ -663,6 +663,7 @@ class API:
         self.records.get('lot',lot_id)
         self.authorize(body['organization_id'],call.token)
         from harvestnet_agents.negotiation import amendment_from_dict,parse_draft
+        self.engine.protocol.check_owner_amendment(body['organization_id'],body['amendment'])
         with self.records.transaction():
             # The version check and the queued counter share one transaction.
             lot=self.records.get('lot',lot_id)

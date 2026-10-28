@@ -1,7 +1,7 @@
 """Real deterministic calculators; no stand-in inheritance or model arithmetic."""
 from dataclasses import asdict
 from datetime import timedelta
-from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt
+from harvestnet_agents.calculators import CalculatorCall, CapacityFit, GapAfterPlan, GapResult, PickupCheck, StorageAt, split_in_proportion
 from harvestnet_agents.calculators import CalculatorError as AgentsCalculatorError
 from harvestnet_agents.fair_share import FairShareError, fair_share, load_fair_share_table
 from harvestnet_agents.profiles import UnitConversionError, load_profiles, to_pounds
@@ -141,3 +141,10 @@ class Calculators:
         except UnitConversionError as exc:
             raise BadUnit(str(exc)) from exc
         return self.log("to_pounds", {"produce_id": produce_id, "quantity": quantity, "unit": unit, "lb_per_unit": lb_per_unit}, result)
+
+    def proportional_split(self, held_lb, gaps_lb):
+        # ADR 0013 (concede toward need): one shared algorithm, so every food bank and the
+        # advocate get the same tenths of a pound for the same input.
+        held = {k: number(v) for k, v in dict(held_lb).items()}
+        gaps = {k: number(v) for k, v in dict(gaps_lb).items()}
+        return self.log("proportional_split", {"held_lb": held, "gaps_lb": gaps}, split_in_proportion(held, gaps))

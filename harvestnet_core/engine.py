@@ -14,7 +14,7 @@ from harvestnet_agents.terms import terms_hash
 from .protocol import Protocol, Conflict, dt, number, named
 from .records import Records
 from .checks import rule_checks
-from .workflows import checked_move
+from .workflows import checked_move, claims_in, contests_in, cycle_key
 
 
 class Engine:
@@ -101,7 +101,7 @@ class Engine:
         gap = self.calc.fair_share_gap([HouseholdBalance(r["household_size"], r.get("received_this_week_lb",0)+self.reserved(r["request_code"])) for r in rs])
         return {"households":len(rs), "people":sum(r["household_size"] for r in rs), "below_fair_share_lb":gap.gap_lb, "limited_fridge":sum(r["limited_fridge"] for r in rs), "evening_only":sum(all((w.get("start") or "00:00") >= "18:00" for w in r["pickup_windows"]) for r in rs), "table_version":gap.table_version}
 
-    def facts(self, org, draft, declined=()):
+    def facts(self, org, draft, declined=(), contests=()):
         role = self.roles[org]
         donor = self.donors[draft["donor_id"]]
         if role == "donor":
@@ -109,7 +109,7 @@ class Engine:
         if role == "food_bank":
             bank = self.records.get("bank", org)
             return {"food_bank_id":org, "name":self.names[org], "storage":bank["storage"], "pickup_windows":bank["pickup_windows"], "truck":bank.get("truck"), "travel_minutes_from_donor":donor["travel_minutes"].get(org), "demand":self.demand(org)}
-        return {"gaps":[{"food_bank_id":bid,"name":self.names[bid],"households":self.demand(bid)["households"],"below_fair_share_lb":self.demand(bid)["below_fair_share_lb"],"low_access":b["low_access"]} for bid,b in self.banks.items()], "declined":list(declined)}
+        return {"gaps":[{"food_bank_id":bid,"name":self.names[bid],"households":self.demand(bid)["households"],"below_fair_share_lb":self.demand(bid)["below_fair_share_lb"],"low_access":b["low_access"]} for bid,b in self.banks.items()], "declined":list(declined), "contests":list(contests)}
 
     def drop_off(self, lot_id):
         """The drop-off ability recorded with this lot's offer, else the donor's recorded one."""
@@ -295,6 +295,9 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
         accepts=set()
         unchanged=0
         declined=[]
+        # Terms already seen, with the turn-order position of whoever made them: the same terms
+        # again at the same position is a cycle, kept as a preserved disagreement (ADR 0013).
+        seen_terms={cycle_key(engine.records.get("lot",lot_id)["draft"],len(fixture["turn_order"])-1):1}
         rounds=fixture["policies"]["rounds_without_new_terms_before_disagreement"]
         stop_reason=None
         for turn in range(1,201):
@@ -304,7 +307,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
             if (turn-1)%len(fixture["turn_order"])==0:
                 round_start_version=draft["version"]
             if observer: observer.turn_started(engine,lot_id,org)
-            input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)}}
+            input={"role":engine.roles[org],"draft":draft,"facts":engine.facts(org,draft,declined,contests_in(engine,lot_id)),"turn":{"organization_id":org,"number":turn,"now":engine.now,"accepted_by":sorted(accepts)},"claims":claims_in(engine,lot_id)}
             if observer: observer.facts_ready(engine,lot_id,org,input)
             queued_id=lot_id+':'+org
             try:
@@ -367,6 +370,13 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 if move["amendment"]["kind"]=="set_pounds" and engine.roles[org]=="food_bank":
                     declined.append({"food_bank_id":org,"produce_id":move["amendment"]["produce_id"]})
                 accepts.clear()
+                key=cycle_key(updated,fixture["turn_order"].index(org))
+                if key in seen_terms:
+                    stop_reason=(f"Version {updated['version']} has the same terms as version {seen_terms[key]} at the same point in the "
+                                 "turn order, so the counters are going round in a cycle; the disagreement is kept for each "
+                                 "organization's staff, and nothing commits automatically")
+                    break
+                seen_terms[key]=updated["version"]
             elif action=="accept":
                 accepts.add(org)
             elif action=="request_hold":
