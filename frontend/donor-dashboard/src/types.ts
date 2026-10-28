@@ -192,6 +192,8 @@ export interface IncomingOffer {
   agent_suggests: string | null;
   agent_reason: string;
   needs_your_approval: boolean;
+  /** The lot still takes counters (negotiating or awaiting approvals), whether or not a decision is ours. */
+  can_counter?: boolean;
 }
 export interface FairShareGap {
   households: number;

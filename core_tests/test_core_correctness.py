@@ -316,6 +316,7 @@ class ApprovalRequests(unittest.TestCase):
 
     def test_needs_your_approval_only_while_this_organization_has_an_open_request(self):
         self.assertTrue(self.board()['needs_your_approval'])
+        self.assertTrue(self.board()['can_counter'])
         draft = self.engine.records.get('lot', self.lot_id)['draft']
         decide = {'lot_id': self.lot_id, 'version': draft['version'], 'organization_id': 'city', 'terms_hash': terms_hash(draft), 'decision': 'decline'}
         self.api.call('POST', '/approvals', decide, token='city-test')
@@ -323,6 +324,8 @@ class ApprovalRequests(unittest.TestCase):
         self.assertIn(lot['status'], ('negotiating', 'preserved_disagreement'))
         self.assertFalse(self.board()['needs_your_approval'])
         self.assertEqual(self.api.call('GET', '/approvals?organization_id=city', token='city-test')[1]['approvals'], [])
+        # Counter follows the lot, not this organization's decision: still open while it negotiates.
+        self.assertEqual(self.board()['can_counter'], lot['status'] == 'negotiating')
 
 
 class FairBaselines(unittest.TestCase):
