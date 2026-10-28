@@ -13,7 +13,7 @@ for _ in $(seq 1 120); do
   sleep 5
 done
 
-# 1 GB swap so a small instance survives the image build and nine Python services.
+# 1 GB swap so a small instance survives the image build peak and about eleven containers.
 if [ -z "$(swapon --show --noheadings)" ]; then
   fallocate -l 1G /swapfile
   chmod 600 /swapfile

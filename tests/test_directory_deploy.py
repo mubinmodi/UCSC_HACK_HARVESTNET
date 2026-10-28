@@ -50,7 +50,9 @@ class MemoryDirectory:
         return {'mode': self.mode, 'records': directory_module.search_capability(self.records(), **query)}
 
 
-class Unavailable(Exception):
+class Unavailable(ConnectionError):
+    """Stands in for the SDK's gRPC UNAVAILABLE error (a refused connection)."""
+
     def code(self):
         class Code:
             name = 'UNAVAILABLE'
@@ -110,6 +112,15 @@ class HostRegistration(unittest.TestCase):
             stop.set()
             thread.join(timeout=1)
         self.assertIsNone(publisher.cid)
+
+    def test_a_bug_is_not_hidden_as_a_directory_outage(self):
+        class Broken(MemoryDirectory):
+            def register(self, record):
+                raise TypeError('a programming error, not an outage')
+        publisher = directory_module.DirectoryPublisher(Broken(), 'city', ENDPOINTS['city'], Systems())
+        stop = threading.Event()
+        with self.assertRaises(TypeError):
+            publisher.run_forever(0.01, stop)
 
 
 class DirectoryCli(unittest.TestCase):
@@ -189,10 +200,8 @@ class DeployFiles(unittest.TestCase):
                      capture_output=True).returncode == 0, 'docker compose not available')
 class DirectoryComposeConfig(unittest.TestCase):
     def test_merged_config(self):
-        env = {'PATH': os.environ['PATH'], 'HOME': os.environ.get('HOME', '/tmp'), 'HARVESTNET_RELEASE': 'test',
-               'TRANSPORT_TOKEN': 'x', 'API_EVENTS_TOKEN': 'x', 'DEMO_SWITCH_TOKEN': 'x',
-               'APPROVAL_PUBLIC_URL': 'https://example.invalid', 'HARVESTNET_ALLOWED_ORIGIN': 'https://example.invalid',
-               'HARVESTNET_STAFF_TOKENS': '{"market":"x"}', 'HARVESTNET_DOMAIN': 'example.invalid'}
+        from deploy_env import compose_env
+        env = compose_env()
         args = ['docker', 'compose', '-p', 'harvestnet']
         for name in COMPOSE_FILES:
             args += ['-f', name]
@@ -213,7 +222,7 @@ class DirectoryComposeConfig(unittest.TestCase):
             self.assertEqual(environment['AGNTCY_DIRECTORY_ADDRESS'], 'directory:8888', name)
             self.assertEqual(environment['SYSTEMS_URL'], 'http://systems:8010', name)
             self.assertEqual(environment['AGENT_POLICY'], 'harvestnet_core.join_adapter:policy', name)  # overlays merge
-            self.assertIn('TRANSPORT_TOKEN', environment, name)
+            self.assertIn('TRANSPORT_VERIFY_KEYS', environment, name)  # overlays keep the platform's own keys
         for name, service in services.items():
             if name != 'gateway':
                 self.assertNotIn('ports', service, f'{name} must stay private')

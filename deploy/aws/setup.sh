@@ -21,7 +21,7 @@ Required environment:
 
 Optional environment (defaults in brackets):
   PROFILE [incubator]   REGION [us-east-2]   GIT_REF [main]
-  BUDGET_USD [15]       INSTANCE_TYPE [t4g.micro]   VOLUME_GB [10]
+  BUDGET_USD [25]       INSTANCE_TYPE [t4g.small]   VOLUME_GB [10]
   CPU_CREDITS [standard] (standard never bills extra CPU; unlimited can)
   HARVESTNET_DOMAIN     a hostname whose DNS points at the Elastic IP [<ip>.sslip.io]
   CLAUDE_RUN_CAP_USD [0]  CLAUDE_TOTAL_CAP_USD [same as run cap]  (0 = no paid calls)
@@ -45,8 +45,9 @@ for arg in "$@"; do
 done
 
 GIT_REF="${GIT_REF:-main}"
-BUDGET_USD="${BUDGET_USD:-15}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.micro}"
+BUDGET_USD="${BUDGET_USD:-25}"
+# t4g.small (2 GB): about eleven containers do not fit in a t4g.micro's 1 GB.
+INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.small}"
 VOLUME_GB="${VOLUME_GB:-10}"
 CPU_CREDITS="${CPU_CREDITS:-standard}"
 CLAUDE_RUN_CAP_USD="${CLAUDE_RUN_CAP_USD:-0}"
@@ -213,7 +214,9 @@ setup_secret() {
     aws_rw secretsmanager restore-secret --secret-id "$SECRET_NAME" >/dev/null
   fi
   orgs="$(git -C "$REPO_ROOT" show "$SHA:$CORE_FIXTURE" | jq -c '[.organizations[].organization_id]')"
-  count=$(( $(jq 'length' <<<"$orgs") + 3 ))
+  # Tokens: events, demo switch, the approvals credential, one staff token per organization,
+  # and one transport key per sender (the turn publisher "core" and each organization).
+  count=$(( 2 * $(jq 'length' <<<"$orgs") + 4 ))
   old_json="$TMP_DIR/secret-old.json"
   ( umask 077
     if [ -n "${arn:-}" ] && [ "$DRY_RUN" = 1 ] && [ -n "${deleted:-}" ] && [ "$deleted" != "None" ]; then
@@ -234,14 +237,22 @@ setup_secret() {
       def set_value: . != null and . != "";
       ($ENV.GEN_TOKENS | split("\n")) as $gen
       | . as $old
-      | (reduce range(0; $orgs | length) as $i
+      | ($orgs | length) as $n
+      | (["core"] + $orgs) as $senders
+      | (reduce range(0; $n) as $i
            (($old.HARVESTNET_STAFF_TOKENS // "{}") | fromjson;
             if (.[$orgs[$i]] | set_value) then . else .[$orgs[$i]] = $gen[3 + $i] end)) as $staff
-      | .TRANSPORT_TOKEN = (if ($old.TRANSPORT_TOKEN | set_value) then $old.TRANSPORT_TOKEN else $gen[0] end)
-      | .API_EVENTS_TOKEN = (if ($old.API_EVENTS_TOKEN | set_value) then $old.API_EVENTS_TOKEN else $gen[1] end)
+      | (reduce range(0; $n + 1) as $i
+           (($old.TRANSPORT_KEYS // "{}") | fromjson;
+            if (.[$senders[$i]] | set_value) then . else .[$senders[$i]] = $gen[3 + $n + $i] end)) as $transport
+      | del(.TRANSPORT_TOKEN)  # the retired shared transport token
+      | .API_EVENTS_TOKEN = (if ($old.API_EVENTS_TOKEN | set_value) then $old.API_EVENTS_TOKEN else $gen[0] end)
       | .DEMO_SWITCH_TOKEN = (if ($ENV.DEMO_SWITCH_TOKEN | set_value) then $ENV.DEMO_SWITCH_TOKEN
-                              elif ($old.DEMO_SWITCH_TOKEN | set_value) then $old.DEMO_SWITCH_TOKEN else $gen[2] end)
+                              elif ($old.DEMO_SWITCH_TOKEN | set_value) then $old.DEMO_SWITCH_TOKEN else $gen[1] end)
+      | .HARVESTNET_APPROVALS_TOKEN = (if ($old.HARVESTNET_APPROVALS_TOKEN | set_value) then $old.HARVESTNET_APPROVALS_TOKEN
+                                       else $gen[2] end)
       | .HARVESTNET_STAFF_TOKENS = ($staff | tojson)
+      | .TRANSPORT_KEYS = ($transport | tojson)
       | .HARVESTNET_DOMAIN = $domain
       | .APPROVAL_PUBLIC_URL = "https://\($domain)"
       | .HARVESTNET_HOUSEHOLD_URL = "https://\($domain)/household/"
@@ -258,6 +269,7 @@ setup_secret() {
   [ -z "$bad" ] || die "these secret values are not single-line strings without quotes/backslashes: $bad"
   info "keys: $(jq -r 'keys | join(", ")' "$TMP_DIR/secret.json")"
   info "staff tokens for organizations: $(jq -r 'join(", ")' <<<"$orgs") (values are never printed)"
+  info "transport keys for senders: core, $(jq -r 'join(", ")' <<<"$orgs"); one approvals credential (values are never printed)"
   if [ -z "${arn:-}" ]; then
     aws_rw secretsmanager create-secret --name "$SECRET_NAME" \
       --description "HarvestNet deployment configuration and tokens (deploy/aws/setup.sh)" \
@@ -617,7 +629,11 @@ summary() {
   info "review pages:       https://$DOMAIN/human/...   platform adapters: https://$DOMAIN/platform/health"
   for app in ${frontends[@]+"${frontends[@]}"}; do info "frontend:           $app"; done
   [ "${#frontends[@]}" -gt 0 ] || info "frontend:           none at this git ref"
-  info "API skeleton:       ${skeleton:-not found} (left unchanged)"
+  info "API skeleton:       ${skeleton:-not found} (left unchanged; teardown.sh deletes it unless --keep-skeleton)"
+  if [ -n "$skeleton" ] && [ -z "$(lookup lambda get-function-concurrency --function-name "$SKELETON_FUNCTION" \
+                                    --query ReservedConcurrentExecutions --output text)" ]; then
+    warn "the public API skeleton has no reserved concurrency cap; set one (api_skeleton/DEPLOY.md): aws lambda put-function-concurrency --function-name $SKELETON_FUNCTION --reserved-concurrent-executions 5"
+  fi
   info "secret:             $SECRET_NAME   (read a staff token: see deploy/aws/README.md)"
   info "instance:           $INSTANCE_ID  $INSTANCE_TYPE  $PUBLIC_IP"
   info "logs:               $logs"

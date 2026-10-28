@@ -53,6 +53,19 @@
       }
     },
     {
+      "id": "check-recipient-allowlist",
+      "name": "Check recipient allowlist",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        390,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const allow = String($vars.HARVESTNET_EMAIL_ALLOWLIST || '').split(',').map(a => a.trim().toLowerCase()).filter(Boolean); const recipient = (value) => { const to = typeof value === 'string' ? value.trim().toLowerCase() : ''; if (!allow.length || !allow.includes(to)) throw new Error('Recipient is not on HARVESTNET_EMAIL_ALLOWLIST'); return to; }; const m = $json; if (m.mode !== 'prepared_email' || typeof m.subject !== 'string' || typeof m.text !== 'string') throw new Error('A platform-prepared email is required'); return [{json: {to: recipient(m.to), subject: m.subject, text: m.text}}];"
+      }
+    },
+    {
       "id": "send-email",
       "name": "Send email",
       "type": "n8n-nodes-base.emailSend",
@@ -108,6 +121,17 @@
       ]
     },
     "Validate and prepare": {
+      "main": [
+        [
+          {
+            "node": "Check recipient allowlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check recipient allowlist": {
       "main": [
         [
           {

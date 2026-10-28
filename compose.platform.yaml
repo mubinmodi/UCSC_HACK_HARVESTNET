@@ -1,3 +1,11 @@
+# The five organization hosts on the private `platform` network.
+#
+# Each host gets only its own transport keys (harvestnet_platform/transport_auth.py):
+# TRANSPORT_SIGNING_KEY is its own sending key, and TRANSPORT_VERIFY_KEYS holds only the
+# keys derived for it, so it can check messages addressed to it but cannot speak for
+# anyone else. Generate a local set (never commit it) with
+#   python -m harvestnet_platform.transport_auth --output runtime/transport.env
+# On AWS, deploy/load_secrets.py derives the same variables from the secret's TRANSPORT_KEYS.
 x-agent: &agent
   build:
     context: .
@@ -7,7 +15,6 @@ x-agent: &agent
   tmpfs: [/tmp]
   networks: [platform]
   environment: &agent-env
-    TRANSPORT_TOKEN: ${TRANSPORT_TOKEN:?set TRANSPORT_TOKEN}
     ALLOW_INTERNAL_HTTP: '1'
     RECEIPTS_DB: /app/runtime/receipts.sqlite
 services:
@@ -19,6 +26,8 @@ services:
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://donor:8020
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_MARKET:?set TRANSPORT_SIGNING_KEY_MARKET}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_MARKET:?set TRANSPORT_VERIFY_KEYS_MARKET}
     volumes: [donor-data:/app/runtime]
   city:
     <<: *agent
@@ -26,6 +35,8 @@ services:
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://city:8020
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_CITY:?set TRANSPORT_SIGNING_KEY_CITY}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_CITY:?set TRANSPORT_VERIFY_KEYS_CITY}
     volumes: [city-data:/app/runtime]
   rural:
     <<: *agent
@@ -33,6 +44,8 @@ services:
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://rural:8020
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_RURAL:?set TRANSPORT_SIGNING_KEY_RURAL}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_RURAL:?set TRANSPORT_VERIFY_KEYS_RURAL}
     volumes: [rural-data:/app/runtime]
   eastside:
     <<: *agent
@@ -40,6 +53,8 @@ services:
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://eastside:8020
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_EASTSIDE:?set TRANSPORT_SIGNING_KEY_EASTSIDE}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_EASTSIDE:?set TRANSPORT_VERIFY_KEYS_EASTSIDE}
     volumes: [eastside-data:/app/runtime]
   advocate:
     <<: *agent
@@ -47,6 +62,8 @@ services:
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://advocate:8020
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_ADVOCATE:?set TRANSPORT_SIGNING_KEY_ADVOCATE}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_ADVOCATE:?set TRANSPORT_VERIFY_KEYS_ADVOCATE}
     volumes: [advocate-data:/app/runtime]
 networks:
   platform:

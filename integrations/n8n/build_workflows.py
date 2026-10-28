@@ -6,6 +6,14 @@ callbacks go through the exact-terms review page.
 
 Messages go by email (user decision, October 11, 2026): n8n's Send Email node over SMTP,
 with Amazon SES SMTP credentials configured in n8n Cloud. No workflow uses SMS.
+
+No workflow is an open mail relay. Each email workflow checks the recipient itself, against
+the n8n variable ``HARVESTNET_EMAIL_ALLOWLIST`` (comma-separated; set it to the same verified
+addresses as ``SES_TEST_RECIPIENTS``). An empty or missing list sends nothing. The callers'
+own allowlists stay as a first check, but the workflow does not rely on them. The review
+email is written here from a fixed template and checked fields, never from free text in the
+payload; its link must start with ``HARVESTNET_REVIEW_BASE_URL`` (the deployment's
+``APPROVAL_PUBLIC_URL``) followed by ``/human/review?token=``.
 """
 import json
 from pathlib import Path
@@ -63,12 +71,43 @@ def email(text_field='text'):
 # After a send, answer without echoing the address back: the response says only that it went.
 SENT = '={{ JSON.stringify({sent: true}) }}'
 
+# The recipient check every email workflow runs first (fails closed when the list is unset).
+ALLOWLIST_JS = (
+    "const allow = String($vars.HARVESTNET_EMAIL_ALLOWLIST || '').split(',').map(a => a.trim().toLowerCase()).filter(Boolean); "
+    "const recipient = (value) => { const to = typeof value === 'string' ? value.trim().toLowerCase() : ''; "
+    "if (!allow.length || !allow.includes(to)) throw new Error('Recipient is not on HARVESTNET_EMAIL_ALLOWLIST'); return to; }; ")
+
+# The review email: checked fields into a fixed template. No subject or message comes from the payload.
+REVIEW_EMAIL_JS = ALLOWLIST_JS + (
+    "const b = $json.body || {}; const to = recipient(b.to); "
+    "const base = String($vars.HARVESTNET_REVIEW_BASE_URL || '').replace(/\\/+$/, '') + '/human/review?token='; "
+    "const url = typeof b.decision_url === 'string' ? b.decision_url : ''; "
+    "if (!base.startsWith('https://') || !url.startsWith(base) || !/^[A-Za-z0-9_-]{20,128}$/.test(url.slice(base.length))) "
+    "throw new Error('A review link issued by HarvestNet is required'); "
+    "if (!/^[a-z][a-z0-9-]{0,40}$/.test(String(b.organization_id || '')) || !/^[A-Za-z0-9._:-]{1,100}$/.test(String(b.lot_id || '')) "
+    "|| !Number.isInteger(b.version) || b.version < 1 || !/^sha256:[0-9a-f]{64}$/.test(String(b.terms_hash || ''))) "
+    "throw new Error('Issued human review request required'); "
+    "const subject = 'HarvestNet: review draft version ' + b.version + ' for lot ' + b.lot_id; "
+    "const message = 'HarvestNet: ' + b.organization_id + ', review draft version ' + b.version + ' for lot ' + b.lot_id + '.\\n\\n' "
+    "+ 'Open the link to see the exact terms (terms hash ' + b.terms_hash + ') and choose Approve or Decline:\\n' + url "
+    "+ '\\n\\nNo reply means no approval.'; "
+    "return [{json: {to, subject, message}}];")
+
+# Pickup emails: the platform already wrote the text from the core's notice; check the recipient here.
+PREPARED_EMAIL_JS = ALLOWLIST_JS + (
+    "const m = $json; "
+    "if (m.mode !== 'prepared_email' || typeof m.subject !== 'string' || typeof m.text !== 'string') "
+    "throw new Error('A platform-prepared email is required'); "
+    "return [{json: {to: recipient(m.to), subject: m.subject, text: m.text}}];")
+
+
+def check_recipient():
+    return node('Check recipient allowlist','n8n-nodes-base.code',{'jsCode':PREPARED_EMAIL_JS},390)
+
 
 def main():
     # Approval events already carry platform-issued version-bound review URLs.
-    code = node('Prepare review email','n8n-nodes-base.code',{'jsCode':
-        "const b = $json.body; if (!b.to || !b.message || !b.decision_url || !Number.isInteger(b.version)) throw new Error('Issued human review request required'); "
-        "return [{json: {to:b.to, subject: b.subject || ('HarvestNet: review draft version ' + b.version), message:b.message}}];"},260)
+    code = node('Check recipient and write review email','n8n-nodes-base.code',{'jsCode':REVIEW_EMAIL_JS},260)
     decision_api = api('/approvals')
     decision_api['parameters']['url'] = '={{ $vars.HARVESTNET_CORE_URL + "/approvals" }}'
     decision_api['credentials'] = {'httpHeaderAuth':{'id':'CONFIGURE_IN_N8N','name':'HarvestNet core approval receipt bearer'}}
@@ -76,10 +115,10 @@ def main():
         'approval-requests.json': workflow('HarvestNet - email human review requests', [webhook('harvestnet-approval-request'),code,email('message'),respond(SENT)]),
         # A committed pickup, or a changed one after a cooler failure: the platform turns the
         # core's notice into one email with a "Can't make it" link to the household page.
-        'pickup-emails.json': workflow('HarvestNet - email committed pickup and verified Market Match tip',[webhook('harvestnet-pickup'),api('/notifications/prepare'),email(),respond(SENT)]),
+        'pickup-emails.json': workflow('HarvestNet - email committed pickup and verified Market Match tip',[webhook('harvestnet-pickup'),api('/notifications/prepare'),check_recipient(),email(),respond(SENT)]),
         # "Can't make it" happens on the household page (the email's link calls the core's
         # release_pickup). This workflow emails the thank-you for the core's release notice.
-        'cannot-make-it.json': workflow("HarvestNet - email the thank-you after Can't make it",[webhook('harvestnet-cannot-make-it'),api('/notifications/prepare'),email(),respond(SENT)]),
+        'cannot-make-it.json': workflow("HarvestNet - email the thank-you after Can't make it",[webhook('harvestnet-cannot-make-it'),api('/notifications/prepare'),check_recipient(),email(),respond(SENT)]),
         'human-decisions.json': workflow('HarvestNet - relay explicit version-bound human decision',[webhook('harvestnet-human-decision'),decision_api,respond()])}
     for old in ('pickup-texts.json',):  # renamed: texts became emails
         (ROOT/old).unlink(missing_ok=True)

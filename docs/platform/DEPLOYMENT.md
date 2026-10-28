@@ -12,7 +12,18 @@ Python 3.12 or newer. From the repository root:
 python -m harvestnet_platform.demo     # then open the URL saved in runtime/demo-url.txt
 ```
 
-Keep the terminal running. The page has the cooler switch with capability discovery, five organization turns, review links with Approve and Decline, and text intake with a read-back. Every mode is labeled. It is a **platform rehearsal**, not the whole application: it makes no Claude calls, saves no households and commits no produce. Tests: `uv run --with pytest pytest -q` at the root (optional native SDK tests need `requirements-agntcy.txt`).
+Keep the terminal running. The page has the cooler switch with capability discovery, five organization turns, review links with Approve and Decline, and text intake with a read-back. Every mode is labeled. It is a **platform rehearsal**, not the whole application: it makes no Claude calls, saves no households and commits no produce.
+
+## Tests
+
+`uv run --with pytest pytest -q` at the root runs every platform test, including the Lane B compatibility tests (`tests/test_lane_b.py`), which use the in-repo `agents/src` and its recorded negotiator fixtures. Three tests need optional SDKs and **skip loudly** (`-rs` prints why) unless they are installed; CI installs them in its own jobs:
+
+| Test | Needs | Run it locally (downloads the pinned packages from PyPI once) |
+|---|---|---|
+| `tests/test_sdk_compatibility.py` (2 tests) | `a2a-sdk`, `agntcy-dir` | `uv run --with pytest --with a2a-sdk==0.3.20 --with agntcy-dir==1.0.0 pytest -q tests/test_sdk_compatibility.py` |
+| `tests/test_native_agntcy.py` (1 test) | `agntcy-app-sdk` (Linux) | `uv run --with pytest --with-requirements requirements-agntcy.txt pytest -q tests/test_native_agntcy.py` |
+
+`tests/test_aws_deploy.py` also skips its shellcheck test when `shellcheck` is not installed, and the compose-config tests when Docker is not.
 
 ## Fallbacks
 
@@ -48,6 +59,9 @@ Spending that happened before the ledger existed is recorded by hand: `python -m
 - Rotating a secret means recreating the affected containers.
 - Never log approval links, household emails, transcripts or SNAP answers.
 
-## The generic Compose overlay
+- Each holder gets only its own credential: an organization host its own staff token and transport keys, the approval bridge a decision-only credential, the core the full staff-token map it checks ([`deploy/aws/README.md`](../../deploy/aws/README.md), "Credentials, one per holder").
+- For local Compose runs, `python -m harvestnet_platform.transport_auth --output runtime/transport.env` writes new per-sender transport keys and each host's derived values to a new 0600 file; load it before `docker compose -f compose.platform.yaml ... up`.
 
-`compose.deployment.yaml` (with `compose.platform.yaml` and `compose.agntcy.yaml`) is a generic overlay: Caddy, a private Postgres and a required `CORE_API_IMAGE`. CI validates its configuration. The live stack does not use it; it uses `deploy/aws/compose.aws.yaml`, with SQLite and no Postgres. Prefer the AWS files. The generic overlay still carries retired settings (`REPLY_BINDING_KEY`, `POSTGRES_PASSWORD`).
+## Compose files
+
+The live stack is `compose.platform.yaml` (the five organization hosts) with `deploy/aws/compose.aws.yaml` and `deploy/aws/compose.directory.yaml`, on SQLite with no Postgres. `compose.agntcy.yaml` swaps the hosts for the native AGNTCY SDK host. The older generic overlay (`compose.deployment.yaml`, with Postgres, a separate core image, retired SMS settings and its own `deploy/Caddyfile`) was removed: nothing ran it, and the AWS files replace it.

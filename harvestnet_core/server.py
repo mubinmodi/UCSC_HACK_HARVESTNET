@@ -61,7 +61,9 @@ if __name__=='__main__':
     from .voice import extractor_from_env
     # Voice intake: a Claude extractor under a hard spending cap only when a key and a cap are set; else the API answers 503.
     api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')),
-            household_page_url=page_url,extractor=extractor_from_env())
+            household_page_url=page_url,extractor=extractor_from_env(),
+            # The approval bridge's decision-only credential; it is not a staff token.
+            approvals_token=os.environ.get('HARVESTNET_APPROVALS_TOKEN') or None)
     if email_enabled:
         allowed=os.environ.get('SES_TEST_RECIPIENTS','')
         dispatcher=EmailDispatcher(api,pickup_webhook=pickup_webhook,release_webhook=release_webhook,

@@ -60,6 +60,10 @@ class ApprovalStore:
             CREATE TABLE IF NOT EXISTS links(token_hash TEXT PRIMARY KEY, event TEXT, version INTEGER,
                 organization TEXT, digest TEXT, expires REAL, decision TEXT, receipt_id TEXT);
         ''')
+        # A decision the human made but the core has not yet accepted. It becomes the link's
+        # decision only after the core records it (or in the local fallback, with no core).
+        if 'pending_decision' not in {row[1] for row in self.db.execute('PRAGMA table_info(links)')}:
+            self.db.execute('ALTER TABLE links ADD COLUMN pending_decision TEXT')
         # SMS replies are retired (pickup messages are emails with links): drop any old
         # reply bindings, which held keyed hashes of household phone numbers.
         self.db.execute('DROP TABLE IF EXISTS reply_bindings')
@@ -71,8 +75,8 @@ class ApprovalStore:
     def _link(self, event, version, org, digest, terms, ttl):
         token = secrets.token_urlsafe(32)
         expires = self.clock() + ttl
-        self.db.execute('INSERT INTO links VALUES (?,?,?,?,?,?,NULL,NULL)',
-                        (self.token_hash(token), event, version, org, digest, expires))
+        self.db.execute('INSERT INTO links (token_hash,event,version,organization,digest,expires,decision,receipt_id) '
+                        'VALUES (?,?,?,?,?,?,NULL,NULL)', (self.token_hash(token), event, version, org, digest, expires))
         return {'organization_id': org, 'lot_id': event, 'version': version,
                 'terms_hash': digest, 'terms': terms, 'token': token, 'expires_at': iso(expires)}
 
@@ -137,7 +141,14 @@ class ApprovalStore:
         with self.lock:
             return self._view(token)
 
-    def decide(self, token, decision, version, digest, human_confirmed):
+    def prepare(self, token, decision, version, digest, human_confirmed):
+        """Check a human's decision and give it a receipt, without recording it yet.
+
+        The returned record carries ``decision`` and ``receipt_id`` for the core. The link's
+        own decision is set only by ``confirm``, after the core accepted it, so a refusal (409)
+        never leaves an irreversible local "approve". A retry of the same decision reuses the
+        same receipt, so the core sees one receipt however often the human retries.
+        """
         if human_confirmed is not True or decision not in ('approve', 'decline'):
             raise ValueError('An explicit human approve/decline decision is required')
         with self.lock:
@@ -146,34 +157,71 @@ class ApprovalStore:
                 record = self._view(token)
                 if version != record['version'] or not same_hash(digest, record['terms_hash']):
                     raise StaleApproval('Human decision does not match the displayed version and terms')
-                if record['decision'] and record['decision'] != decision:
-                    raise ValueError('Decision already recorded; change terms with a fresh version')
-                if not record['decision']:
-                    receipt = secrets.token_hex(16)
-                    self.db.execute('UPDATE links SET decision=?,receipt_id=? WHERE token_hash=?',
-                                    (decision,receipt,self.token_hash(token)))
+                if record['decision']:
+                    if record['decision'] != decision:
+                        raise ValueError('Decision already recorded; change terms with a fresh version')
+                    self.db.commit()
+                    return record
+                pending = self.db.execute('SELECT pending_decision FROM links WHERE token_hash=?', (self.token_hash(token),)).fetchone()[0]
+                receipt = record['receipt_id'] if pending == decision and record['receipt_id'] else secrets.token_hex(16)
+                self.db.execute('UPDATE links SET pending_decision=?,receipt_id=? WHERE token_hash=?',
+                                (decision, receipt, self.token_hash(token)))
                 self.db.commit()
-                return self._view(token)
+                return {**record, 'decision': decision, 'receipt_id': receipt}
             except Exception:
                 self.db.rollback()
                 raise
 
-    def approved_organizations(self, event):
+    def confirm(self, token, decision, receipt):
+        """Record the decision the core accepted for this receipt. Returns the link's view."""
         with self.lock:
-            rows = self.db.execute("SELECT organization FROM links l JOIN drafts d ON l.event=d.event AND l.version=d.version AND l.digest=d.digest WHERE l.event=? AND decision='approve' AND expires>?", (event,self.clock()))
+            self.db.execute("UPDATE links SET decision=?,pending_decision=NULL WHERE token_hash=? AND receipt_id=? "
+                            "AND decision IS NULL AND pending_decision=?", (decision, self.token_hash(token), receipt, decision))
+            self.db.commit()
+            row = self.db.execute('SELECT decision FROM links WHERE token_hash=?', (self.token_hash(token),)).fetchone()
+            if not row or row[0] != decision:
+                raise ValueError('Decision was not recorded; another decision on this link came first')
+            return self._view(token)
+
+    def abandon(self, token, receipt):
+        """The core refused this decision: forget it, so nothing local claims it was made."""
+        with self.lock:
+            self.db.execute('UPDATE links SET pending_decision=NULL,receipt_id=NULL WHERE token_hash=? AND receipt_id=? '
+                            'AND decision IS NULL', (self.token_hash(token), receipt))
+            self.db.commit()
+
+    def decide(self, token, decision, version, digest, human_confirmed):
+        """Check and record at once: for the local fallback and tests, where no core is called."""
+        record = self.prepare(token, decision, version, digest, human_confirmed)
+        return self.confirm(token, decision, record['receipt_id'])
+
+    def approved_organizations(self, event):
+        # A recorded approval stays valid after its link expires: expiry limits when a human
+        # may decide, not how long a decision counts. A new version still voids it.
+        with self.lock:
+            rows = self.db.execute("SELECT organization FROM links l JOIN drafts d ON l.event=d.event AND l.version=d.version "
+                                   "AND l.digest=d.digest WHERE l.event=? AND decision='approve'", (event,))
             return sorted({row[0] for row in rows})
 
 
 class CoreAPI:
-    """The core's approval and release operations.
+    """The core's approval operation.
 
-    ``token`` is each organization's own staff credential: a mapping of organization
-    ID to token, in the same JSON shape as the core's ``HARVESTNET_STAFF_TOKENS``. A
-    single string is sent for every organization, which only suits a one-organization client.
+    ``approvals_token`` is the bridge's own decision-only credential (the core's
+    ``HARVESTNET_APPROVALS_TOKEN``): the core accepts it only to record one review link's
+    decision, never for staff actions. The deployment uses it, so the bridge holds no
+    organization's staff token.
+
+    ``token`` is the older form for local runs: each organization's own staff credential,
+    a mapping of organization ID to token in the shape of the core's
+    ``HARVESTNET_STAFF_TOKENS``, or one string for a one-organization client.
     """
 
-    def __init__(self, base_url=None, token=None, decision_webhook=None, webhook_token=None):
+    def __init__(self, base_url=None, token=None, decision_webhook=None, webhook_token=None, approvals_token=None):
         self.base_url = base_url.rstrip('/') if base_url else None
+        if approvals_token is not None and (not isinstance(approvals_token, str) or not approvals_token):
+            raise ValueError('The approvals credential is a nonempty token')
+        self.approvals_token = approvals_token
         if token is not None and not isinstance(token, (str, dict)):
             raise ValueError('Core credentials are a token or a mapping of organization to token')
         if isinstance(token, dict) and (any(not isinstance(v, str) or not v for v in token.values()) or len(set(token.values())) != len(token)):
@@ -183,9 +231,14 @@ class CoreAPI:
 
     @classmethod
     def from_env(cls):
-        """Per-organization tokens from ``CORE_API_TOKENS``, else the core's own
-        ``HARVESTNET_STAFF_TOKENS`` (same JSON shape). A single legacy ``CORE_API_TOKEN``
-        still works but only commits that one organization's decisions."""
+        """``CORE_APPROVALS_TOKEN`` (the decision-only credential) when set; else per-organization
+        tokens from ``CORE_API_TOKENS``, else the core's own ``HARVESTNET_STAFF_TOKENS`` (same
+        JSON shape). A single legacy ``CORE_API_TOKEN`` still works but only commits that one
+        organization's decisions."""
+        approvals = os.getenv('CORE_APPROVALS_TOKEN') or None
+        if approvals:
+            return cls(os.getenv('CORE_API_URL'), None, os.getenv('N8N_DECISION_WEBHOOK_URL'), os.getenv('N8N_WEBHOOK_TOKEN'),
+                       approvals_token=approvals)
         tokens = None
         for name in ('CORE_API_TOKENS', 'HARVESTNET_STAFF_TOKENS'):
             if os.getenv(name):
@@ -198,10 +251,15 @@ class CoreAPI:
             print('Warning: one CORE_API_TOKEN for every organization; set CORE_API_TOKENS so each '
                   "organization's decisions use its own token", flush=True)
         if os.getenv('CORE_API_URL') and tokens is None:
-            print('Warning: no core credentials; the core will refuse decisions (401) until CORE_API_TOKENS is set', flush=True)
+            print('Warning: no core credentials; the core will refuse decisions (401) until CORE_APPROVALS_TOKEN is set', flush=True)
+        elif tokens is not None:
+            print('Warning: the approval bridge holds staff tokens; set CORE_APPROVALS_TOKEN (the core\'s '
+                  'HARVESTNET_APPROVALS_TOKEN) so it holds only a decision-only credential', flush=True)
         return cls(os.getenv('CORE_API_URL'), tokens, os.getenv('N8N_DECISION_WEBHOOK_URL'), os.getenv('N8N_WEBHOOK_TOKEN'))
 
     def token_for(self, organization):
+        if self.approvals_token:
+            return self.approvals_token
         if isinstance(self.tokens, dict):
             if organization not in self.tokens:
                 raise ValueError(f'No core credential configured for {organization}')
@@ -416,19 +474,33 @@ def pickup_email(notice, *, now=None):
             'subject': words['subject'][kind].format(food_bank=food_bank), 'text': '\n\n'.join(parts) + '\n'}
 
 
-def approval_page(record, token):
+def review_csp(nonce):
+    """The review page's Content-Security-Policy: only its own nonce-tagged script and style,
+    fetches to its own origin, no frames, forms or base changes."""
+    return (f"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'nonce-{nonce}'; connect-src 'self'; "
+            "img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
+def _script_json(value):
+    """JSON that is safe inside a <script> element."""
+    return json.dumps(value).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+
+
+def approval_page(record, token, nonce):
     terms = html.escape(json.dumps(record['terms'], indent=2))
-    token_js = json.dumps(token)
-    payload = canonical({'version': record['version'], 'terms_hash': record['terms_hash'], 'human_confirmed': True})
+    token_js = _script_json(token)
+    payload = _script_json({'version': record['version'], 'terms_hash': record['terms_hash'], 'human_confirmed': True})
     return f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-    <title>HarvestNet human approval</title><style>body{{font:18px system-ui;max-width:760px;margin:2rem auto;padding:1rem}}pre{{white-space:pre-wrap}}button{{font:inherit;padding:.8rem;margin:.5rem}}</style>
+    <title>HarvestNet human approval</title><style nonce="{nonce}">body{{font:18px system-ui;max-width:760px;margin:2rem auto;padding:1rem}}pre{{white-space:pre-wrap}}button{{font:inherit;padding:.8rem;margin:.5rem}}</style>
     <h1>Review draft version {record['version']}</h1><p>Organization: {html.escape(record['organization_id'])}</p>
     <p>Local approval fallback. This records your decision. The core must validate holds and every organization's approval before commitment.</p>
     <pre>{terms}</pre><p>Terms hash: {html.escape(record['terms_hash'])}</p><p>Link expires: {html.escape(record['expires_at'])}</p>
-    <button onclick="decide('approve')">I approve these exact terms</button><button onclick="decide('decline')">Decline</button>
-    <pre id="result"></pre><script>const token={token_js}; async function decide(decision){{
-    const response=await fetch('/human/decision',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{...{payload},token,decision}})}});
-    document.getElementById('result').textContent=JSON.stringify(await response.json(),null,2);}}</script></html>'''
+    <button id="approve">I approve these exact terms</button><button id="decline">Decline</button>
+    <pre id="result"></pre><script nonce="{nonce}">const token={token_js}; const payload={payload}; async function decide(decision){{
+    const response=await fetch('/human/decision',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{...payload,token,decision}})}});
+    document.getElementById('result').textContent=JSON.stringify(await response.json(),null,2);}}
+    document.getElementById('approve').addEventListener('click',()=>decide('approve'));
+    document.getElementById('decline').addEventListener('click',()=>decide('decline'));</script></html>'''
 
 
 def handler_for(store, core, events_token, public_url, *, approver_emails=None,
@@ -450,9 +522,12 @@ def handler_for(store, core, events_token, public_url, *, approver_emails=None,
             try:
                 token = parse_qs(parsed.query).get('token', [''])[0]
                 record = store.view(token)
-                raw = approval_page(record, token).encode()
+                nonce = secrets.token_urlsafe(18)
+                raw = approval_page(record, token, nonce).encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Security-Policy', review_csp(nonce))
+                self.send_header('X-Content-Type-Options', 'nosniff')
                 self.send_header('Content-Length', str(len(raw)))
                 self.send_header('Cache-Control', 'no-store')
                 self.send_header('Referrer-Policy', 'no-referrer')
@@ -486,18 +561,28 @@ def handler_for(store, core, events_token, public_url, *, approver_emails=None,
                             # The link was already issued. A timeout may mean n8n sent the email;
                             # do not reissue automatically. The caller still gets the link for a
                             # deliberate manual fallback or an explicit reissue.
+                            # Structured fields only: the n8n workflow writes the email from its own
+                            # template and checks the recipient against its own allowlist.
                             try:
                                 result=request_json(approval_webhook,{
-                                    'to':address,'lot_id':link['lot_id'],'version':link['version'],
-                                    'decision_url':link['decision_url'],'subject':link['subject'],
-                                    'message':link['message']},token=webhook_token)
+                                    'to':address,'organization_id':link['organization_id'],'lot_id':link['lot_id'],
+                                    'version':link['version'],'terms_hash':link['terms_hash'],
+                                    'decision_url':link['decision_url']},token=webhook_token)
                                 link['email_delivery']='sent' if result.get('sent') is True else 'uncertain'
                             except (HTTPError,URLError,TimeoutError,OSError,ValueError):
                                 link['email_delivery']='uncertain'
                     return self.send_json(201, {'status': 'awaiting_humans', 'committed': False, 'requests': links})
                 if path == '/human/decision':
-                    record = store.decide(data['token'], data['decision'], data['version'], data['terms_hash'], data.get('human_confirmed'))
-                    return self.send_json(200, core.decision(record))
+                    record = store.prepare(data['token'], data['decision'], data['version'], data['terms_hash'], data.get('human_confirmed'))
+                    try:
+                        result = core.decision(record)
+                    except HTTPError as exc:
+                        if exc.code < 500:
+                            # The core refused (401, 409): nothing is recorded here either.
+                            store.abandon(data['token'], record['receipt_id'])
+                        raise
+                    store.confirm(data['token'], record['decision'], record['receipt_id'])
+                    return self.send_json(200, result)
                 if path == '/notifications/prepare':
                     # The core's trusted notice becomes one email for n8n; nothing is sent or kept here.
                     return self.send_json(200, {**pickup_email(data), 'mode': 'prepared_email', 'sent': False})

@@ -4,15 +4,21 @@
 #   docker compose -p harvestnet --env-file /opt/harvestnet/deploy.env \
 #     -f compose.platform.yaml -f deploy/aws/compose.aws.yaml up -d --no-build
 #
-# Differences from compose.deployment.yaml, on purpose:
 # - The core is the real Lane A server (python -m harvestnet_core.server) built into
-#   the same image, on SQLite in a named volume. The core reads DATABASE_URL, not the
-#   POSTGRES_* settings, and SQLite is its supported single-host option, so there is
-#   no Postgres container (less memory on a small instance, nothing to back up twice).
+#   the same image, on SQLite in a named volume (the core's supported single-host option;
+#   no Postgres container, so less memory and nothing to back up twice).
 # - One image (deploy/aws/Dockerfile) for every service, built once on the instance.
 # - The organization hosts run the real policy adapter (harvestnet_core.join_adapter).
 # - Caddy also serves the frontend apps from the release bundle, on the same origin.
 # Built by deploy/aws/remote_deploy.sh, which sets HARVESTNET_RELEASE.
+#
+# Credentials, one per holder (deploy/load_secrets.py derives the per-host values):
+# - Each food bank host gets only its own core staff token (HARVESTNET_STAFF_TOKEN from
+#   STAFF_TOKEN_<ORG>) and its own transport keys (compose.platform.yaml). Only the core,
+#   which checks them, holds the whole HARVESTNET_STAFF_TOKENS map.
+# - The approval bridge holds no staff token: CORE_APPROVALS_TOKEN is the core's
+#   HARVESTNET_APPROVALS_TOKEN, which the core accepts only to record one review link's
+#   decision for the current version and terms.
 
 x-app-image: &app-image
   image: harvestnet-app:${HARVESTNET_RELEASE:?set by deploy/aws/remote_deploy.sh}
@@ -26,8 +32,8 @@ x-agent-env: &agent-env
 # The three food bank hosts also run their own cooler watcher (harvestnet_core.cooler_watch,
 # #23): it polls that food bank's own cooler reading from the systems service and, when it
 # fails, proposes the new version and asks the approval bridge for review emails. Each host
-# gets the core credential map but reads only its own organization's entry. Nobody commits
-# for a food bank; only its human, on the review link, does.
+# gets only its own organization's core token, so city cannot act as rural at the core.
+# Nobody commits for a food bank; only its human, on the review link, does.
 x-bank-env: &bank-env
   <<: *agent-env
   COOLER_WATCH: '1'
@@ -35,7 +41,6 @@ x-bank-env: &bank-env
   SYSTEMS_URL: http://systems:8010
   CORE_API_URL: ${CORE_API_URL:-http://core:8000}
   APPROVALS_URL: http://approvals:8030
-  HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
   API_EVENTS_TOKEN: ${API_EVENTS_TOKEN:?set API_EVENTS_TOKEN}
 
 services:
@@ -44,13 +49,19 @@ services:
     environment: *agent-env
   city:
     <<: *app-image
-    environment: *bank-env
+    environment:
+      <<: *bank-env
+      HARVESTNET_STAFF_TOKEN: ${STAFF_TOKEN_CITY:?set STAFF_TOKEN_CITY (deploy/load_secrets.py)}
   rural:
     <<: *app-image
-    environment: *bank-env
+    environment:
+      <<: *bank-env
+      HARVESTNET_STAFF_TOKEN: ${STAFF_TOKEN_RURAL:?set STAFF_TOKEN_RURAL (deploy/load_secrets.py)}
   eastside:
     <<: *app-image
-    environment: *bank-env
+    environment:
+      <<: *bank-env
+      HARVESTNET_STAFF_TOKEN: ${STAFF_TOKEN_EASTSIDE:?set STAFF_TOKEN_EASTSIDE (deploy/load_secrets.py)}
   advocate:
     <<: *app-image
     environment: *agent-env
@@ -73,7 +84,7 @@ services:
       API_EVENTS_TOKEN: ${API_EVENTS_TOKEN:?set API_EVENTS_TOKEN}
       APPROVAL_PUBLIC_URL: ${APPROVAL_PUBLIC_URL:?set APPROVAL_PUBLIC_URL}
       CORE_API_URL: ${CORE_API_URL:-http://core:8000}
-      CORE_API_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
+      CORE_APPROVALS_TOKEN: ${HARVESTNET_APPROVALS_TOKEN:?set HARVESTNET_APPROVALS_TOKEN}
       N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:-}
       N8N_APPROVAL_WEBHOOK_URL: ${N8N_APPROVAL_WEBHOOK_URL:-}
       APPROVER_EMAILS_JSON: ${APPROVER_EMAILS_JSON:-}
@@ -97,6 +108,10 @@ services:
       HARVESTNET_FIXTURE: docs/contracts/examples/scenario-normal-afternoon.json
       HARVESTNET_ALLOWED_ORIGIN: ${HARVESTNET_ALLOWED_ORIGIN:?set HARVESTNET_ALLOWED_ORIGIN}
       HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
+      HARVESTNET_APPROVALS_TOKEN: ${HARVESTNET_APPROVALS_TOKEN:?set HARVESTNET_APPROVALS_TOKEN}
+      # The turn publisher's own signing key, for when the core publishes turns over A2A.
+      TRANSPORT_SENDER: core
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_CORE:-}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
       CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
       CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json

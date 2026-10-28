@@ -45,23 +45,28 @@ class FallbackDirectory:
     """The AGNTCY Directory when it answers; otherwise the labeled local registry.
 
     The fallback's own ``mode`` ("local_directory_fallback") stays on its result, so the
-    dashboard never presents local data as AGNTCY results.
+    dashboard never presents local data as AGNTCY results. ``mode`` reports whichever one
+    answered the last search (the primary's until a search falls back).
     """
 
     def __init__(self, primary, fallback):
         self.primary, self.fallback = primary, fallback
+        self.answered = primary
 
     @property
     def mode(self):
-        return self.primary.mode
+        return self.answered.mode
 
     def search(self, **query):
         try:
-            return self.primary.search(**query)
+            result = self.primary.search(**query)
         except Exception as exc:  # gRPC errors: the Directory is down or refused the call
             result = self.fallback.search(**query)
             result['agntcy_unreachable'] = type(exc).__name__
+            self.answered = self.fallback
             return result
+        self.answered = self.primary
+        return result
 
 
 class State:
@@ -288,11 +293,15 @@ def watcher_from_env(organization, environ=None):
     if organization not in BANKS:
         log(f'{organization} is not a food bank; no cooler watcher')
         return None
-    try:
-        # Only this organization's own core credential is kept from the staff-token map.
-        token = json.loads(environ.get('HARVESTNET_STAFF_TOKENS') or '{}').get(organization)
-    except ValueError:
-        token = None
+    # This organization's own core credential. The deployment gives each food bank host only
+    # its own (HARVESTNET_STAFF_TOKEN). The full map is still read for local runs that have it,
+    # and only this organization's entry is kept.
+    token = environ.get('HARVESTNET_STAFF_TOKEN')
+    if not token:
+        try:
+            token = json.loads(environ.get('HARVESTNET_STAFF_TOKENS') or '{}').get(organization)
+        except (ValueError, AttributeError):
+            token = None
     events, systems_url = environ.get('API_EVENTS_TOKEN'), environ.get('SYSTEMS_URL')
     if not (token and events and systems_url):
         log('needs the organization core token, API_EVENTS_TOKEN and SYSTEMS_URL; not started')

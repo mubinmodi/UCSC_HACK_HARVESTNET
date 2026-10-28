@@ -1,6 +1,6 @@
-# HarvestNet gateway on AWS (deploy/aws/compose.aws.yaml). Same routes as
-# deploy/Caddyfile, plus the frontend apps from frontends.caddy, which
-# deploy/aws/setup.sh generates for each frontend/<app> in the release.
+# HarvestNet gateway (deploy/aws/compose.aws.yaml), the only Caddyfile. Routes the
+# core API, the approval bridge and the demo cooler switch, plus the frontend apps from
+# frontends.caddy, which deploy/aws/setup.sh generates for each frontend/<app> in the release.
 # Caddy gets and renews the TLS certificate for HARVESTNET_DOMAIN by itself.
 {$HARVESTNET_DOMAIN} {
 	encode gzip

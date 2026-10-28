@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HarvestNet AWS teardown: deletes everything deploy/aws/setup.sh created, found by
-# name and the project=harvestnet tag. Leaves the API skeleton Lambda and its role
-# alone unless --include-skeleton.
+# name and the project=harvestnet tag, and the public API skeleton Lambda and its role
+# (keep those with --keep-skeleton).
 #
 #   deploy/aws/teardown.sh --dry-run   # list what would be deleted
 #   deploy/aws/teardown.sh             # asks before deleting
@@ -13,11 +13,13 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 usage() {
   cat <<'EOF'
-Usage: deploy/aws/teardown.sh [--dry-run] [--yes] [--include-skeleton] [--keep-budget] [--purge-secret]
+Usage: deploy/aws/teardown.sh [--dry-run] [--yes] [--keep-skeleton] [--keep-budget] [--purge-secret]
 
   --dry-run           run only read-only AWS calls; print the delete commands
   --yes               do not ask for confirmation
-  --include-skeleton  also delete the harvestnet-api-skeleton Lambda, its URL, logs and role
+  --keep-skeleton     keep the harvestnet-api-skeleton Lambda, its public URL, logs and role
+                      (default: delete them; the URL is public, so nothing is left running)
+  --include-skeleton  accepted for older scripts; deleting the skeleton is now the default
   --keep-budget       keep the AWS Budgets alert (it costs nothing)
   --purge-secret      delete the secret at once (default: 7-day recovery window, no charge)
 
@@ -25,12 +27,13 @@ Environment: PROFILE [incubator], REGION [us-east-2], BUCKET [harvestnet-deploy-
 EOF
 }
 
-YES=0 INCLUDE_SKELETON=0 KEEP_BUDGET=0 PURGE_SECRET=0
+YES=0 INCLUDE_SKELETON=1 KEEP_BUDGET=0 PURGE_SECRET=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --yes) YES=1 ;;
     --include-skeleton) INCLUDE_SKELETON=1 ;;
+    --keep-skeleton) INCLUDE_SKELETON=0 ;;
     --keep-budget) KEEP_BUDGET=1 ;;
     --purge-secret) PURGE_SECRET=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -79,7 +82,7 @@ info "budget:             ${BUDGET_FOUND:-none}$([ "$KEEP_BUDGET" = 1 ] && echo 
 if [ "$INCLUDE_SKELETON" = 1 ]; then
   info "skeleton Lambda:    ${SKELETON_FOUND:-none}, role ${SKELETON_ROLE_FOUND:-none}"
 else
-  info "skeleton Lambda:    left alone (use --include-skeleton to delete it)"
+  info "skeleton Lambda:    kept (--keep-skeleton)"
 fi
 info "data on the instance (core SQLite, approvals, receipts) is deleted with its volume."
 
@@ -186,7 +189,7 @@ else
 fi
 
 if [ "$INCLUDE_SKELETON" = 1 ]; then
-  step "API skeleton Lambda (--include-skeleton)"
+  step "API skeleton Lambda (public URL; keep it with --keep-skeleton)"
   if [ -n "$SKELETON_FOUND" ]; then
     aws_rw lambda delete-function-url-config --function-name "$SKELETON_FUNCTION" 2>/dev/null || true
     aws_rw lambda delete-function --function-name "$SKELETON_FUNCTION"

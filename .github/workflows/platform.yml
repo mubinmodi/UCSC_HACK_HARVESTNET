@@ -17,15 +17,10 @@ jobs:
       - run: python -m pytest tests -v
       - run: python integrations/n8n/build_workflows.py && git diff --exit-code -- integrations/n8n
       - name: Validate deployment configuration without revealing secrets
-        env:
-          TRANSPORT_TOKEN: ci-placeholder
-          API_EVENTS_TOKEN: ci-placeholder
-          DEMO_SWITCH_TOKEN: ci-placeholder
-          POSTGRES_PASSWORD: ci-placeholder
-          APPROVAL_PUBLIC_URL: https://example.invalid
-          HARVESTNET_DOMAIN: example.invalid
-          CORE_API_IMAGE: example.invalid/harvestnet-core:ci
-        run: docker compose -f compose.platform.yaml -f compose.deployment.yaml -f compose.agntcy.yaml config --quiet
+        # Placeholder per-host transport keys, written to a 0600 file and never printed.
+        run: |
+          python -m harvestnet_platform.transport_auth --output "$RUNNER_TEMP/transport.env"
+          docker compose --env-file "$RUNNER_TEMP/transport.env" -f compose.platform.yaml -f compose.agntcy.yaml config --quiet
   native-agntcy:
     runs-on: ubuntu-latest
     steps:

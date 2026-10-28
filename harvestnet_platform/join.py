@@ -10,6 +10,7 @@ import os
 import threading
 import uuid
 from pathlib import Path
+from .transport_auth import Signer
 from .transport import ORGANIZATIONS, Receiver, InProcess, A2ATransport, canonical, load_policy, turn_organization, validate_move
 
 REQUIRED_CHECKS = {'no_double_booking', 'pounds_conserved', 'versioned_approvals',
@@ -81,7 +82,8 @@ def main():
     if policy.__module__ == 'harvestnet_platform.transport' or getattr(policy, 'uses_stand_in_calculators', False):
         parser.error('A stand-in is not evidence for the real-agent join')
     endpoints = json.loads(os.environ['AGENT_ENDPOINTS'])
-    network = A2ATransport(endpoints,os.environ['TRANSPORT_TOKEN'])
+    # The join publishes turns as the turn publisher (`core`), signed with TRANSPORT_SIGNING_KEY.
+    network = A2ATransport(endpoints,Signer.from_env())
     report = compare_fixture(json.loads(Path(args.fixture).read_text()),harness,policy,network)
     report['policy'] = args.policy
     report['harness'] = args.harness
