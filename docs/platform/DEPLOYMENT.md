@@ -21,7 +21,7 @@ Keep the terminal running. The page has the cooler switch with capability discov
 | Test | Needs | Run it locally (downloads the pinned packages from PyPI once) |
 |---|---|---|
 | `tests/test_sdk_compatibility.py` (2 tests) | `a2a-sdk`, `agntcy-dir` | `uv run --with pytest --with a2a-sdk==0.3.20 --with agntcy-dir==1.0.0 pytest -q tests/test_sdk_compatibility.py` |
-| `tests/test_native_agntcy.py` (1 test) | `agntcy-app-sdk` (Linux) | `uv run --with pytest --with-requirements requirements-agntcy.txt pytest -q tests/test_native_agntcy.py` |
+| `tests/test_native_agntcy.py` (2 tests: the native host's signature check, and its signed reply to the core's move request) | `agntcy-app-sdk` (Linux in CI; also installs on macOS) | `uv run --with pytest --with-requirements requirements-agntcy.txt pytest -q tests/test_native_agntcy.py` |
 
 `tests/test_aws_deploy.py` also skips its shellcheck test when `shellcheck` is not installed, and the compose-config tests when Docker is not.
 
@@ -34,7 +34,7 @@ Each one is labeled on screen. Pick one before a run and do not switch inside a 
 | Beeceptor | The recorded synthetic fixtures (`mode: replay`, with a reason) | [`CONTRACTS.md`](CONTRACTS.md) |
 | ElevenLabs | The text form: a validated draft with read-back, awaiting consent | No food is promised by text intake. |
 | n8n | The local review page with the exact version and Approve and Decline | A missing core records a decision but cannot commit it ([`APPROVALS.md`](APPROVALS.md)). |
-| AGNTCY | `InProcess` transport, visibly labeled | [`TRANSPORT.md`](TRANSPORT.md) |
+| AGNTCY | A host that cannot answer: that turn's move is made in process, recorded as `in_process_fallback` with the reason. The whole stack: `HARVESTNET_MOVE_TRANSPORT=in_process`, labeled in the core log | [`TRANSPORT.md`](TRANSPORT.md) |
 | Claude, or its cap reached | Rules-based moves and the recorded replay | Live calls are off until a cap is set. |
 | The whole deployment | `docs/demo/replay.html`, opened from a laptop | `docs/demo/REHEARSAL.md` |
 
@@ -64,4 +64,4 @@ Spending that happened before the ledger existed is recorded by hand: `python -m
 
 ## Compose files
 
-The live stack is `compose.platform.yaml` (the five organization hosts) with `deploy/aws/compose.aws.yaml` and `deploy/aws/compose.directory.yaml`, on SQLite with no Postgres. `compose.agntcy.yaml` swaps the hosts for the native AGNTCY SDK host. The older generic overlay (`compose.deployment.yaml`, with Postgres, a separate core image, retired SMS settings and its own `deploy/Caddyfile`) was removed: nothing ran it, and the AWS files replace it.
+The live stack is `compose.platform.yaml` (the five organization hosts) with `deploy/aws/compose.aws.yaml` and `deploy/aws/compose.directory.yaml`, on SQLite with no Postgres. The core requests every live move from the hosts over signed A2A (`HARVESTNET_MOVE_TRANSPORT=a2a`). `HARVESTNET_ORG_HOST=harvestnet_platform.agntcy_server` runs the native AGNTCY SDK host in the same containers, with the same arguments; `compose.agntcy.yaml` does the same for a local stack. The older generic overlay (`compose.deployment.yaml`, with Postgres, a separate core image, retired SMS settings and its own `deploy/Caddyfile`) was removed: nothing ran it, and the AWS files replace it.

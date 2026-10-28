@@ -8,7 +8,11 @@
 #   the same image, on SQLite in a named volume (the core's supported single-host option;
 #   no Postgres container, so less memory and nothing to back up twice).
 # - One image (deploy/aws/Dockerfile) for every service, built once on the instance.
-# - The organization hosts run the real policy adapter (harvestnet_core.join_adapter).
+# - The organization hosts run the real policy adapter (harvestnet_core.join_adapter), and the
+#   core asks each one for its own organization's moves over signed A2A (HARVESTNET_MOVE_TRANSPORT
+#   on the core, below). HARVESTNET_ORG_HOST=harvestnet_platform.agntcy_server swaps the hosts for
+#   the native AGNTCY App SDK host; remote_deploy.sh then builds the image with the App SDK. It is
+#   heavier per container, so the default stays the JSON-RPC host on the t4g.small.
 # - Caddy also serves the frontend apps from the release bundle, on the same origin.
 # Built by deploy/aws/remote_deploy.sh, which sets HARVESTNET_RELEASE.
 #
@@ -109,9 +113,21 @@ services:
       HARVESTNET_ALLOWED_ORIGIN: ${HARVESTNET_ALLOWED_ORIGIN:?set HARVESTNET_ALLOWED_ORIGIN}
       HARVESTNET_STAFF_TOKENS: ${HARVESTNET_STAFF_TOKENS:?set HARVESTNET_STAFF_TOKENS}
       HARVESTNET_APPROVALS_TOKEN: ${HARVESTNET_APPROVALS_TOKEN:?set HARVESTNET_APPROVALS_TOKEN}
-      # The turn publisher's own signing key, for when the core publishes turns over A2A.
+      # Live moves come from each organization's own host (harvestnet_core/move_transport.py):
+      # the core signs a move request as the turn publisher, `core`, for the organization whose
+      # turn it is, and checks the reply against the keys the organizations derived for `core`.
+      # A turn a host cannot answer is made in process and recorded as in_process_fallback.
+      # HARVESTNET_MOVE_TRANSPORT=in_process (in the secret) runs every negotiator in the core.
+      HARVESTNET_MOVE_TRANSPORT: ${HARVESTNET_MOVE_TRANSPORT:-a2a}
+      AGENT_ENDPOINTS: '{"market":"http://donor:8020","city":"http://city:8020","rural":"http://rural:8020","eastside":"http://eastside:8020","advocate":"http://advocate:8020"}'
+      # Rules moves take milliseconds; a host that hangs costs at most this, then its turns fall
+      # back (labeled) for MOVE_HOST_RETRY_SECONDS before it is asked again.
+      AGENT_TURN_TIMEOUT_SECONDS: ${AGENT_TURN_TIMEOUT_SECONDS:-15}
+      MOVE_HOST_RETRY_SECONDS: '30'
+      ALLOW_INTERNAL_HTTP: '1'
       TRANSPORT_SENDER: core
-      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_CORE:-}
+      TRANSPORT_SIGNING_KEY: ${TRANSPORT_SIGNING_KEY_CORE:?set TRANSPORT_SIGNING_KEY_CORE (deploy/load_secrets.py)}
+      TRANSPORT_VERIFY_KEYS: ${TRANSPORT_VERIFY_KEYS_CORE:?set TRANSPORT_VERIFY_KEYS_CORE (deploy/load_secrets.py)}
       CLAUDE_RUN_CAP_USD: ${CLAUDE_RUN_CAP_USD:-0}
       CLAUDE_TOTAL_CAP_USD: ${CLAUDE_TOTAL_CAP_USD:-}
       CLAUDE_SPEND_LEDGER: /app/budget/claude-spend.json

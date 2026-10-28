@@ -1144,3 +1144,7 @@ The first implementation of ADR 0013 (PR #83) kept every standoff, as the ADR th
 4. A preserved disagreement remains only when a side refuses the proportional split and the terms repeat.
 
 Claude amended ADR 0013, MVP_DESIGN sections 6 and 8, CONTEXT.md "Contest", and the READMEs. The derived HTML and PDF copies of `docs/MVP_DESIGN.md` are stale after this edit.
+
+## User direction (October 27, 2026): live moves over signed A2A, recorded by Claude
+
+The lead asked that the running system match the claim that agents negotiate over AGNTCY A2A, after a review found that the live core ran every negotiator in process. Claude added a move request to the organization hosts: on each live turn the core signs a request as `core` for the organization whose turn it is, that organization's own host runs its own negotiator and signs its reply with its own key, and the core checks the signature, the request it answers and the move before using it (`harvestnet_platform/moves.py`, `harvestnet_core/move_transport.py`). A turn a host cannot answer is made by the same rules negotiator in the core and recorded as `in_process_fallback` with the reason; every live move has a `move_source` event. The AWS compose sets `HARVESTNET_MOVE_TRANSPORT=a2a`; `HARVESTNET_ORG_HOST` can choose the native AGNTCY App SDK host, which also answers move requests. The negotiators did not change, and the evaluation numbers on the five core fixtures are unchanged. Nothing was deployed; the live path is tested on localhost only.

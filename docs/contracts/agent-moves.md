@@ -87,3 +87,5 @@ No facts ever name or describe an individual household.
 ## How Lane C carries it
 
 Lane C's transport (PR #27) wraps this input in an envelope with `event_id` (the lot ID, README decision 7) and a `sequence` number, broadcasts it, and returns the move unchanged. The envelope adds ordering only. It never accepts or commits for anyone.
+
+**Proposed (live path):** the live core sends this same input, in its wire form (`turn` as the organization ID, the turn object in `turn_context`), only to the organization whose turn it is, as a signed `move_request`, and that organization's own host returns this same move in a reply signed with its own key ([`docs/platform/TRANSPORT.md`](../platform/TRANSPORT.md), "Move requests"). The input and the move are unchanged; the request and reply add only the request ID, the host's transport and policy, and the signatures.

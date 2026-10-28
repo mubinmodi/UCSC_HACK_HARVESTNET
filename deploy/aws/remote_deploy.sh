@@ -21,8 +21,12 @@ chmod 600 "$env_file"
 [ -f deploy/aws/frontends.caddy ] || printf 'handle /apps.txt {\n\trespond "Frontend apps: none" 200\n}\n' > deploy/aws/frontends.caddy
 mkdir -p frontend-dist
 
-echo "building image harvestnet-app:$release"
-docker build --quiet --tag "harvestnet-app:$release" --file deploy/aws/Dockerfile . >/dev/null
+# The native AGNTCY App SDK host needs the SDK in the image; the default JSON-RPC host does not.
+app_sdk=0
+if grep -qxF "HARVESTNET_ORG_HOST='harvestnet_platform.agntcy_server'" "$env_file"; then app_sdk=1; fi
+echo "building image harvestnet-app:$release (App SDK: $app_sdk)"
+docker build --quiet --build-arg INSTALL_AGNTCY_APP_SDK="$app_sdk" --tag "harvestnet-app:$release" \
+  --file deploy/aws/Dockerfile . >/dev/null
 
 export HARVESTNET_RELEASE="$release"
 compose=(docker compose --project-name harvestnet --env-file "$env_file"
