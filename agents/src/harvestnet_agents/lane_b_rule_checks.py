@@ -194,8 +194,9 @@ def numbers_trace_to_inputs(log: _Log) -> list[str]:
             out.append(f"move {e['seq']}: version {e['version']} is not in the log")
             continue
         pool = NumberPool()
-        for source in (terms, _draft_totals(parse_draft(terms), log), e["facts"], e["turn"], log.outputs(e["calculator_call_seqs"])):
+        for source in (terms, e["facts"], e["turn"], log.outputs(e["calculator_call_seqs"])):
             pool.add(source)
+        pool.add(_draft_totals(parse_draft(terms), log), ("draft_totals_lb",))  # pounds, by construction
         out.extend(f"move {e['seq']} ({e['organization_id']}): {p}" for p in _move_number_problems(e["move"], pool))
     for e in log.of("facts"):
         outputs = log.outputs(e["calculator_call_seqs"])

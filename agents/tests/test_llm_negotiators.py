@@ -123,10 +123,7 @@ def compare_with_rules():
 def test_differences_from_rules_are_exactly_the_declared_ones():
     declared = {n for n in RULES_FIXTURES if "differs_from_rules" in json.loads((HERE / "llm_negotiators" / f"{n}.json").read_text())}
     differences = compare_with_rules()
-    assert set(differences) == declared == {"advocate_passes_when_no_gap_remains"}
-    rules, llm = differences["advocate_passes_when_no_gap_remains"]
-    assert rules.kind is MoveKind.PASS
-    assert llm.kind is MoveKind.COUNTER and llm.amendment == SetPounds("potatoes", "rural", 360)
+    assert set(differences) == declared == set()
 
 
 # --- No API, model per role, request shape -------------------------------------------------
@@ -217,15 +214,27 @@ def test_amendment_pounds_must_come_from_facts_or_a_tool_result():
     pool = pool_for("city_counters_when_cold_storage_is_short")
     bad = Move("city", Role.FOOD_BANK, 3, MoveKind.COUNTER, reason="Taking 150 lb.", amendment=SetPounds("romaine", "city", 140))
     assert any("140" in p for p in move_number_problems(bad, pool))
-    pool.add({"result": 140})  # e.g. from an adjust_pounds call
+    pool.add(140, ("adjust_pounds",))  # an adjust_pounds result, as the negotiator records it
     assert move_number_problems(bad, pool) == []
 
 
 def test_extra_numbers_come_from_calculator_tool_calls():
-    _, _, _, decision, _, _ = run_llm("advocate_passes_when_no_gap_remains")
-    assert decision.source == "llm"
+    _, _, _, decision, client, _ = run_llm("advocate_passes_when_no_gap_remains")
     assert [(c.name, c.result) for c in decision.tool_calls] == [("adjust_pounds", 360.0)]
-    assert decision.move.amendment.pounds == 360  # 360 appears nowhere in the inputs
+    # 360 appears nowhere in the inputs, yet the number check accepts it from the tool result:
+    # the first move is refused for what it means, never for its numbers.
+    refused = client.requests[2]["messages"][-1]["content"][-1]
+    assert refused["is_error"] and "360" not in refused["content"]
+
+
+def test_an_advocate_counter_with_no_remaining_gap_is_refused_and_it_passes():
+    # The recorded model first proposes the 300 lb of unclaimed potatoes for Rural (60 to 360 lb)
+    # though every food bank's households already reach fair share under version 5.
+    _, _, agent_input, decision, client, _ = run_llm("advocate_passes_when_no_gap_remains")
+    assert decision.source == "llm" and decision.number_check_failures == 1 and len(client.requests) == 3
+    assert any("already have their fair share" in p for p in decision.check_problems)
+    assert decision.move.kind is MoveKind.PASS
+    assert decision.move.kind == rules_move(agent_input, Role.ADVOCATE).kind
 
 
 def test_a_tool_call_cannot_launder_an_invented_number():
@@ -364,3 +373,200 @@ def test_negotiators_from_the_factory_share_the_env_cap_and_make_no_call_at_zero
     assert city.cap is advocate.cap and city.cap.limit_usd == 0
     monkeypatch.setenv("CLAUDE_RUN_CAP_USD", "3")
     assert llm_negotiators_for([Role.FOOD_BANK])(Role.FOOD_BANK, "city", StandInCalculators()).cap.limit_usd == 3
+
+
+# --- Claude API errors ----------------------------------------------------------------------
+
+
+class FakeAPIError(Exception):
+    """Stands in for anthropic.APIError when the SDK isn't installed (the default test env)."""
+
+
+class FailingClient:
+    def __init__(self, error):
+        self.error, self.calls = error, 0
+        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+
+    def _create(self, **request):
+        self.calls += 1
+        raise self.error
+
+
+def test_a_claude_api_error_falls_back_to_the_rules_move_and_releases_the_reservation(monkeypatch):
+    import harvestnet_agents.llm_negotiators as llm
+
+    monkeypatch.setattr(llm, "api_error_types", lambda: (FakeAPIError,))
+    _, role, agent_input = load_input("city_bids_only_what_cold_storage_allows")
+    cap = SpendingCap(limit_usd=5.0)
+    client = FailingClient(FakeAPIError("429 rate limited"))
+    decision = LLMNegotiator(role, "city", cap=cap, client=client).decide(agent_input)
+    assert client.calls == 1
+    assert decision.source == "fallback" and "Claude API error" in decision.fallback_reason and "429" in decision.fallback_reason
+    assert decision.move == rules_move(agent_input, role) and decision.model_calls == 0
+    assert cap.reserved_usd == 0 and cap.spent_usd == 0 and cap.entries == []  # the cap didn't shrink
+
+
+def test_an_unexpected_client_error_still_releases_the_reservation_and_is_raised(monkeypatch):
+    import harvestnet_agents.llm_negotiators as llm
+
+    monkeypatch.setattr(llm, "api_error_types", lambda: (FakeAPIError,))
+    _, role, agent_input = load_input("city_bids_only_what_cold_storage_allows")
+    cap = SpendingCap(limit_usd=5.0)
+    with pytest.raises(KeyError):
+        LLMNegotiator(role, "city", cap=cap, client=FailingClient(KeyError("bug"))).decide(agent_input)
+    assert cap.reserved_usd == 0
+
+
+@pytest.mark.parametrize("make", ["rate_limit", "server", "timeout", "connection"])
+def test_the_sdks_own_api_errors_fall_back(make):
+    anthropic = pytest.importorskip("anthropic")
+    httpx = pytest.importorskip("httpx2")
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    error = {
+        "rate_limit": lambda: anthropic.RateLimitError("rate limited", response=httpx.Response(429, request=request), body=None),
+        "server": lambda: anthropic.InternalServerError("overloaded", response=httpx.Response(529, request=request), body=None),
+        "timeout": lambda: anthropic.APITimeoutError(request=request),
+        "connection": lambda: anthropic.APIConnectionError(request=request),
+    }[make]()
+    _, role, agent_input = load_input("city_bids_only_what_cold_storage_allows")
+    cap = SpendingCap(limit_usd=5.0)
+    decision = LLMNegotiator(role, "city", cap=cap, client=FailingClient(error)).decide(agent_input)
+    assert decision.source == "fallback" and type(error).__name__ in decision.fallback_reason
+    assert cap.reserved_usd == 0
+
+
+def test_a_scenario_survives_a_claude_api_error_on_every_call(monkeypatch):
+    import harvestnet_agents.llm_negotiators as llm
+    from harvestnet_agents.calculators import StandInCalculators
+    from harvestnet_agents.scenario import load_scenario
+    from harvestnet_agents.scenario_runner import run_scenario
+
+    monkeypatch.setattr(llm, "api_error_types", lambda: (FakeAPIError,))
+    client, cap = FailingClient(FakeAPIError("503")), SpendingCap(limit_usd=5.0)
+
+    def factory(role, org, calculators):
+        return LLMNegotiator(role, org, cap=cap, client=client, calculators=calculators)
+
+    example = Path(__file__).parents[2] / "docs" / "contracts" / "examples" / "scenario-normal-afternoon.json"
+    run = run_scenario(load_scenario(example), StandInCalculators(), negotiator_factory=factory)
+    assert run.status == "committed" and client.calls > 0  # every move fell back to the rules move
+    assert cap.reserved_usd == 0 and cap.spent_usd == 0
+
+
+def test_the_default_client_has_an_explicit_timeout_and_few_retries(monkeypatch):
+    import sys
+
+    from harvestnet_agents import claude_client
+
+    built = {}
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kw: built.update(kw) or "client"))
+    assert claude_client.default_client("tests") == "client"
+    assert built == {"timeout": claude_client.REQUEST_TIMEOUT_S, "max_retries": claude_client.MAX_RETRIES}
+    assert 0 < claude_client.REQUEST_TIMEOUT_S < 600 and claude_client.MAX_RETRIES <= 1
+
+
+# --- Numbers of the right kind, and counters that fit the organization's facts --------------
+
+
+def test_a_storage_claim_must_be_a_storage_figure_not_any_number_in_the_inputs():
+    pool = pool_for("city_bids_only_what_cold_storage_allows")  # apples weigh 300 lb; cold space is 150 lb
+    assert pool.has_number(300) and not pool.has_number(300, "cold_space")
+    assert any("cold space" in p for p in text_number_problems("We have 300 lb of cold space.", pool))
+    assert text_number_problems("We have 150 lb of cold space and 300 lb of dry space.", pool) == []
+
+
+def test_pounds_must_be_pounds_not_a_household_count():
+    pool = pool_for("city_bids_only_what_cold_storage_allows")  # 60 households
+    assert any("60 lb" in p for p in text_number_problems("Taking 60 lb.", pool))
+    assert text_number_problems("Our 60 households are 200 lb below fair share.", pool) == []
+    bad = Move("city", Role.FOOD_BANK, 1, MoveKind.COUNTER, reason="Taking some.", amendment=SetPounds("romaine", "city", 60))
+    assert any("not a number of pounds" in p for p in move_number_problems(bad, pool))
+
+
+def test_amendment_pounds_cannot_exceed_the_items_pounds():
+    _, _, agent_input = load_input("city_bids_only_what_cold_storage_allows")
+    pool = pool_for("city_bids_only_what_cold_storage_allows")
+    bad = Move("city", Role.FOOD_BANK, 1, MoveKind.COUNTER, reason="Taking it.", amendment=SetPounds("romaine", "city", 300))
+    assert any("more than the 200 lb of romaine" in p for p in move_number_problems(bad, pool, agent_input.draft))
+
+
+def submitted(kind, amendment, reason):
+    a = {"kind": "set_pounds", "produce_id": None, "food_bank_id": None, "from_food_bank_id": None, "to_food_bank_id": None,
+         "pounds": None, "mover": None, "departs_at": None, "arrives_at": None, **amendment}
+    return {"kind": kind, "reason": reason, "amendment": a, "holds": None}
+
+
+def check(name, raw_move):
+    from harvestnet_agents.llm_negotiators import check_move
+
+    _, role, agent_input = load_input(name)
+    rules = rules_negotiator(role, agent_input.turn.organization_id)
+    return check_move(raw_move, role, agent_input, pool_for(name), getattr(rules, "review", lambda _: []),
+                      getattr(rules, "counter_problems", None))
+
+
+def test_a_food_bank_counter_past_its_own_cold_storage_is_refused():
+    # 200 lb of romaine traces to the draft, but the city food bank has 150 lb of cold space.
+    move, problems = check("city_bids_only_what_cold_storage_allows", submitted(
+        "counter", {"produce_id": "romaine", "food_bank_id": "city", "pounds": 200},
+        "Our 60 households are 200 lb below fair share. Asking for 200 lb."))
+    assert move is None and any("at most 150 lb more romaine" in p for p in problems)
+    move, problems = check("city_bids_only_what_cold_storage_allows", submitted(
+        "counter", {"produce_id": "romaine", "food_bank_id": "city", "pounds": 150},
+        "Our 60 households are 200 lb below fair share. Asking for 150 lb."))
+    assert move is not None, problems
+
+
+def test_a_food_bank_counter_its_truck_cant_do_is_refused():
+    from datetime import datetime
+
+    from harvestnet_agents.negotiation import Mover, SetTransport
+
+    _, role, agent_input = load_input("city_counters_when_cold_storage_is_short")
+    rules = rules_negotiator(role, "city")
+    tr = agent_input.draft.transport("city")
+    # Arriving at 11:59 pm is outside the truck's free window.
+    late = SetTransport("city", Mover.FOOD_BANK, tr.departs_at, datetime.fromisoformat("2026-10-13T23:59"))
+    amended = agent_input.draft.amend(late, proposer_id="city", reason="x")
+    assert any("truck can't do that collection" in p for p in rules.counter_problems(agent_input, amended))
+    assert rules.counter_problems(agent_input, agent_input.draft.amend(
+        SetTransport("city", Mover.FOOD_BANK, tr.departs_at, tr.arrives_at), proposer_id="city", reason="x")) == []
+
+
+@pytest.mark.parametrize("amendment,expected", [
+    ({"produce_id": "potatoes", "food_bank_id": "rural", "pounds": 400}, "past its households' fair-share gap"),
+    ({"kind": "shift_pounds", "produce_id": "romaine", "from_food_bank_id": "city", "to_food_bank_id": "rural", "pounds": 200},
+     "City food bank's households need for their fair share"),
+])
+def test_an_advocate_counter_past_a_gap_or_out_of_a_fair_share_is_refused(amendment, expected):
+    move, problems = check("advocate_proposes_unclaimed_pounds_to_the_largest_gap", submitted(
+        "counter", amendment, "Rural food bank's 42 households are 310 lb below fair share."))
+    assert move is None and any(expected in p for p in problems), problems
+
+
+def test_every_rules_based_counter_passes_its_own_counter_check():
+    """The meaning checks only hold the LLM to what the rules-based negotiators already do."""
+    from harvestnet_agents.calculators import StandInCalculators
+    from harvestnet_agents.scenario import load_scenario
+    from harvestnet_agents.scenario_runner import run_scenario
+
+    refused = []
+
+    class Checked:
+        def __init__(self, inner):
+            self.inner = inner
+
+        def move(self, agent_input):
+            m = self.inner.move(agent_input)
+            if m.kind is MoveKind.COUNTER and hasattr(self.inner, "counter_problems"):
+                amended = agent_input.draft.amend(m.amendment, proposer_id=m.organization_id, reason=m.reason)
+                refused.extend(self.inner.counter_problems(agent_input, amended))
+            return m
+
+    fixtures = [Path(__file__).parents[2] / "docs" / "contracts" / "examples" / "scenario-normal-afternoon.json",
+                *sorted((Path(__file__).parents[2] / "core_fixtures").glob("*.json"))]
+    for path in fixtures:
+        run = run_scenario(load_scenario(path), StandInCalculators(),
+                           negotiator_factory=lambda role, org, calc: Checked(rules_negotiator(role, org, calc)))
+        assert run.status in ("committed", "waiting_for_human"), (path.name, run.status)
+    assert refused == []

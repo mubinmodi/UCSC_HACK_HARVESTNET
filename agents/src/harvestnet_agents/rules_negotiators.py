@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Any, Sequence
 
 from .calculators import Calculators, StandInCalculators
 from .negotiation import (
@@ -52,6 +52,7 @@ from .negotiation import (
     Move,
     MoveKind,
     Mover,
+    POUNDS_TOLERANCE,
     Role,
     SetPounds,
     SetTransport,
@@ -59,6 +60,7 @@ from .negotiation import (
     Transport,
 )
 from .profiles import STORAGE_COLD, STORAGE_DRY, ProduceProfile, ProfileSet
+from .wording import clock as _clock, join as _join, lb as _lb, window as _window
 
 __all__ = [
     "Problem",
@@ -290,6 +292,16 @@ class RulesDonor(_Negotiator):
 class _Arrival:
     at: datetime
     transport: Transport | None  # None: estimated for a bid, before a transport line exists
+
+
+@dataclass(frozen=True)
+class _Receivable:
+    arrival: _Arrival
+    pickup: Any  # the pickup_feasibility result
+    cold: bool
+    uses_truck: bool
+    room_lb: float  # storage room in the item's class, at arrival and until pickup ends
+    limit_lb: float  # that room, and our truck's room when we collect
 
 
 class RulesFoodBank(_Negotiator):
@@ -595,9 +607,11 @@ class RulesFoodBank(_Negotiator):
                 return bid
         return None
 
-    def _bid_for(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem, shortfall: float | None) -> Move | None:
-        """A bid for one unclaimed item: toward our gap (``shortfall``), or beyond fair share
-        (``shortfall`` is None). The same facts bound both; only the gap differs."""
+    def _receivable(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem) -> _Receivable | None:
+        """How many more pounds of ``item`` we could receive and hand out under this version, by
+        our own facts only: storage room in its class at arrival and when pickup ends (storage
+        over time), our truck's room when we collect, pickup hours before it spoils, and its
+        produce profile. None when we can't take any of it."""
         me, pid = self.organization_id, item.produce_id
         if item.condition_grade == "not_for_people" or item.condition_doubt or self._profile(pid) is None:
             return None
@@ -607,8 +621,6 @@ class RulesFoodBank(_Negotiator):
             return None
         collecting = arrival.transport is not None and arrival.transport.mover is Mover.FOOD_BANK
         uses_truck = collecting or (arrival.transport is None and not self._drop_off_suits(draft, ids))
-        if shortfall is None and not uses_truck and draft.lot_id in self._drop_off_refused_at:
-            return None  # the donor turned our drop-off down at a load we can't see past
         pickup = self.calculators.pickup_feasibility(arrival.at, facts.pickup_windows, item.usable_until)
         if not pickup.feasible or not self._keeps_until(pid, arrival.at, pickup.collect.end):
             return None
@@ -620,9 +632,50 @@ class RulesFoodBank(_Negotiator):
         )
         in_class = sum(a.pounds for a in draft.allocations_to(me) if self._needs_cold_storage(a.produce_id) == cold)
         room = self.calculators.capacity_fit(free_lb, in_class).room_left_lb
-        limits = [draft.unallocated_lb(pid), room] + ([shortfall] if shortfall is not None else [])
+        limit = room
         if uses_truck:
-            limits.append(self.calculators.capacity_fit(facts.truck.capacity_lb, draft.planned_lb(me)).room_left_lb)
+            limit = min(limit, self.calculators.capacity_fit(facts.truck.capacity_lb, draft.planned_lb(me)).room_left_lb)
+        return _Receivable(arrival, pickup, cold, uses_truck, room, limit)
+
+    def counter_problems(self, agent_input: AgentInput, amended: DraftVersion) -> list[str]:
+        """Why a counter (from anyone speaking for us, such as our LLM negotiator) asks for more
+        than our own facts allow. It reuses the limits our bids respect (``_receivable``) and our
+        truck check; it never limits what we give back. Empty: the counter fits our facts."""
+        draft, facts = agent_input.draft, agent_input.facts
+        me = self.organization_id
+        problems = []
+        for item in draft.items:
+            more = amended.pounds(item.produce_id, me) - draft.pounds(item.produce_id, me)
+            if more <= POUNDS_TOLERANCE:
+                continue
+            name = self._item_name(item.produce_id).lower()
+            can = self._receivable(draft, facts, item)
+            if can is None or can.limit_lb <= 0:
+                problems.append(f"our facts don't let us receive and hand out more {name} under version {draft.version} "
+                                "(storage, pickup hours before it spoils, transport, or its condition)")
+            elif more > can.limit_lb + POUNDS_TOLERANCE:
+                problems.append(f"we can receive at most {_lb(can.limit_lb)} lb more {name} (our storage at arrival and until "
+                                f"pickup ends{', and our truck' if can.uses_truck else ''}), not {_lb(more)} lb")
+        tr = amended.transport(me)
+        if tr is not None and tr != draft.transport(me) and tr.mover is Mover.FOOD_BANK and amended.allocations_to(me):
+            why = self._cannot_collect(amended, facts, tr)
+            if why is None and amended.planned_lb(me) > facts.truck.capacity_lb + POUNDS_TOLERANCE:
+                why = f"our truck holds {_lb(facts.truck.capacity_lb)} lb"
+            if why is not None:
+                problems.append(f"our truck can't do that collection: {why}")
+        return problems
+
+    def _bid_for(self, draft: DraftVersion, facts: FoodBankFacts, item: LotItem, shortfall: float | None) -> Move | None:
+        """A bid for one unclaimed item: toward our gap (``shortfall``), or beyond fair share
+        (``shortfall`` is None). The same facts bound both; only the gap differs."""
+        me, pid = self.organization_id, item.produce_id
+        can = self._receivable(draft, facts, item)
+        if can is None:
+            return None
+        arrival, pickup, cold, uses_truck, room = can.arrival, can.pickup, can.cold, can.uses_truck, can.room_lb
+        if shortfall is None and not uses_truck and draft.lot_id in self._drop_off_refused_at:
+            return None  # the donor turned our drop-off down at a load we can't see past
+        limits = [draft.unallocated_lb(pid), can.limit_lb] + ([shortfall] if shortfall is not None else [])
         bid = min(limits)
         if bid <= 0:
             return None
@@ -771,6 +824,46 @@ class RulesAdvocate(_Negotiator):
         return self._pass(draft, f"{target.name} is still {_lb(remaining)} lb below fair share, but nothing is unclaimed "
                                  "and no food bank is planned above its own gap")
 
+    def counter_problems(self, agent_input: AgentInput, amended: DraftVersion) -> list[str]:
+        """Why a counter from the advocate (such as its LLM negotiator's) isn't one this advocate
+        may propose: pounds go only toward a food bank still below fair share under this version,
+        no further than its gap, never on an item it already declined or one not fit to hand out,
+        and pounds are taken only from above another food bank's gap. Beyond fair share is each
+        food bank's own bid. The same gap calculator as ``move``; empty means it fits."""
+        draft, facts = agent_input.draft, agent_input.facts
+        gaps = {g.food_bank_id: g for g in facts.gaps}
+        declined = set(facts.declined)
+        problems = []
+        if amended.transports != draft.transports:
+            problems.append("the advocate proposes pounds, not transport terms")
+        banks = list(dict.fromkeys([*draft.named_food_banks(), *amended.named_food_banks()]))
+        for fb in banks:
+            before, after = draft.planned_lb(fb), amended.planned_lb(fb)
+            g = gaps.get(fb)
+            if g is None:
+                if abs(after - before) > POUNDS_TOLERANCE:
+                    problems.append(f"{fb} has no fair-share gap in your facts, so you can't move pounds for it")
+                continue
+            plan_before = self.calculators.gap_after_plan(g.below_fair_share_lb, before)
+            plan_after = self.calculators.gap_after_plan(g.below_fair_share_lb, after)
+            gained = [i for i in draft.items if amended.pounds(i.produce_id, fb) - draft.pounds(i.produce_id, fb) > POUNDS_TOLERANCE]
+            if gained:
+                if plan_before.remaining_gap_lb <= 0:
+                    problems.append(f"{g.name}'s households already have their fair share under version {draft.version}; "
+                                    "asking for pounds beyond fair share is that food bank's own call")
+                elif plan_after.above_gap_lb > POUNDS_TOLERANCE:
+                    problems.append(f"that takes {g.name} {_lb(plan_after.above_gap_lb)} lb past its households' fair-share gap; "
+                                    f"propose at most {_lb(plan_before.remaining_gap_lb)} lb more")
+                for i in gained:
+                    if (fb, i.produce_id) in declined:
+                        problems.append(f"{g.name} already declined {self._item_name(i.produce_id).lower()}")
+                    if i.condition_grade == "not_for_people" or i.condition_doubt:
+                        problems.append(f"{self._item_name(i.produce_id).lower()} is not fit to hand out, or a human must check it first")
+            if after < before - POUNDS_TOLERANCE and plan_after.remaining_gap_lb > plan_before.remaining_gap_lb + POUNDS_TOLERANCE:
+                problems.append(f"that takes pounds {g.name}'s households need for their fair share; shift only pounds "
+                                "planned above its gap")
+        return problems
+
     def _gap_sentence(self, draft: DraftVersion, facts: AdvocateFacts, target: FoodBankGap, plans) -> str:
         others = ", ".join(
             f"{g.name} {_lb(plans[g.food_bank_id].remaining_gap_lb)} lb" for g in facts.gaps if g.food_bank_id != target.food_bank_id
@@ -810,26 +903,3 @@ def _pickup_problem_text(check, arrives_at: datetime, usable_until: datetime, fa
     opens = min((w.start for w in facts.pickup_windows if w.end > arrives_at), default=None)
     opens_text = f"pickup opens at {_clock(opens)}" if opens else "no pickup opens after it arrives"
     return f"{opens_text}, and it is usable only until {_clock(usable_until)}"
-
-
-def _clock(t: datetime) -> str:
-    hour = t.hour % 12 or 12
-    suffix = "am" if t.hour < 12 else "pm"
-    return f"{hour} {suffix}" if t.minute == 0 else f"{hour}:{t.minute:02d} {suffix}"
-
-
-def _window(w) -> str:
-    if w.start.date() != w.end.date():
-        return f"{_clock(w.start)} to {_clock(w.end)} the next day"
-    return f"{_clock(w.start)} to {_clock(w.end)}"
-
-
-def _lb(x: float) -> str:
-    return str(int(x)) if float(x).is_integer() else f"{x:g}"
-
-
-def _join(words: Sequence[str]) -> str:
-    words = list(dict.fromkeys(words))
-    if len(words) <= 1:
-        return "".join(words)
-    return ", ".join(words[:-1]) + " and " + words[-1]

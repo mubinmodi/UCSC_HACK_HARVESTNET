@@ -19,7 +19,6 @@ from harvestnet_agents.rules_negotiators import rules_negotiator
 from harvestnet_agents.scenario import load_scenario
 from harvestnet_agents.scenario_runner import (
     FIXTURE_CHECKS_IN_HARNESS,
-    LANE_A_PENDING,
     EventLog,
     RecordedCalculators,
     llm_negotiators_for,
@@ -69,7 +68,6 @@ def test_every_lane_b_rule_check_passes_on_the_normal_afternoon(normal):
 def test_the_fixtures_own_rule_checks_are_left_to_lane_as_harness_never_faked(normal):
     assert set(normal.fixture_rule_checks) == set(raw()["rule_checks"])
     assert all(v == FIXTURE_CHECKS_IN_HARNESS for v in normal.fixture_rule_checks.values())
-    assert LANE_A_PENDING == FIXTURE_CHECKS_IN_HARNESS
     assert "pending" not in FIXTURE_CHECKS_IN_HARNESS
 
 
@@ -531,3 +529,128 @@ def test_a_known_reason_for_a_difference_is_added_to_its_explanation():
     d = log.events[-1]["difference_from_stand_in"]
     assert d["fields"] == ["arrives_at"]
     assert d["explanation"].endswith("Why: every route is 5 minutes slower in this test")
+
+
+# --- Robustness: invalid moves, the clock, cycles, missing pickup hours ----------------------
+
+
+def test_a_negotiator_that_only_sends_invalid_moves_is_a_failure_not_a_preserved_disagreement():
+    class Broken:
+        def move(self, agent_input):
+            return "accept"  # not a Move: every turn is invalid
+
+    def factory(role, org, calculators):
+        return Broken() if org == "city" else rules_negotiator(role, org, calculators)
+
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), negotiator_factory=factory)
+    assert run.status == "negotiator_failure"
+    stop = events(run, "stop")[-1]
+    assert stop["rule"] == "invalid_moves" and "city" in stop["reason"] and "not a preserved disagreement" in stop["reason"]
+    assert run.outcome["status"] == "negotiator_failure" and not events(run, "commitment")
+    assert all(run.rule_checks().values()), {k: v.failures for k, v in run.lane_b_rule_checks.items()}
+
+
+def test_a_genuine_disagreement_with_an_earlier_invalid_move_is_still_preserved():
+    class OnceBroken:
+        """Sends garbage once, then never accepts (a real disagreement, with a valid last reason)."""
+
+        def __init__(self, inner):
+            self.inner, self.turns = inner, 0
+
+        def move(self, agent_input):
+            self.turns += 1
+            if self.turns == 1:
+                return "accept"
+            m = self.inner.move(agent_input)
+            if m.kind.value in ("accept", "request_hold"):
+                return replace(m, kind=type(m.kind)("pass"), holds=(), reason="We are not ready to accept this version.")
+            return m
+
+    def factory(role, org, calculators):
+        n = rules_negotiator(role, org, calculators)
+        return OnceBroken(n) if org == "market" else n
+
+    run = run_scenario(load_scenario(CONTRACT_EXAMPLE), StandInCalculators(), negotiator_factory=factory)
+    assert run.status == "preserved_disagreement"
+
+
+def test_the_harness_clock_moves_by_default_so_the_deadline_can_stop_a_negotiation():
+    from harvestnet_agents.scenario_runner import DEFAULT_MINUTES_PER_TURN
+
+    assert DEFAULT_MINUTES_PER_TURN > 0
+    # The offer comes in 20 minutes before the deadline: too few turns to finish.
+    data = raw()
+    offer = data["surplus_offers"][0]
+    deadline = datetime.fromisoformat(offer["deadline"])
+    offer["reported_at"] = (deadline - timedelta(minutes=20)).isoformat()
+    run = run_scenario(load_scenario(data), StandInCalculators())
+    assert run.status == "unclaimed_deadline", events(run, "stop")
+    assert events(run, "stop")[-1]["rule"] == "deadline"
+    assert not events(run, "commitment")
+    turns = [datetime.fromisoformat(m["at"]) for m in events(run, "move")]
+    assert turns == sorted(turns) and turns[-1] > turns[0]
+
+
+def test_the_default_clock_leaves_the_normal_afternoon_committed_before_its_deadline(normal):
+    commitment = events(normal, "commitment")[0]
+    deadline = datetime.fromisoformat(raw()["surplus_offers"][0]["deadline"])
+    assert datetime.fromisoformat(commitment["at"]) < deadline
+    assert events(normal, "scenario")[0]["minutes_per_turn"] > 0
+
+
+def test_counters_that_go_round_in_a_cycle_end_as_a_preserved_disagreement_naming_it():
+    from harvestnet_agents.negotiation import Move, MoveKind, SetPounds
+    from harvestnet_agents.scenario_runner import negotiate
+
+    draft = parse_draft({
+        "lot_id": "lot-1", "version": 1, "donor_id": "market", "deadline": "2026-10-13T15:00:00-07:00",
+        "items": [{"produce_id": "apples", "pounds": 100, "condition_grade": "good", "usable_until": "2026-11-01T00:00:00-07:00"}],
+    })
+
+    class Flip:
+        """Two organizations that keep undoing each other's counter."""
+
+        def __init__(self, org, role, pounds):
+            self.org, self.role, self.pounds = org, role, pounds
+
+        def move(self, agent_input):
+            return Move(self.org, self.role, agent_input.draft.version, MoveKind.COUNTER, f"We want {self.pounds} lb.",
+                        amendment=SetPounds("apples", "city", self.pounds))
+
+    class Passer:
+        def __init__(self, org, role):
+            self.org, self.role = org, role
+
+        def move(self, agent_input):
+            return Move(self.org, self.role, agent_input.draft.version, MoveKind.PASS, "Nothing to add.")
+
+    roles = {"market": Role.DONOR, "city": Role.FOOD_BANK, "advocate": Role.ADVOCATE}
+    negotiators = {"market": Passer("market", Role.DONOR), "city": Flip("city", Role.FOOD_BANK, 100),
+                   "advocate": Flip("advocate", Role.ADVOCATE, 50)}
+    log = EventLog()
+    result = negotiate(draft, turn_order=list(roles), roles=roles, facts_at=lambda org, now: None, negotiators=negotiators,
+                       start=datetime.fromisoformat("2026-10-13T12:00:00-07:00"), log=log)
+    assert result.status == "preserved_disagreement"
+    stop = log.events[-1]
+    assert stop["rule"] == "counter_cycle" and "cycle" in stop["reason"]
+    assert result.draft.version == 4  # v2 (city 100), v3 (advocate 50), v4 (city 100 again: the terms of v2)
+
+
+def test_a_cooler_failure_at_a_food_bank_with_no_pickup_hours_is_logged_not_a_crash(monkeypatch):
+    import harvestnet_agents.scenario_runner as runner
+
+    data = raw()
+    fault = data["faults"][0]
+    failing, at = fault["food_bank_id"], datetime.fromisoformat(fault["at"])
+    real = runner.facts_for
+
+    def facts_without_pickup_hours(scenario, org, now, calc, **kwargs):
+        facts = real(scenario, org, now, calc, **kwargs)
+        return replace(facts, pickup_windows=()) if org == failing and now >= at else facts
+
+    monkeypatch.setattr(runner, "facts_for", facts_without_pickup_hours)
+    run = run_scenario(load_scenario(data), StandInCalculators())
+    assert run.status == "committed"
+    assessment = events(run, "cooler_failure_assessment")
+    assert len(assessment) == 1 and assessment[0]["not_assessed"] and assessment[0]["proposal"] is None
+    assert "no pickup hours" in assessment[0]["problem"]

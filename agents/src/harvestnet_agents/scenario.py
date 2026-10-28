@@ -49,7 +49,7 @@ from .negotiation import (
 )
 from .profiles import load_profiles
 from .serialize import jsonable
-from .rules_negotiators import _clock, _join, _lb  # wording helpers: they format facts, never add any
+from .wording import clock as _clock, join as _join, lb as _lb  # they format facts, never add any
 
 __all__ = [
     "CONTRACT_VERSION",

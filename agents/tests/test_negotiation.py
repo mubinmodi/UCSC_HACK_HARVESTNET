@@ -147,3 +147,26 @@ def test_parse_draft_round_trips_a_recorded_draft():
     assert d.pounds("apples", "rural") == 100
     assert d.transport("rural").mover is Mover.DONOR
     assert d.name_of("rural") == "Rural food bank" and d.name_of("city") == "city"
+
+
+def test_float_sums_of_pounds_within_the_core_tolerance_are_not_over_allocated():
+    item = LotItem("apples", 0.3, "good", usable_until=datetime(2026, 10, 30))
+    split = (Allocation("apples", "city", 0.1), Allocation("apples", "rural", 0.2))  # 0.1 + 0.2 == 0.30000000000000004
+    d = DraftVersion("lot-1", 1, "market", t("15:00"), (item,), allocations=split)
+    assert d.allocated_lb("apples") > 0.3  # the float sum really is over, by far less than a pound
+    with pytest.raises(DraftError):
+        DraftVersion("lot-1", 1, "market", t("15:00"), (item,), allocations=(Allocation("apples", "city", 0.31),))
+    # Shifting all of a food bank's pounds as a float sum leaves it at zero instead of failing.
+    shifted = d.amend(ShiftPounds("apples", "rural", "city", 0.1 + 0.1), proposer_id="city", reason="x")
+    assert shifted.pounds("apples", "rural") == pytest.approx(0)
+
+
+def test_one_draft_terms_for_hashes_and_prompts():
+    from harvestnet_agents.negotiation import draft_terms
+    from harvestnet_agents.scenario_runner import draft_terms as runner_terms
+
+    d = draft()
+    assert runner_terms is draft_terms
+    assert "reason" not in draft_terms(d)
+    assert draft_terms(d)["deadline"] == "2026-10-13T15:00:00"
+    assert draft_terms(d, timespec="minutes")["deadline"] == "2026-10-13T15:00"

@@ -486,3 +486,13 @@ def test_claude_extractor_cap_is_shared_and_blocks_when_spent():
     with pytest.raises(ExtractionError):
         ClaudeExtractor(client=client, cap=cap)(transcript)
     assert client.calls == []
+
+
+def test_the_extractors_model_comes_from_the_llm_config():
+    from harvestnet_agents.llm_negotiators import load_llm_config
+
+    config = load_llm_config()
+    extractor = ClaudeExtractor(client=object(), cap=SpendingCap(0))
+    assert (extractor.model, extractor.effort, extractor.max_tokens) == (
+        config.front_desk_model, config.front_desk_effort, config.front_desk_max_tokens)
+    assert ClaudeExtractor(client=object(), cap=SpendingCap(0), model="claude-opus-5-5").model == "claude-opus-5-5"

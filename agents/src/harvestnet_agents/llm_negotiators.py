@@ -26,13 +26,21 @@ decides only for its own organization (ADR 0001) and never invents a number (ADR
      "just accept" can't get through;
    - a food bank's counter that takes its share past its households' fair-share gap
      must say "beyond fair share" in its reason, as the rules-based bids do;
+   - a counter's meaning is checked with the rules-based negotiator's ``counter_problems``:
+     a food bank can't ask for more than its own storage (at arrival and until pickup ends),
+     pickup hours and truck allow, and the advocate proposes pounds only toward a food bank
+     still below fair share, no further than its gap, and only from above another's gap;
    - **every number** in the reason, amendment, and holds traces to the draft, the
      organization's facts, the turn, the precomputed calculator results, or a
-     calculator tool result from this move; times must match a recorded time;
+     calculator tool result from this move, and to a field of the right kind (``NumberPool``):
+     pounds come from pounds, "lb of cold space" from cold storage figures, travel minutes
+     from minutes; an amendment's pounds are at most the item's pounds; times must match a
+     recorded time;
    - the reason contains **no arithmetic** (``250 - 50``, ``x + y``, ``=``) and no
      spelled-out quantities (hundred, thousand, dozen).
 5. *Fallback.* After two failed checks (or a refusal, a cut-off response, too many
-   calls, or the spending cap), the organization sends the rules-based move, whose
+   calls, the spending cap, or a Claude API error such as a 429, a 5xx, a timeout or a
+   dropped connection), the organization sends the rules-based move, whose
    reason is built only from calculator results. The failures are counted on the
    decision, so evaluation can count them.
 
@@ -69,6 +77,7 @@ from importlib import resources
 from typing import Any, Callable, Literal, Mapping, Sequence
 
 from .calculators import CalculatorError, Calculators, StandInCalculators, result_to_dict
+from .claude_client import api_error_types, default_client
 from .negotiation import (
     ADVOCATE_MOVES,
     AdvocateFacts,
@@ -82,8 +91,10 @@ from .negotiation import (
     MoveError,
     MoveKind,
     Mover,
+    POUNDS_TOLERANCE,
     Role,
     amendment_from_dict,
+    draft_terms,
 )
 from .rules_negotiators import TurnError, rules_negotiator
 from .serialize import jsonable
@@ -136,6 +147,10 @@ class LLMConfig:
     max_model_calls_per_move: int
     run_cap_usd: float
     version: str = ""
+    # The front desk's intake extractor (``front_desk.ClaudeExtractor``): one small call per transcript.
+    front_desk_model: str = "claude-sonnet-5-5"
+    front_desk_effort: str = "low"
+    front_desk_max_tokens: int = 1024
 
 
 def load_llm_config(data: Mapping[str, Any] | None = None) -> LLMConfig:
@@ -146,6 +161,7 @@ def load_llm_config(data: Mapping[str, Any] | None = None) -> LLMConfig:
     missing = set(Role) - set(models)
     if missing:
         raise ValueError(f"no model configured for {sorted(r.value for r in missing)}")
+    front_desk = data.get("front_desk") or {}
     return LLMConfig(
         models=models,
         effort=str(data["effort"]),
@@ -153,6 +169,9 @@ def load_llm_config(data: Mapping[str, Any] | None = None) -> LLMConfig:
         max_model_calls_per_move=int(data["max_model_calls_per_move"]),
         run_cap_usd=float(data["run_cap_usd"]),
         version=str(data.get("version", "")),
+        front_desk_model=str(front_desk.get("model", LLMConfig.front_desk_model)),
+        front_desk_effort=str(front_desk.get("effort", LLMConfig.front_desk_effort)),
+        front_desk_max_tokens=int(front_desk.get("max_tokens", LLMConfig.front_desk_max_tokens)),
     )
 
 
@@ -333,12 +352,10 @@ def _jsonable(value: Any) -> Any:
     return jsonable(value, timespec="minutes")
 
 
-def draft_terms(draft: DraftVersion) -> dict[str, Any]:
-    """The draft's structured terms. The proposer's free-text reason is left out here; it
-    is passed separately as an organization message."""
-    terms = _jsonable(draft)
-    terms.pop("reason", None)
-    return terms
+def _terms(draft: DraftVersion) -> dict[str, Any]:
+    """The draft's terms as the model sees them (``draft_terms`` at minute precision). The
+    proposer's free-text reason is passed separately, as an organization message."""
+    return draft_terms(draft, timespec="minutes")
 
 
 def precompute(role: Role, agent_input: AgentInput, calc: Calculators) -> dict[str, Any]:
@@ -454,24 +471,58 @@ _MONTH_DAY = re.compile(
 _NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w])")
 _ARITHMETIC = re.compile(r"\d\s*(?:[+*/×÷=]|\s-\s)\s*\d|\d\s+(?:plus|minus|divided by|multiplied by)\s+\d", re.IGNORECASE)
 _NUMBER_WORDS = re.compile(r"\b(hundred|thousand|dozen)s?\b", re.IGNORECASE)
+_POUNDS_AFTER = re.compile(r"\s*(?:lb|lbs|pounds?)\b", re.IGNORECASE)
+_SPACE_AFTER = re.compile(r"\s*(?:lb|lbs|pounds?)\s+(?:of\s+)?(cold|dry)(?:[\s-]+storage)?\s+(?:space|room)\b", re.IGNORECASE)
+# ("200 lb of cold storage" is how much to hold, so only "space" or "room" makes a storage claim.)
 _MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+
+# Kinds of number, read from the field names on the path to each number in the inputs and the
+# calculator results. A number of a kind may only be used where that kind is meant: pounds in an
+# amendment or a hold, pounds of cold or dry space in a storage claim, minutes as travel time.
+POUNDS, COLD_SPACE, DRY_SPACE, MINUTES = "pounds", "cold_space", "dry_space", "minutes"
+_POUND_FIELDS = {"pounds", "my_share", "adjust_pounds", "to_pounds"}  # the last two: those tools' bare results
+_ROOM_FIELDS = {"room_left_lb", "free_lb"}  # capacity_fit's room: storage of either class, or a truck
+
+
+def _kinds(path: Sequence[str]) -> set[str]:
+    kinds = set()
+    for name in path:
+        if name.endswith("_lb") or "_lb_" in name or name in _POUND_FIELDS:
+            kinds.add(POUNDS)
+        if "minutes" in name:
+            kinds.add(MINUTES)
+    last = path[-1] if path else ""
+    if last == "cold_free_lb" or "cold_fit" in path or last in _ROOM_FIELDS:
+        kinds.add(COLD_SPACE)
+    if last == "dry_free_lb" or "dry_fit" in path or last in _ROOM_FIELDS:
+        kinds.add(DRY_SPACE)
+    return kinds
 
 
 @dataclass
 class NumberPool:
-    """Every number and time a move may use: from the inputs and this move's tool results."""
+    """Every number and time a move may use: from the inputs and this move's tool results.
+
+    ``numbers`` holds every number; ``by_kind`` holds the numbers of each kind (``POUNDS``,
+    ``COLD_SPACE``, ``DRY_SPACE``, ``MINUTES``), read from the field each number came from. So
+    "300 lb of cold space" passes only if 300 is a cold-space figure, not merely the weight of
+    some item."""
 
     numbers: set[float] = field(default_factory=set)
     datetimes: set[datetime] = field(default_factory=set)
+    by_kind: dict[str, set[float]] = field(default_factory=dict)
 
     def copy(self) -> NumberPool:
-        return NumberPool(set(self.numbers), set(self.datetimes))
+        return NumberPool(set(self.numbers), set(self.datetimes), {k: set(v) for k, v in self.by_kind.items()})
 
-    def add(self, value: Any) -> None:
+    def add(self, value: Any, path: Sequence[str] = ()) -> None:
         if isinstance(value, bool) or value is None:
             return
         if isinstance(value, (int, float)):
             self.numbers.add(float(value))
+            for kind in _kinds(path):
+                self.by_kind.setdefault(kind, set()).add(float(value))
         elif isinstance(value, datetime):
             self.datetimes.add(value)
         elif isinstance(value, str):
@@ -480,16 +531,17 @@ class NumberPool:
             except ValueError:
                 pass  # free text: its digits are not facts
         elif isinstance(value, Mapping):
-            for v in value.values():
-                self.add(v)
+            for k, v in value.items():
+                self.add(v, (*path, str(k)))
         elif isinstance(value, (list, tuple, set)):
             for v in value:
-                self.add(v)
+                self.add(v, path)
         elif is_dataclass(value):
-            self.add(_jsonable(value))
+            self.add(_jsonable(value), path)
 
-    def has_number(self, x: float) -> bool:
-        return float(x) in self.numbers
+    def has_number(self, x: float, kind: str | None = None) -> bool:
+        """Whether ``x`` is in the pool, and, with ``kind``, among the numbers of that kind."""
+        return float(x) in (self.numbers if kind is None else self.by_kind.get(kind, set()))
 
     def has_time(self, hour24: int, minute: int) -> bool:
         return any(d.hour == hour24 and d.minute == minute for d in self.datetimes)
@@ -520,26 +572,42 @@ def text_number_problems(text: str, pool: NumberPool) -> list[str]:
         return " "
 
     rest = _MONTH_DAY.sub(day_ok, _TIME.sub(time_ok, text))
-    for token in _NUMBER.findall(rest):
-        if not pool.has_number(float(token)):
+    for m in _NUMBER.finditer(rest):
+        token, x = m.group(0), float(m.group(0))
+        space = _SPACE_AFTER.match(rest, m.end())
+        if space is not None:
+            label = space.group(1).lower()
+            if not pool.has_number(x, COLD_SPACE if label == "cold" else DRY_SPACE):
+                problems.append(f"{token} lb of {label} space is not a {label} storage figure in your facts or a calculator result")
+        elif _POUNDS_AFTER.match(rest, m.end()):
+            if not pool.has_number(x, POUNDS):
+                problems.append(f"{token} lb is not a number of pounds in the draft, your facts, or a calculator result")
+        elif not pool.has_number(x):
             problems.append(f"the number {token} is not in the draft, your facts, or a calculator result")
     return problems
 
 
-def move_number_problems(move: Move, pool: NumberPool) -> list[str]:
+def move_number_problems(move: Move, pool: NumberPool, draft: DraftVersion | None = None) -> list[str]:
+    """Problems with the numbers in a move. Pounds must be pounds from the facts or a calculator
+    result (not, say, a household count or a version number) and, given the ``draft``, no more
+    than the item's pounds in the lot."""
     problems = text_number_problems(move.reason, pool)
     a = move.amendment
     if a is not None:
         pounds = getattr(a, "pounds", None)
-        if pounds is not None and not pool.has_number(pounds):
-            problems.append(f"the amendment's {pounds:g} lb is not in the facts or a calculator result")
+        if pounds is not None and not pool.has_number(pounds, POUNDS):
+            problems.append(f"the amendment's {pounds:g} lb is not a number of pounds in the facts or a calculator result")
+        produce_id = getattr(a, "produce_id", None)
+        if pounds is not None and draft is not None and produce_id in {i.produce_id for i in draft.items}:
+            if pounds > draft.item(produce_id).pounds + POUNDS_TOLERANCE:
+                problems.append(f"the amendment's {pounds:g} lb is more than the {draft.item(produce_id).pounds:g} lb of {produce_id} in the lot")
         for name in ("departs_at", "arrives_at"):
             t = getattr(a, name, None)
             if t is not None and t not in pool.datetimes:
                 problems.append(f"the amendment's {name} {t.isoformat(timespec='minutes')} is not a recorded or calculated time")
     for h in move.holds:
-        if h.pounds is not None and not pool.has_number(h.pounds):
-            problems.append(f"the hold's {h.pounds:g} lb is not in the facts or a calculator result")
+        if h.pounds is not None and not pool.has_number(h.pounds, POUNDS):
+            problems.append(f"the hold's {h.pounds:g} lb is not a number of pounds in the facts or a calculator result")
         for t in (h.start, h.end):
             if t not in pool.datetimes:
                 problems.append(f"the hold time {t.isoformat(timespec='minutes')} is not a recorded or calculated time")
@@ -568,8 +636,20 @@ def _parse_submitted(raw: Mapping[str, Any], role: Role, organization_id: str, d
     )
 
 
-def check_move(raw: Mapping[str, Any], role: Role, agent_input: AgentInput, pool: NumberPool, review: Callable[[AgentInput], list]) -> tuple[Move | None, list[str]]:
-    """Validate a model's submitted move. Returns the move, or None and the problems."""
+def check_move(
+    raw: Mapping[str, Any],
+    role: Role,
+    agent_input: AgentInput,
+    pool: NumberPool,
+    review: Callable[[AgentInput], list],
+    counter_review: Callable[[AgentInput, DraftVersion], list[str]] | None = None,
+) -> tuple[Move | None, list[str]]:
+    """Validate a model's submitted move. Returns the move, or None and the problems.
+
+    ``review`` is the organization's own hard checks (its rules-based negotiator's ``review``);
+    ``counter_review(agent_input, amended)`` checks what a counter means for that organization
+    (its rules-based negotiator's ``counter_problems``: a food bank's own storage and truck, the
+    advocate's fair-share rules)."""
     draft = agent_input.draft
     me = agent_input.turn.organization_id
     try:
@@ -584,6 +664,8 @@ def check_move(raw: Mapping[str, Any], role: Role, agent_input: AgentInput, pool
             problems.append(f"the amendment doesn't apply to version {draft.version}: {exc}")
         else:
             problems.extend(_beyond_fair_share_problems(role, agent_input, amended, move.reason))
+            if counter_review is not None:
+                problems.extend(counter_review(agent_input, amended))
     if move.kind in (MoveKind.ACCEPT, MoveKind.REQUEST_HOLD) and role is not Role.ADVOCATE:
         own = review(agent_input)
         if own:
@@ -594,7 +676,7 @@ def check_move(raw: Mapping[str, Any], role: Role, agent_input: AgentInput, pool
             problems.append("no food bank is named in this version yet")
     if move.kind is MoveKind.REQUEST_HOLD and not set(draft.named_organizations()) <= set(agent_input.turn.accepted_by):
         problems.append("request holds only once every organization named in this version has accepted it")
-    problems.extend(move_number_problems(move, pool))
+    problems.extend(move_number_problems(move, pool, draft))
     return (None, problems) if problems else (move, [])
 
 
@@ -673,8 +755,8 @@ You are the advocate. You speak for households' combined requests, using pooled 
 have no vote: you never accept, reject, hold, or veto. Your only moves are counter (one amendment) \
 or pass.
 - Propose an amendment toward the food bank whose households are furthest below fair share after \
-this version, using unclaimed pounds or pounds planned above another food bank's gap, or a change \
-that reduces waste.
+this version, using unclaimed pounds or pounds planned above another food bank's gap, and no more \
+than its remaining gap. Asking for pounds beyond fair share is each food bank's own call, not yours.
 - Don't repeat an item a food bank already declined. Mention low-access areas (USDA Food Access \
 Research Atlas) where the facts say so. Pass when you have nothing to propose.""",
 }
@@ -782,7 +864,7 @@ def render_input(role: Role, agent_input: AgentInput, labeled: Mapping[str, Any]
     messages.extend((m.organization_id, "message", m.text) for m in agent_input.messages if m.organization_id != me)
     parts = [
         f"You are {me} ({role.value}). It is your turn on draft version {draft.version}.",
-        "<draft_version>\n" + json.dumps(draft_terms(draft), indent=1) + "\n</draft_version>",
+        "<draft_version>\n" + json.dumps(_terms(draft), indent=1) + "\n</draft_version>",
         "<your_facts>\n" + json.dumps(_jsonable(agent_input.facts), indent=1) + "\n</your_facts>",
         "<calculator_results>\n" + json.dumps(labeled, indent=1) + "\n</calculator_results>",
         "<turn>\n" + json.dumps(_jsonable(agent_input.turn), indent=1) + "\n</turn>",
@@ -857,7 +939,7 @@ class LLMNegotiator:
         rules_move = self.rules.move(agent_input)  # also checks the facts are our own; the fallback
         labeled = precompute(self.role, agent_input, self.calculators)
         pool = NumberPool()
-        for source in (draft_terms(agent_input.draft), _jsonable(agent_input.facts), _jsonable(agent_input.turn), labeled):
+        for source in (_terms(agent_input.draft), _jsonable(agent_input.facts), _jsonable(agent_input.turn), labeled):
             pool.add(source)
 
         state = _MoveState()
@@ -882,13 +964,19 @@ class LLMNegotiator:
                 self.cap.reserve(worst)
             except SpendingCapReached as exc:
                 return self._fallback(rules_move, state, f"spending cap: {exc}")
-            if client is None:
-                try:
+            try:
+                if client is None:
                     client = _default_client()
-                except Exception:
-                    self.cap.release(worst)
-                    raise
-            response = client.beta.messages.create(**request)
+                response = client.beta.messages.create(**request)
+            except api_error_types() as exc:
+                # A 429, 5xx, timeout or dropped connection (after the client's own retry): no
+                # usage came back to settle, so the reservation goes back and the move falls back
+                # instead of aborting the run with the worst case still held against the cap.
+                self.cap.release(worst)
+                return self._fallback(rules_move, state, f"Claude API error: {type(exc).__name__}: {exc}")
+            except BaseException:
+                self.cap.release(worst)
+                raise
             state.calls += 1
             served = getattr(response, "model", None) or self.model
             cost = usage_cost_usd([self.model, served], response.usage)
@@ -923,7 +1011,8 @@ class LLMNegotiator:
                     continue
                 results.append(self._run_tool(block, pool, agent_input, state))
             if submitted is not None:
-                move, problems = check_move(submitted.input, self.role, agent_input, seen_pool, getattr(self.rules, "review", lambda _: []))
+                move, problems = check_move(submitted.input, self.role, agent_input, seen_pool, getattr(self.rules, "review", lambda _: []),
+                                            getattr(self.rules, "counter_problems", None))
                 if move is not None:
                     self.last_decision = LLMDecision(move, "llm", self.model, state.calls, state.failures, tuple(state.problems), tuple(state.tool_calls), state.cost)
                     return self.last_decision
@@ -947,7 +1036,7 @@ class LLMNegotiator:
         except (CalculatorError, ValueError, KeyError, TypeError) as exc:
             state.tool_calls.append(ToolCall(block.name, args, None, str(exc)))
             return {"type": "tool_result", "tool_use_id": block.id, "is_error": True, "content": f"Error: {exc}"}
-        pool.add(result)
+        pool.add(result, (block.name,))
         state.tool_calls.append(ToolCall(block.name, args, result))
         return {"type": "tool_result", "tool_use_id": block.id, "content": json.dumps(result)}
 
@@ -996,7 +1085,8 @@ def _check_tool_inputs(name: str, args: Mapping[str, Any], pool: NumberPool) -> 
         if isinstance(value, bool) or value is None:
             continue
         if isinstance(value, (int, float)):
-            ok = pool.has_number(value) or (key == "change_lb" and pool.has_number(-value))
+            kind = POUNDS if key.endswith("_lb") else MINUTES if "minutes" in key else None
+            ok = pool.has_number(value, kind) or (key == "change_lb" and pool.has_number(-value, kind))
             if not ok:
                 raise CalculatorError(f"{key}={value:g} is not a number from the facts or a calculator result")
         elif key in ("departs_at", "at", "arrives_at", "usable_until"):
@@ -1005,8 +1095,4 @@ def _check_tool_inputs(name: str, args: Mapping[str, Any], pool: NumberPool) -> 
 
 
 def _default_client() -> Any:
-    try:
-        import anthropic
-    except ImportError as exc:  # pragma: no cover - depends on the optional extra
-        raise RuntimeError("LLM negotiators need the 'claude' extra: uv sync --extra claude") from exc
-    return anthropic.Anthropic()
+    return default_client("LLM negotiators")

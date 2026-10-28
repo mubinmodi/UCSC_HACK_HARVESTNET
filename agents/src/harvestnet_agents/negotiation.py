@@ -34,6 +34,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, Mapping
 
+from .serialize import as_datetime as _dt, jsonable
+
 __all__ = [
     "ADVOCATE_MOVES",
     "AdvocateCannotVote",
@@ -43,6 +45,7 @@ __all__ = [
     "Amendment",
     "DemandCounts",
     "DonorFacts",
+    "POUNDS_TOLERANCE",
     "DraftError",
     "DraftVersion",
     "DropOff",
@@ -65,12 +68,18 @@ __all__ = [
     "Truck",
     "Turn",
     "amendment_from_dict",
+    "draft_terms",
     "amendment_to_dict",
     "parse_agent_input",
     "parse_draft",
     "parse_facts",
     "parse_turn",
 ]
+
+
+# Float sums of pounds are compared with the same tolerance Lane A's core uses (1e-8 lb), so a
+# split such as 33.3 + 33.3 + 33.4 of a 100 lb item never reads as over-allocated.
+POUNDS_TOLERANCE = 1e-8
 
 
 class DraftError(ValueError):
@@ -224,7 +233,7 @@ class DraftVersion:
                 raise DraftError(f"{a.food_bank_id} has two lines for {a.produce_id}")
             seen.add((a.produce_id, a.food_bank_id))
         for item in self.items:
-            if sum(a.pounds for a in self.allocations if a.produce_id == item.produce_id) > item.pounds:
+            if sum(a.pounds for a in self.allocations if a.produce_id == item.produce_id) > item.pounds + POUNDS_TOLERANCE:
                 raise DraftError(f"{item.produce_id}: allocated more pounds than the lot holds")
         banks = [tr.food_bank_id for tr in self.transports]
         if len(set(banks)) != len(banks):
@@ -287,9 +296,9 @@ class DraftVersion:
                 self._known(p)
                 if lb <= 0:
                     raise DraftError("a shift moves a positive number of pounds")
-                if lb > self.pounds(p, src):
+                if lb > self.pounds(p, src) + POUNDS_TOLERANCE:
                     raise DraftError(f"{src} has only {self.pounds(p, src)} lb of {p} to shift")
-                allocations = _set(allocations, p, src, self.pounds(p, src) - lb)
+                allocations = _set(allocations, p, src, max(0.0, self.pounds(p, src) - lb))
                 allocations = _set(allocations, p, dst, self.pounds(p, dst) + lb)
             case SetTransport(food_bank_id=fb, mover=m, departs_at=d, arrives_at=a):
                 transports = [tr for tr in transports if tr.food_bank_id != fb] + [Transport(fb, Mover(m), d, a)]
@@ -308,6 +317,17 @@ class DraftVersion:
     def _known(self, produce_id: str) -> None:
         if produce_id not in {i.produce_id for i in self.items}:
             raise DraftError(f"{produce_id!r} is not in the lot")
+
+
+def draft_terms(draft: DraftVersion, *, timespec: str = "auto") -> dict[str, Any]:
+    """A version's terms: the draft without the proposer's free-text reason.
+
+    This is what approvals hash (``terms.terms_hash``), at the default ``timespec``. LLM
+    prompts pass ``timespec="minutes"`` to keep times short; the reason travels separately,
+    as another organization's message."""
+    terms = jsonable(draft, timespec=timespec)
+    terms.pop("reason", None)
+    return terms
 
 
 def _set(allocations: list[Allocation], produce_id: str, food_bank_id: str, pounds: float) -> list[Allocation]:
@@ -612,7 +632,3 @@ def parse_agent_input(raw: Mapping[str, Any]) -> tuple[Role, AgentInput]:
 
 def _window(raw: Mapping[str, Any]) -> TimeWindow:
     return TimeWindow(_dt(raw["start"]), _dt(raw["end"]))
-
-
-def _dt(value: str | datetime) -> datetime:
-    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
