@@ -382,7 +382,7 @@ function OfferCard({ offer, foodBankId, approval, onChanged }: { offer: Incoming
         <p className="inline-status">No decision needed from you on this version.</p>
       )}
       <div className="decision-actions">
-        <button type="button" className="outline" onClick={() => setCountering(true)} disabled={!offer.needs_your_approval}>
+        <button type="button" className="outline" onClick={() => setCountering(true)} disabled={!offer.can_counter}>
           Counter
         </button>
         <button type="button" className="outline" aria-expanded={open} onClick={() => setOpen(!open)}>

@@ -7,15 +7,15 @@ review links. All data is synthetic. No network beyond 127.0.0.1, no paid APIs.
 """
 import copy
 import json
-import os
 import socket
-import sys
 import threading
 import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
+
+import platform_source  # noqa: F401  (Lane C on the import path)
 
 from harvestnet_core.api import API
 from harvestnet_core.server import make_server
@@ -51,10 +51,8 @@ def free_port():
         return s.getsockname()[1]
 
 
-@unittest.skipUnless(os.environ.get('HARVESTNET_PLATFORM_SOURCE'), 'pinned platform package not configured')
 class CoolerFailureJoin(unittest.TestCase):
     def setUp(self):
-        sys.path.insert(0, os.environ['HARVESTNET_PLATFORM_SOURCE'])
         from harvestnet_core import cooler_join as join
         from harvestnet_platform import approvals, systems as lane_c_systems
         from harvestnet_platform.directory import LocalDirectory
@@ -353,7 +351,6 @@ class CoolerFailureFixtureChecks(unittest.TestCase):
         fixture = json.loads(FIXTURE.read_text())
         core = run_fixture(copy.deepcopy(fixture))['rule_checks']
         self.assertEqual({k for k, v in core.items() if v is not True}, set())
-        sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
         from harvestnet_core.cooler_join import lane_b_harness_checks
         lane_b = lane_b_harness_checks(fixture)
         self.assertEqual(len(lane_b), 6)

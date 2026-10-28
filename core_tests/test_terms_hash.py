@@ -4,11 +4,9 @@ The canonical function lives in ``harvestnet_agents.terms``. The platform ships 
 and CI do not carry the agents package), so ``harvestnet_platform.transport.terms_hash`` restates
 the same two lines; this test holds the two equal.
 """
-import sys
-import os
 import unittest
 
-sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
+import platform_source  # noqa: F401  (Lane C on the import path)
 
 from harvestnet_agents import cooler_failure_flow, scenario_runner
 from harvestnet_agents.terms import terms_hash

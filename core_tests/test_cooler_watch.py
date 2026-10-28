@@ -6,11 +6,14 @@ APIs. The watcher polls once per ``tick()`` here instead of on a timer. All data
 """
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 from urllib.error import URLError
+
+import platform_source  # noqa: F401  (Lane C on the import path)
 
 from harvestnet_core import changes
 
@@ -18,7 +21,6 @@ import test_cooler_failure_join as join_test
 from test_cooler_failure_join import DEMO, EVENTS, LOT, TOKENS, call
 
 
-@unittest.skipUnless(os.environ.get('HARVESTNET_PLATFORM_SOURCE'), 'pinned platform package not configured')
 class CoolerWatch(unittest.TestCase):
     # The join test's real servers, reused as they are.
     serve = join_test.CoolerFailureJoin.serve
@@ -196,8 +198,6 @@ class CoolerWatch(unittest.TestCase):
 
 class WatcherFromEnv(unittest.TestCase):
     def test_a_host_starts_its_watcher_only_when_asked(self):
-        import sys
-        sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
         from harvestnet_platform import transport
         # Test placeholder: a host refuses to start without its own verification keys.
         keys = {'TRANSPORT_VERIFY_KEYS': json.dumps({'core': '0' * 64})}
@@ -219,10 +219,6 @@ class WatcherFromEnv(unittest.TestCase):
 
     ENV = {'HARVESTNET_STAFF_TOKENS': json.dumps({'city': 'city-own', 'rural': 'rural-own'}), 'API_EVENTS_TOKEN': 'events',
            'SYSTEMS_URL': 'http://systems:8010', 'COOLER_WATCH_STATE': '/nonexistent/state.json'}
-
-    def setUp(self):
-        import sys
-        sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
 
     def test_keeps_only_its_own_organizations_core_token(self):
         from harvestnet_core.cooler_watch import watcher_from_env

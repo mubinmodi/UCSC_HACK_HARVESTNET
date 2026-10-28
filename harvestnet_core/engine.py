@@ -1,7 +1,8 @@
 """A scripted clock and owner-by-owner moves; never a supervisor policy."""
 import copy
 from dataclasses import asdict, is_dataclass
-from datetime import timedelta, time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import re
 import uuid
 from harvestnet_agents.negotiation import parse_agent_input, parse_draft, parse_facts, Role
@@ -56,8 +57,19 @@ class Engine:
             self.negotiators[key]=rules_negotiator(role,organization,self.calc)
         return self.negotiators[key]
 
+    def exists(self, kind, id):
+        try:
+            self.records.get(kind, id)
+        except KeyError:
+            return False
+        return True
+
     def reserved(self, code):
         return sum(p["pounds"] for p in self.records.all("pickup") if p["request_code"] == code and p["status"] == "committed")
+
+    def local(self, value):
+        """An instant (ISO text or datetime) on the region's own clock, where weekdays and hours are read."""
+        return (value if isinstance(value, datetime) else dt(value)).astimezone(ZoneInfo(self.fixture["timezone"]))
 
     def eligible(self, request, bank, item, arrival):
         exclusions={str(x).strip().casefold() for x in request['cant_eat']}
@@ -67,8 +79,10 @@ class Engine:
         # Design section 8: produce that needs a household fridge goes to limited-fridge
         # households only for same-day pickup. The profile's needs-fridge field, not its cold chain.
         needs_fridge = profile.needs_fridge
+        # Weekdays, hours and "same day" are the region's local clock, whatever offset the instants carry.
+        arrival = self.local(arrival)
         for window in bank["pickup_windows"]:
-            start, end = max(dt(window["start"]), arrival), min(dt(window["end"]), dt(item["usable_until"]))
+            start, end = max(self.local(window["start"]), arrival), self.local(min(dt(window["end"]), dt(item["usable_until"])))
             if request["limited_fridge"] and needs_fridge and start.date() != arrival.date():
                 continue
             for hw in request["pickup_windows"]:
@@ -131,6 +145,17 @@ class Engine:
         bank = self.records.get("bank", owner)
         return {STORAGE_COLD: min((s["cold_free_lb"] for s in bank["storage"]),default=0), STORAGE_DRY:min((s["dry_free_lb"] for s in bank["storage"]),default=0), "truck":bank["truck"]["capacity_lb"] if bank.get("truck") else 0}
 
+    def audit_capacities(self, lot_id, owners=()):
+        """Every holding owner's real capacity, for the audit's booking check: read from the lot
+        that names it, this lot first, never a default of zero for an owner of another lot."""
+        this = self.records.get("lot", lot_id)
+        caps = {}
+        for lot, extra in [(this, set(owners))] + [(l, set()) for l in self.records.all("lot") if l["draft"]["lot_id"] != lot_id]:
+            for owner in set(named(lot["draft"])) | set(lot["holds"]) | extra:
+                for resource, value in self.capacities(owner, lot["draft"]).items():
+                    caps.setdefault((owner, resource), value)
+        return caps
+
     def validate(self, draft, holds):
         parse_draft(draft)
         transports = {t["food_bank_id"]:t for t in draft["transports"]}
@@ -166,12 +191,9 @@ class Engine:
                 cold += a["pounds"] if profile.storage_resource==STORAGE_COLD else 0
                 dry += a["pounds"] if profile.storage_resource==STORAGE_DRY else 0
                 total += a["pounds"]
-                resource=profile.storage_resource
-                held=[h for h in holds.get(bid,[]) if h['resource']==resource and dt(h['start'])<=arrival<dt(h['end'])]
-                if not held:
+                pickup_bank=self.held_pickup_hours(bank,holds.get(bid,[]),profile.storage_resource,arrival)
+                if pickup_bank is None:
                     raise Conflict('missing storage reservation through collection')
-                last=min(dt(h['end']) for h in held)
-                pickup_bank={**bank,'pickup_windows':[{'start':w['start'],'end':min(dt(w['end']),last).isoformat()} for w in bank['pickup_windows'] if dt(w['start'])<last]}
                 if not any(self.eligible(r,pickup_bank,item,arrival) for r in self.records.all("request")):
                     raise Conflict("no eligible household pickup before spoilage")
             if cold > capacity.cold_free_lb+1e-8 or dry > capacity.dry_free_lb+1e-8:
@@ -187,30 +209,41 @@ class Engine:
             if t['mover']=='food_bank' and sum(h.get('pounds') or 0 for h in holds.get(bid,[]) if h['resource']=='truck' and dt(h['start'])<=depart and dt(h['end'])>=arrival)+1e-8 < total:
                 raise Conflict('truck hold does not cover transport')
 
+    def held_pickup_hours(self, bank, holds, resource, arrival):
+        """The food bank with its pickup hours cut to its storage hold through ``arrival``: pickups
+        stay inside the reserved interval. ``None`` when no hold of ``resource`` covers the arrival."""
+        held=[h for h in holds if h['resource']==resource and dt(h['start'])<=arrival<dt(h['end'])]
+        if not held:
+            return None
+        last=min(dt(h['end']) for h in held)
+        return {**bank,'pickup_windows':[{'start':w['start'],'end':min(dt(w['end']),last).isoformat()} for w in bank['pickup_windows'] if dt(w['start'])<last]}
+
     def distribute(self, lot_id):
-        lot = self.records.get("lot",lot_id)
-        if lot["status"] != "committed":
-            return
-        if any(p["lot_id"]==lot_id for p in self.records.all("pickup")):
-            return
-        d=lot["draft"]
+        # Check and write in one transaction, so two processes never both split the same lot.
         with self.records.transaction():
+            lot = self.records.get("lot",lot_id)
+            if lot["status"] != "committed" or any(p["lot_id"]==lot_id for p in self.records.all("pickup")):
+                return
+            d=lot["draft"]
+            # Pickup IDs count within this lot, read inside the transaction, and never reuse a stored ID.
+            sequence=0
             for a in d["allocations"]:
                 if a["pounds"]<=0:
                     continue
                 bank=self.records.get("bank",a["food_bank_id"])
                 item=next(i for i in d["items"] if i["produce_id"]==a["produce_id"])
                 arrival=dt(next(t["arrives_at"] for t in d["transports"] if t["food_bank_id"]==a["food_bank_id"]))
-                resource=self.calc.profiles.get(item['produce_id']).storage_resource
-                last=min(dt(h['end']) for h in lot['holds'][a['food_bank_id']] if h['resource']==resource and dt(h['start'])<=arrival<dt(h['end']))
-                bank={**bank,'pickup_windows':[{'start':w['start'],'end':min(dt(w['end']),last).isoformat()} for w in bank['pickup_windows'] if dt(w['start'])<last]}
+                bank=self.held_pickup_hours(bank,lot['holds'][a['food_bank_id']],self.calc.profiles.get(item['produce_id']).storage_resource,arrival)
                 rs=[r for r in self.records.all("request") if self.eligible(r,bank,item,arrival)]
                 portions=self.calc.household_portions(a["pounds"],[{"request_code":r["request_code"],"household_size":r["household_size"],"received_lb":r.get("received_this_week_lb",0)+self.reserved(r["request_code"])} for r in rs])
                 for portion in portions["portions"]:
                     if portion["pounds"]<1e-8:
                         continue
                     r=next(r for r in rs if r["request_code"]==portion["request_code"])
-                    pid=f"pk-{lot_id}-{len(self.records.all('pickup'))+1}"
+                    sequence+=1
+                    while self.exists("pickup",f"pk-{lot_id}-{sequence}"):
+                        sequence+=1
+                    pid=f"pk-{lot_id}-{sequence}"
                     pickup={"pickup_id":pid,"request_code":r["request_code"],"food_bank_id":a["food_bank_id"],"food_bank_name":self.names[a["food_bank_id"]],"window":self.eligible(r,bank,item,arrival),"items":[{"produce_id":item["produce_id"],"name":self.calc.profiles.get(item["produce_id"]).name,"pounds":portion["pounds"]}],"pounds":portion["pounds"],"lot_id":lot_id,"version":d["version"],"status":"committed"}
                     self.records.put("pickup",pid,pickup)
                     self.records.event(lot_id,self.now,"pickup_notice",pickup)
@@ -239,6 +272,7 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
     if observer: observer.attach(engine)
     result={"commitments":[],"pathways":[],"rule_checks":{},"mode":fixture["mode"],"synthetic":fixture["synthetic"],"scenario_id":fixture["scenario_id"],"calculator_label":engine.calc.label,"policy_label":getattr(move_provider,'label','real rules-based negotiators' if move_provider is None else 'configured policy adapter'),"scripted_humans":True,"events":[],"faults":[]}
     checks=[]
+    result["lot_rule_checks"]={}
     pending_faults=list(fixture.get("faults",[]))
     for offer in fixture["surplus_offers"]:
         engine.now=offer["reported_at"]
@@ -298,9 +332,10 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                     count=metadata.get('number_check_failures',0)
                     if count:
                         engine.records.event(lot_id,engine.now,'number_check_failure',{'count':count,'organization_id':org,'problems':['reported by validated LLM policy']})
-                        current=engine.records.get('lot',lot_id)
-                        current['number_check_failures']=current.get('number_check_failures',0)+count
-                        with engine.records.transaction(): engine.records.put('lot',lot_id,current)
+                        with engine.records.transaction():
+                            current=engine.records.get('lot',lot_id)
+                            current['number_check_failures']=current.get('number_check_failures',0)+count
+                            engine.records.put('lot',lot_id,current)
             record_provenance()
             if queued:
                 with engine.records.transaction():
@@ -400,8 +435,9 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
         if changes.changes_for(engine.records,lot_id) or changes.failed_coolers(engine):
             checks.append(changes.rule_checks(engine,lot_id))
         else:
-            caps={(o,r):v for o in named(lot["draft"]) for r,v in engine.capacities(o,lot["draft"]).items()}
-            checks.append(rule_checks(engine.records,lot_id,pathways,caps))
+            checks.append(rule_checks(engine.records,lot_id,pathways,engine.audit_capacities(lot_id)))
+        # Each lot's own checks, so the evaluation judges each commitment by its own lot.
+        result["lot_rule_checks"][lot_id]=checks[-1]
         if observer: observer.lot_finished(engine,lot_id)
         result["commitments"].extend(engine.records.get("lot",lot_id)["commitments"])
         result["pathways"].extend(pathways)

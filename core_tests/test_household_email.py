@@ -6,10 +6,10 @@ deleted with the request after 7 days. Its pickup emails, in English and Spanish
 addresses use the reserved example.invalid domain. Nothing is sent.
 """
 import json
-import os
-import sys
 import unittest
 from urllib.parse import parse_qs, urlsplit
+
+import platform_source  # noqa: F401  (Lane C on the import path)
 
 from harvestnet_core.api import API
 from harvestnet_core.contact import email_address, release_url
@@ -110,12 +110,10 @@ class CreateRequestEmail(unittest.TestCase):
         self.assertFalse(any('household.test' in data.lower() for _, data in rows))
 
 
-@unittest.skipUnless(os.environ.get('HARVESTNET_PLATFORM_SOURCE'), 'pinned platform package not configured')
 class PickupEmails(unittest.TestCase):
     """English and Spanish emails from a real committed pickup; the link releases it."""
 
     def setUp(self):
-        sys.path.insert(0, os.environ['HARVESTNET_PLATFORM_SOURCE'])
         from harvestnet_platform.approvals import pickup_email
         self.pickup_email = pickup_email
 

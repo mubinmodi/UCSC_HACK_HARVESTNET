@@ -14,6 +14,8 @@ class Conflict(ValueError):
 
 
 def dt(value):
+    if not isinstance(value, str):
+        raise ValueError("timestamps must be ISO 8601 text with a UTC offset")
     result = datetime.fromisoformat(value)
     if result.tzinfo is None:
         raise ValueError("timestamps must include a UTC offset")
@@ -25,6 +27,16 @@ def number(value, *, signed=False):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or (value < 0 and not signed):
         raise ValueError("a finite number is required" if signed else "a finite nonnegative number is required")
     return float(value)
+
+
+def overbooked(hold, holds, capacity):
+    """Whether ``holds`` (``hold`` among them) of ``hold``'s resource add up to more than ``capacity``
+    at any moment of ``hold``'s interval. Sweeps each boundary; pairwise sums would wrongly reject
+    holds that never overlap in time. The one double-booking check for lots and changes."""
+    start, end = dt(hold["start"]), dt(hold["end"])
+    overlapping = [x for x in holds if x["resource"] == hold["resource"] and dt(x["start"]) < end and start < dt(x["end"])]
+    return any(sum(number(x.get("pounds") or 0) for x in overlapping if dt(x["start"]) <= at < dt(x["end"])) > capacity + 1e-8
+               for at in {start} | {dt(x["start"]) for x in overlapping if start <= dt(x["start"]) < end})
 
 
 def named(draft):
@@ -99,12 +111,8 @@ class Protocol:
                         # Each lot is distinct inventory, not another claim on this lot.
                         continue
                     existing.extend(other.get("holds", {}).get(owner, []))
-                overlapping = [x for x in existing + holds if x["resource"] == h["resource"] and dt(x["start"]) < end and start < dt(x["end"])]
-                # Sweep each boundary; pairwise sums wrongly reject nonconcurrent holds.
-                for at in {start} | {dt(x["start"]) for x in overlapping if start <= dt(x["start"]) < end}:
-                    total = sum(number(x.get("pounds") or 0) for x in overlapping if dt(x["start"]) <= at < dt(x["end"]))
-                    if total > number(capacities[h["resource"]]) + 1e-8:
-                        raise Conflict("resource would be double booked")
+                if overbooked(h, existing + holds, number(capacities[h["resource"]])):
+                    raise Conflict("resource would be double booked")
             lot["holds"][owner] = copy.deepcopy(holds)
             self.records.put("lot", lot_id, lot)
             self.records.event(lot_id, now, "owner_hold", {"organization_id": owner, "version": version, "holds": holds})
@@ -185,6 +193,10 @@ class Protocol:
                 raise Conflict("stale version or changed terms")
             if owner not in named(draft) or dt(now) >= dt(draft["deadline"]):
                 raise Conflict("unnamed organization or deadline passed")
+            # A recorded decline is final for its version, as on a change (changes.approve).
+            declined = sorted(o for o, r in lot["approvals"].items() if r["decision"] == "decline")
+            if declined:
+                raise Conflict(f"{', '.join(declined)} declined version {draft['version']}; a decision needs a new version")
             if receipt["decision"] == "approve" and self._expire_holds(lot, now):
                 self.records.put("lot", lot_id, lot)
                 result = {"lot_id": lot_id, "version": draft["version"], "decision_recorded": False, "returned_to_negotiation": "hold_expired",

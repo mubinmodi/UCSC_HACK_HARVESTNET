@@ -15,19 +15,23 @@ committed version instead of a draft amendment.
 """
 import copy
 from collections import defaultdict
-from zoneinfo import ZoneInfo
 from harvestnet_agents.negotiation import parse_facts
 from harvestnet_agents.profiles import STORAGE_COLD
 from harvestnet_agents.terms import terms_hash
-from .protocol import Conflict, dt, named, number
+from .protocol import Conflict, dt, named, number, overbooked
 
 
 def _key(lot_id, version):
     return f'{lot_id}:{version}'
 
 
-def latest_version(lot):
-    return max(lot['draft']['version'], lot.get('change_version', 0))
+def latest_version(records, lot):
+    """The lot's newest version number: its draft, or any recorded change, committed or declined.
+
+    Version numbers are never reused, so a declined change keeps its own record and the next
+    proposal is numbered after it."""
+    recorded = [c['version'] for c in changes_for(records, lot['draft']['lot_id'])]
+    return max([lot['draft']['version'], lot.get('change_version', 0), *recorded])
 
 
 def find(records, lot_id, version):
@@ -39,10 +43,6 @@ def find(records, lot_id, version):
 
 def changes_for(records, lot_id):
     return sorted((c for c in records.all('change') if c['lot_id'] == lot_id), key=lambda c: c['version'])
-
-
-def _local(engine, value):
-    return dt(value).astimezone(ZoneInfo(engine.fixture['timezone']))
 
 
 def _held(lot, food_bank_id):
@@ -82,7 +82,7 @@ def holding(engine, lot_id, food_bank_id):
     if not upcoming:
         raise Conflict('this food bank has no pickup hours left for its households')
     tonight = min(upcoming, key=lambda w: dt(w['start']))
-    return {'event_id': lot_id, 'lot_id': lot_id, 'current_version': latest_version(lot),
+    return {'event_id': lot_id, 'lot_id': lot_id, 'current_version': latest_version(records, lot),
             'food_bank_id': food_bank_id, 'food_bank_name': engine.names[food_bank_id],
             'timezone': engine.fixture['timezone'],
             'items': [{'produce_id': p, 'pounds': lb} for p, lb in held.items()],
@@ -117,9 +117,9 @@ def propose(engine, lot_id, body, owner):
             raise ValueError('only cooler-failure changes are supported')
         if (records.get('bank', owner).get('cooler') or {}).get('status') != 'failed':
             raise Conflict("record the failed cooler reading in this food bank's status first")
-        latest = latest_version(lot)
+        latest = latest_version(records, lot)
         if terms.get('based_on_version') != latest or terms.get('version') != latest + 1:
-            raise Conflict('stale version: a change builds on the latest committed version')
+            raise Conflict('stale version: a change builds on the latest version, and a declined version number is never reused')
         if any(c['status'] == 'awaiting_approvals' for c in changes_for(records, lot_id)):
             raise Conflict('another change of this lot is awaiting approvals')
         moves, fallback, staying, human = _parts(terms)
@@ -231,11 +231,8 @@ def _check_free(records, owner, hold, capacity):
     start, end = dt(hold['start']), dt(hold['end'])
     if start >= end:
         raise Conflict('hold has an empty interval')
-    overlapping = [x for x in _owner_holds(records, owner, hold['resource']) + [hold] if dt(x['start']) < end and start < dt(x['end'])]
-    for at in {start} | {dt(x['start']) for x in overlapping if start <= dt(x['start']) < end}:
-        total = sum(number(x.get('pounds') or 0) for x in overlapping if dt(x['start']) <= at < dt(x['end']))
-        if total > max(0.0, capacity) + 1e-8:
-            raise Conflict(f"{owner}'s {hold['resource']} would be double booked")
+    if overbooked(hold, _owner_holds(records, owner, hold['resource']) + [hold], max(0.0, capacity)):
+        raise Conflict(f"{owner}'s {hold['resource']} would be double booked")
 
 
 def _commit(engine, change):
@@ -247,9 +244,9 @@ def _commit(engine, change):
     new_holds = defaultdict(list)
     receiver = moves[0]['to_food_bank_id'] if moves else None
     if moves:
-        depart = min(_local(engine, m['departs_at']) for m in moves)
-        arrive = max(_local(engine, m['arrives_at']) for m in moves)
-        collect_end = max(_local(engine, m['households_collect']['end']) for m in moves)
+        depart = min(engine.local(m['departs_at']) for m in moves)
+        arrive = max(engine.local(m['arrives_at']) for m in moves)
+        collect_end = max(engine.local(m['households_collect']['end']) for m in moves)
         pounds = sum(number(m['pounds']) for m in moves)
         cold = sum(number(m['pounds']) for m in moves if profiles.get(m['produce_id']).storage_resource == STORAGE_COLD)
         # The receiver's recorded cold space at arrival, rechecked now, not the agent's answer.
@@ -267,7 +264,7 @@ def _commit(engine, change):
         new_holds[receiver].append(hold)
         new_holds[owner].append(truck_hold)
     # From the failure on, the failed cooler holds nothing cold.
-    failure = _local(engine, change['failure_at'])
+    failure = engine.local(change['failure_at'])
     kept = []
     for h in lot['holds'].get(owner, []):
         if h['resource'] != STORAGE_COLD:
@@ -315,12 +312,12 @@ def _move_pickups(engine, lot, change, receiver, moved, fallback, touched):
         window = None
         if receiver and budget.get(pid, 0) + 1e-8 >= p['pounds']:
             m = next(m for m in change['terms']['moves'] if m['produce_id'] == pid)
-            collect = {k: _local(engine, m['households_collect'][k]).isoformat() for k in ('start', 'end')}
+            collect = {k: engine.local(m['households_collect'][k]).isoformat() for k in ('start', 'end')}
             request = records.get('request', p['request_code'])
             original = next(i for i in lot['draft']['items'] if i['produce_id'] == pid)
             # The household's own pickup times and limits still apply at the new food bank.
             window = engine.eligible({**request, 'chosen_food_bank_ids': [receiver]}, {**rbank, 'pickup_windows': [collect]},
-                                     original, _local(engine, m['arrives_at']))
+                                     original, engine.local(m['arrives_at']))
         if window:
             budget[pid] -= p['pounds']
             p.update(food_bank_id=receiver, food_bank_name=engine.names[receiver], window=window, version=version,
@@ -357,8 +354,7 @@ def rule_checks(engine, lot_id):
     records = engine.records
     lot = records.get('lot', lot_id)
     orgs = set(named(lot['draft'])) | {o for c in changes_for(records, lot_id) for o in c['organizations']}
-    caps = {(o, r): v for o in orgs for r, v in engine.capacities(o, lot['draft']).items()}
-    core = core_checks(records, lot_id, pathways(engine, lot_id), caps)
+    core = core_checks(records, lot_id, pathways(engine, lot_id), engine.audit_capacities(lot_id, orgs))
     change = change_checks(engine, lot_id)
     merged = {k: core[k] and change.get(k, True) for k in core}
     merged.update({k: v for k, v in change.items() if k not in core})

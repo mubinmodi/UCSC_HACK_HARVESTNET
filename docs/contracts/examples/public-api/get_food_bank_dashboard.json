@@ -68,7 +68,8 @@
             },
             "agent_suggests": "accept",
             "agent_reason": "At arrival (2:20 pm) we have 250 lb of cold space free and our share needs 200 lb. Households can collect from 6 pm to 8 pm.",
-            "needs_your_approval": true
+            "needs_your_approval": true,
+            "can_counter": true
           }
         ],
         "fair_share_gap": {

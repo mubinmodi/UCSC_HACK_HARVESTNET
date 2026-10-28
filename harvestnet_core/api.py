@@ -3,6 +3,7 @@ from collections import deque
 import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import logging
 import secrets
 import time
 from urllib.parse import urlsplit, parse_qs
@@ -20,6 +21,33 @@ from .workflows import negotiate_pending
 
 class Unauthorized(ValueError):
     pass
+
+
+class MissingField(ValueError, KeyError):
+    """A field the caller's body or query left out: bad input (400), unlike a missing record key."""
+
+    def __str__(self):
+        return f"missing field {self.args[0]!r}"
+
+
+class Body(dict):
+    """The caller's JSON. Only a missing field here is the caller's error; a ``KeyError`` from
+    anywhere else is a server bug and answers 500."""
+
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            raise MissingField(key) from None
+
+
+def caller_input(value):
+    """JSON from the caller, with every object a ``Body``."""
+    if isinstance(value, dict):
+        return Body({k: caller_input(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [caller_input(v) for v in value]
+    return value
 
 
 # Every operation this API serves, for GET /. The first block is the agreed contract
@@ -52,6 +80,11 @@ OPERATIONS = (
 
 # The public API contract this serves. v0.2: households give an optional email, not a phone.
 CONTRACT_VERSION = "contract-v0.2"
+
+log = logging.getLogger(__name__)
+
+# The longest a read waits before purge runs again, for records another API process added.
+PURGE_INTERVAL = timedelta(minutes=1)
 
 # Voice intake calls per process in a sliding window (#22). Each call can cost a model call.
 VOICE_RATE_LIMIT = (20, 60.0)
@@ -128,6 +161,7 @@ class API:
         self.voice_calls=deque()
         self.household_page_url=household_page_url
         self.email_dispatcher_thread=None
+        self.next_purge=None
         if household_page_url:
             self.records.enable_email_outbox()
 
@@ -161,30 +195,55 @@ class API:
         reopened=[lot['draft']['lot_id'] for lot in self.records.all('lot') if lot['status']=='awaiting_approvals' and self.engine.protocol.expire_holds(lot['draft']['lot_id'],self.engine.now)]
         for lot_id in reopened:
             negotiate_pending(self.engine,lot_id)
-        expired=[r for r in self.records.all("request") if dt(r["expires_at"])<=dt(self.engine.now)]
-        if expired:
-            with self.records.transaction():
-                for r in expired:
-                    code=r["request_code"]
-                    self.records.delete("request",code)
-                    self.records.delete("email",code)
-                    self.records.delete("phone",code)  # retired with contract-v0.2; kept so old records still go
-                    for p in self.records.all("pickup"):
-                        if p["request_code"]==code:
-                            self.records.delete("pickup",p["pickup_id"])
-                    # Design section 12: results keep only counts. Pickup notices keep the
-                    # pounds and food bank; the request code and household window go.
-                    for e in self.records.events_of_kind("pickup_notice"):
-                        if e["data"].get("request_code")==code:
-                            self.records.replace_event_data(e["sequence"],{**e["data"],"request_code":None,"window":None,"anonymized":"request expired"})
+        with self.records.transaction():
+            for r in self.records.all("request"):
+                if dt(r["expires_at"])>dt(self.engine.now):
+                    continue
+                code=r["request_code"]
+                self.records.delete("request",code)
+                self.records.delete("email",code)
+                self.records.delete("phone",code)  # retired with contract-v0.2; kept so old records still go
+                # Design section 12: results keep only counts. A collected pickup stays as a count
+                # (pounds, items, food bank, lot) under a fresh random household reference, so
+                # households reached and collected pounds do not shrink later; its request code and
+                # window go. Every other pickup of the request is deleted, as before.
+                household="expired-"+secrets.token_hex(8)
+                for p in self.records.all("pickup"):
+                    if p["request_code"]!=code:
+                        continue
+                    if p["status"]=="collected":
+                        self.records.put("pickup",p["pickup_id"],{**p,"request_code":household,"window":None,"anonymized":"request expired"})
+                    else:
+                        self.records.delete("pickup",p["pickup_id"])
+                # Pickup notices keep the pounds and food bank; the request code and household window go.
+                for e in self.records.events_of_kind("pickup_notice"):
+                    if e["data"].get("request_code")==code:
+                        self.records.replace_event_data(e["sequence"],{**e["data"],"request_code":None,"window":None,"anonymized":"request expired"})
+        self.next_purge=self.purge_due()
+
+    def purge_due(self):
+        """When purge next has work: the earliest open lot's deadline, hold end of a lot awaiting
+        approvals, or request expiry. Never later than ``PURGE_INTERVAL`` from now, since another
+        API process may add records this one has not seen."""
+        due=[dt(self.engine.now)+PURGE_INTERVAL]
+        for lot in self.records.all('lot'):
+            if lot['status'] not in ('committed','unclaimed','preserved_disagreement'):
+                due.append(dt(lot['draft']['deadline']))
+            if lot['status']=='awaiting_approvals':
+                due+=[dt(h['end']) for hs in lot['holds'].values() for h in hs]
+        due+=[dt(r['expires_at']) for r in self.records.all('request')]
+        return min(due)
 
     def call(self, method, target, body=None, token=None):
         # Reads and mutations share one lock; never leak database exception contents.
         with self.records.lock:
             self.engine.now=self.clock()
-            self.purge()
+            # Every change runs purge; a read runs it only when something is due (or the interval
+            # passed), so reads do not rescan and rewrite every record.
+            if method!='GET' or self.next_purge is None or dt(self.engine.now)>=self.next_purge:
+                self.purge()
             try:
-                status,data=self.dispatch(method,target,body or {},token)
+                status,data=self.dispatch(method,target,caller_input(body or {}),token)
                 return status,{"mode":self.engine.fixture["mode"],"synthetic":self.engine.fixture["synthetic"],**data}
             except Unauthorized as exc:
                 return 401,{"error":{"code":"unauthorized","message":str(exc)}}
@@ -192,11 +251,13 @@ class API:
                 return 404,{"error":{"code":"not_found","message":"Record not found"}}
             except Conflict as exc:
                 return 409,{"error":{"code":"conflict","message":str(exc)}}
-            except KeyError as exc:
-                # A missing field, or an unknown produce or organization in the body: bad input.
-                return 400,{"error":{"code":"bad_request","message":f"missing or unknown field {exc}"}}
-            except (ValueError,TypeError,AttributeError) as exc:
+            except ValueError as exc:
+                # Validation: a missing field (MissingField) or a value the rules refuse.
                 return 400,{"error":{"code":"bad_request","message":str(exc)}}
+            except Exception:
+                # Anything else is a server bug: logged here, never shown to the caller.
+                log.exception("unexpected error in %s /%s", method, urlsplit(target).path.strip('/').split('/')[0])
+                return 500,{"error":{"code":"internal_error","message":"Something went wrong on our side"}}
 
     def preview(self, draft):
         return {"saved":False,"draft_request":draft.to_dict(),"complete":draft.is_complete,"fair_share_lb":self.engine.calc.fair_share(draft.household_size).pounds if draft.household_size else None,"read_back":desk.read_back(draft),"missing_questions":list(desk.missing_questions(draft)),"consent_question":desk.consent_wording(draft) if draft.is_complete else None}
@@ -362,6 +423,18 @@ class API:
             options.append({"version":v['version'],"proposer_id":v['proposer_id'],"reason":v['reason'],"allocations":plan})
         return {"reason":reason,"options":options,"reasons":[{"organization_id":o,"version":m['version'],"action":m['action'],"reason":m['reason']} for o,m in last.items()]}
 
+    def awaiting_decision(self, lot, owner):
+        """Whether ``owner`` has an open approval request on this lot: its current version awaits
+        approvals, names ``owner``, has no decision from ``owner`` yet, and its deadline is ahead."""
+        d=lot['draft']
+        return lot['status']=='awaiting_approvals' and owner in named(d) and owner not in lot['approvals'] and dt(d['deadline'])>dt(self.engine.now)
+
+    def requested_at(self, lot):
+        """When the current version went out for approval: the last owner hold on that version."""
+        version=lot['draft']['version']
+        return max((e['at'] for e in self.records.events(lot['draft']['lot_id']) if e['kind']=='owner_hold' and e['data'].get('version')==version),
+                   key=dt,default=None)
+
     def release(self, pid, code):
         with self.records.transaction():
             pickup=self.records.get("pickup",pid)
@@ -403,7 +476,7 @@ class API:
         route table, ``op_<operation>`` the handler). Anything else is a 404."""
         url=urlsplit(target)
         segments=url.path.strip('/').split('/')
-        query={name:values[0] for name,values in parse_qs(url.query).items()}
+        query=Body({name:values[0] for name,values in parse_qs(url.query).items()})
         if method=='GET' and segments==['']:
             return self.op_index()
         for operation,route_method,template,_ in OPERATIONS:
@@ -480,11 +553,12 @@ class API:
 
     def op_choose_food_banks(self, call):
         code,body=call.params['request_code'],call.body
-        request=self.records.get('request',code)
+        self.records.get('request',code)
         ids=body['food_bank_ids'] if 'food_bank_ids' in body else body['chosen_food_bank_ids']
         if not isinstance(ids,list) or len(ids)!=len(set(ids)) or any(bank_id not in self.engine.banks for bank_id in ids):
             raise ValueError("choose known, distinct food banks")
         with self.records.transaction():
+            request=self.records.get('request',code)
             request['chosen_food_bank_ids']=ids
             self.records.put('request',code,request)
         return 200,{"request_code":code,"chosen_food_bank_ids":ids,"status":"saved","message":SAVED_MESSAGE.get(request.get('language'),SAVED_MESSAGE['en'])}
@@ -504,13 +578,15 @@ class API:
         body=call.body
         owner=body['food_bank_id']
         self.authorize(owner,call.token)
-        request=self.records.get('request',body['request_code'])
-        pending=[pickup for pickup in self.records.all('pickup') if pickup['request_code']==body['request_code'] and pickup['food_bank_id']==owner and pickup['status']=='committed']
-        if not pending:
-            raise Conflict("no open pickup at this food bank")
-        if any(not (dt(pickup['window']['start'])<=dt(self.engine.now)<dt(pickup['window']['end'])) for pickup in pending):
-            raise Conflict("pickup is outside its confirmed window")
         with self.records.transaction():
+            # Read the pickups and the household's balance inside the transaction that updates them,
+            # so two staff confirming at once never count one pickup twice.
+            request=self.records.get('request',body['request_code'])
+            pending=[pickup for pickup in self.records.all('pickup') if pickup['request_code']==body['request_code'] and pickup['food_bank_id']==owner and pickup['status']=='committed']
+            if not pending:
+                raise Conflict("no open pickup at this food bank")
+            if any(not (dt(pickup['window']['start'])<=dt(self.engine.now)<dt(pickup['window']['end'])) for pickup in pending):
+                raise Conflict("pickup is outside its confirmed window")
             for pickup in pending:
                 pickup['status']='collected'
                 self.records.put('pickup',pickup['pickup_id'],pickup)
@@ -584,15 +660,17 @@ class API:
 
     def op_submit_counter(self, call):
         lot_id,body=call.params['lot_id'],call.body
-        lot=self.records.get('lot',lot_id)
-        draft=lot['draft']
+        self.records.get('lot',lot_id)
         self.authorize(body['organization_id'],call.token)
-        if body['version']!=draft['version'] or lot['status']=='committed':
-            raise Conflict("stale or committed version")
         from harvestnet_agents.negotiation import amendment_from_dict,parse_draft
-        parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
-        move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
         with self.records.transaction():
+            # The version check and the queued counter share one transaction.
+            lot=self.records.get('lot',lot_id)
+            draft=lot['draft']
+            if body['version']!=draft['version'] or lot['status']=='committed':
+                raise Conflict("stale or committed version")
+            parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
+            move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
             self.records.put('queued_move',lot_id+':'+body['organization_id'],{"lot_id":lot_id,**move})
         negotiate_pending(self.engine,lot_id)
         return 202,{"lot_id":lot_id,"status":"queued_for_turn","based_on_version":draft['version'],"move":move,"message":"Counter queued for your organization's next turn."}
@@ -628,8 +706,8 @@ class API:
         approvals=[]
         for lot in self.records.all('lot'):
             draft=lot['draft']
-            if owner in named(draft) and lot['status']!='committed' and dt(draft['deadline'])>dt(self.engine.now):
-                approvals.append({"lot_id":draft['lot_id'],"version":draft['version'],"terms_hash":terms_hash(draft),"requested_at":self.engine.now,"expires_at":draft['deadline'],"why_you":["exact_version_review"],"summary":draft['reason'],"terms":draft,"status":"awaiting_decision"})
+            if self.awaiting_decision(lot,owner):
+                approvals.append({"lot_id":draft['lot_id'],"version":draft['version'],"terms_hash":terms_hash(draft),"requested_at":self.requested_at(lot),"expires_at":draft['deadline'],"why_you":["exact_version_review"],"summary":draft['reason'],"terms":draft,"status":"awaiting_decision"})
         approvals+=changes.pending_approvals(self.records,owner)
         return 200,{"organization_id":owner,"approvals":approvals}
 
@@ -662,13 +740,15 @@ class API:
     def op_update_food_bank_status(self, call):
         bank_id,body=call.params['food_bank_id'],call.body
         self.authorize(bank_id,call.token)
-        bank=self.records.get('bank',bank_id)
         from harvestnet_agents.negotiation import parse_facts
-        updated={**bank,**{field:body[field] for field in ('storage','pickup_windows','truck','cooler') if field in body}}
-        parse_facts('food_bank',{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"demand":self.engine.demand(bank_id),**updated})
-        for slot in updated['storage']: number(slot['cold_free_lb']); number(slot['dry_free_lb'])
-        updated['status_version']=bank.get('status_version',0)+1
-        with self.records.transaction(): self.records.put('bank',bank_id,updated)
+        with self.records.transaction():
+            # Read the status inside the transaction that bumps its version: no lost update.
+            bank=self.records.get('bank',bank_id)
+            updated={**bank,**{field:body[field] for field in ('storage','pickup_windows','truck','cooler') if field in body}}
+            parse_facts('food_bank',{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"demand":self.engine.demand(bank_id),**updated})
+            for slot in updated['storage']: number(slot['cold_free_lb']); number(slot['dry_free_lb'])
+            updated['status_version']=bank.get('status_version',0)+1
+            self.records.put('bank',bank_id,updated)
         return 200,{"food_bank_id":bank_id,"status_version":updated['status_version'],"updated_at":self.engine.now,"message":"Your organization's facts are updated."}
 
     def op_get_food_bank_dashboard(self, call):
@@ -688,7 +768,7 @@ class API:
             if not allocations: continue
             transport=next((t for t in draft['transports'] if t['food_bank_id']==bank_id),None)
             suggests,why=self.suggestion(lot,bank_id)
-            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":lot['status'] in ('awaiting_approvals','negotiating')})
+            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":self.awaiting_decision(lot,bank_id),"can_counter":lot['status'] in ('awaiting_approvals','negotiating')})
             if transport: arrivals.append({"lot_id":draft['lot_id'],"version":draft['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
             if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":draft['lot_id'],"reason":lot['stop_reason']})
         return 200,{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"capacity":{field:bank.get(field) for field in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bank_id),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bank_id)}

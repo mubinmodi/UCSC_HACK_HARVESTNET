@@ -6,16 +6,14 @@ same evaluation and compares. If it fails, rerun
 block, keeping the "synthetic" label. All data is synthetic.
 """
 import json
-import os
 import re
-import sys
 import unittest
 from pathlib import Path
 
+import platform_source  # noqa: F401  (Lane C on the import path)
+
 from harvestnet_core.evaluation import evaluate
 
-# The cooler-failure scenario reads Lane C's organization systems in process.
-sys.path.insert(0, os.environ.get('HARVESTNET_PLATFORM_SOURCE', '.'))
 
 SLIDES = Path('docs/demo/slides.html')
 FIELDS = ('method', 'status', 'collected_by_households_lb', 'committed_to_food_banks_lb', 'produce_wasted_lb',

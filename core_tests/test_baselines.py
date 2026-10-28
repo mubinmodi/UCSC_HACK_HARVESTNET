@@ -58,7 +58,7 @@ class FirstComeFirstServed(unittest.TestCase):
 
     def test_the_earliest_claimant_goes_first(self):
         fixture = load('normal-afternoon')
-        order = Baseline(fixture, 'first_come_first_served').priority
+        order = Baseline(fixture, 'first_come_first_served').bid_order('market')
         earliest = {b: min(r['submitted_at'] for r in fixture['requests'] if b in r['chosen_food_bank_ids']) for b in order}
         self.assertEqual([earliest[b] for b in order], sorted(earliest[b] for b in order))
 

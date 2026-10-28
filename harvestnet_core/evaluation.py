@@ -52,16 +52,18 @@ class Baseline:
         self.method=method
         self.engine=Engine(fixture)
         self.claimants={}
-        rs=fixture['requests']
-        banks=[b['organization_id'] for b in fixture['food_banks']]
-        if method=='first_come_first_served':
-            self.priority=sorted(banks,key=lambda b:min((dt(r['submitted_at']) for r in rs if b in r['chosen_food_bank_ids']),default=dt(fixture['clock']['end'])))
-        elif method=='nearest_food_bank':
-            donor=fixture['donors'][0]
-            self.priority=sorted(banks,key=lambda b:(donor['travel_minutes'].get(b,float('inf')),b))
-        else:
+        if method not in ('first_come_first_served','nearest_food_bank'):
             raise ValueError('unknown baseline')
-        self.passed=set()
+        # Who has finished bidding, per lot: a food bank that passed on one lot still bids first on the next.
+        self.passed=defaultdict(set)
+
+    def bid_order(self, donor_id):
+        """The order food banks bid in on a lot from ``donor_id``: who asked first, or nearest to that donor."""
+        rs,banks=self.fixture['requests'],[b['organization_id'] for b in self.fixture['food_banks']]
+        if self.method=='first_come_first_served':
+            return sorted(banks,key=lambda b:min((dt(r['submitted_at']) for r in rs if b in r['chosen_food_bank_ids']),default=dt(self.fixture['clock']['end'])))
+        travel=self.engine.donors[donor_id]['travel_minutes']
+        return sorted(banks,key=lambda b:(travel.get(b,float('inf')),b))
 
     def __call__(self, org, wire):
         role,typed=parse_agent_input({**wire,'turn':wire['turn_context']})
@@ -69,7 +71,8 @@ class Baseline:
             return Move(org,role,typed.draft.version,MoveKind.PASS,'Baseline has no advocate amendments').to_dict()
         if role.value=='food_bank':
             # Allow earlier banks to finish requesting before the next bank bids.
-            outstanding=[b for b in self.priority if b not in self.passed]
+            passed=self.passed[typed.draft.lot_id]
+            outstanding=[b for b in self.bid_order(typed.draft.donor_id) if b not in passed]
             if outstanding and outstanding[0]!=org and not typed.draft.allocations_to(org):
                 return Move(org,role,typed.draft.version,MoveKind.PASS,'Waiting for baseline priority turn').to_dict()
         negotiator=self.engine.rules_for(role,org)
@@ -77,7 +80,7 @@ class Baseline:
             negotiator=self.claimants.setdefault(org,FirstComeFoodBank(org,self.engine.calc))
         move=negotiator.move(typed)
         if role.value=='food_bank' and move.kind in (MoveKind.ACCEPT,MoveKind.PASS,MoveKind.REJECT):
-            self.passed.add(org)
+            self.passed[typed.draft.lot_id].add(org)
         return move.to_dict()
 
 
@@ -191,6 +194,17 @@ def produce_split(records, calc=None):
     return out
 
 
+def invalid_commitments(run, records, arrivals):
+    """Commitments (first and changed) that fail their own lot's invalid-commitment or booking check.
+
+    Each commitment is judged by the checks of the lot it belongs to, so one bad lot never marks
+    another lot's commitments invalid. A run saved before per-lot checks falls back to the run-wide ones."""
+    bad=lambda c: not (c.get('zero_invalid_commitments',False) and c.get('no_double_booking',False))
+    if 'lot_rule_checks' not in run:
+        return sum(bad(run['rule_checks']) for _ in arrivals)
+    return sum(bad(c) for lot_id,c in run['lot_rule_checks'].items() for e in records.events(lot_id) if e['kind'] in ('commitment','change_commitment'))
+
+
 def metrics(fixture, run, records):
     requests=records.all('request')
     collected=[p for p in records.all('pickup') if p['status']=='collected']
@@ -200,10 +214,9 @@ def metrics(fixture, run, records):
     arrivals=[e for e in run['events'] if e['kind'] in ('commitment','change_commitment')]
     first=[e for e in arrivals if e['kind']=='commitment']
     start=min((dt(o['reported_at']) for o in fixture['surplus_offers']),default=dt(fixture['clock']['start']))
-    checks=run['rule_checks']
     coverage=coverage_by_food_bank(fixture,requests)
     # The old produce_wasted_lb, kept under its own name so the definition change is visible.
-    result={**split,"uncollected_by_scenario_households_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":sum(not (checks.get('zero_invalid_commitments',False) and checks.get('no_double_booking',False)) for e in arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
+    result={**split,"uncollected_by_scenario_households_lb":max(0,offered-total),"worst_served_coverage":min(coverage.values()) if coverage else None,"coverage_by_food_bank":coverage,"households_reached":len({p['request_code'] for p in collected}),"pickup_window_match":collected_before_spoiling(run,records,collected),"time_to_commitment_minutes":(min(dt(e['at']) for e in first)-start).total_seconds()/60 if first else None,"invalid_commitments":invalid_commitments(run,records,arrivals),"number_check_failures":sum(e['data'].get('count',0) for e in run['events'] if e['kind']=='number_check_failure')}
     if fixture.get('faults'):
         result['cooler_failure']=cooler_failure_report(run)
     return result

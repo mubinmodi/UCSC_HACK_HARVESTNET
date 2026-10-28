@@ -58,13 +58,15 @@ def negotiate_pending(engine,lot_id,provider=None):
         move=ask()
         for call in engine.calc.calls[call_start:]: pool.add(call.result)
         move=checked_move(engine,lot_id,org,move,pool,ask,lambda:engine.rules_for(role,org).move(typed).to_dict())
-        try:
-            queued=engine.records.get('queued_move',lot_id+':'+org)
-        except KeyError:
-            queued=None
-        if queued:
-            with engine.records.transaction(): engine.records.delete('queued_move',lot_id+':'+org)
-            if queued['version']==d['version']: move={k:v for k,v in queued.items() if k!='lot_id'}
+        with engine.records.transaction():
+            # Take the queued counter in the same transaction that reads it: it is used once.
+            try:
+                queued=engine.records.get('queued_move',lot_id+':'+org)
+            except KeyError:
+                queued=None
+            else:
+                engine.records.delete('queued_move',lot_id+':'+org)
+        if queued and queued['version']==d['version']: move={k:v for k,v in queued.items() if k!='lot_id'}
         if move['organization_id']!=org or move['version']!=d['version']:
             raise ValueError('owner move does not match published turn')
         if org=='advocate' and move['action'] not in ('counter','pass'):
@@ -81,22 +83,26 @@ def negotiate_pending(engine,lot_id,provider=None):
             except Conflict as exc:
                 # A hold that is already over (or double booked) is a refused move, not a crash.
                 engine.records.event(lot_id,engine.now,'hold_refused',{'organization_id':org,'version':d['version'],'reason':str(exc)})
-        lot=engine.records.get('lot',lot_id)
-        queued=any(m['lot_id']==lot_id for m in engine.records.all('queued_move'))
-        # A human's decline stays on the version: these exact terms never go back for approval.
-        if not queued and not declined_by(lot) and lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
-            lot['status']='awaiting_approvals'
-            with engine.records.transaction(): engine.records.put('lot',lot_id,lot)
-            return lot
+        with engine.records.transaction():
+            # Read and write the lot in one transaction, so a concurrent change is never overwritten.
+            lot=engine.records.get('lot',lot_id)
+            queued=any(m['lot_id']==lot_id for m in engine.records.all('queued_move'))
+            # A human's decline stays on the version: these exact terms never go back for approval.
+            if lot['status']!='committed' and not queued and not declined_by(lot) and lot['draft']['allocations'] and all(lot['holds'].get(o) for o in named(lot['draft'])):
+                lot['status']='awaiting_approvals'
+                engine.records.put('lot',lot_id,lot)
+                return lot
+        if lot['status']=='committed': return lot
         if turn%len(engine.fixture['turn_order'])==0:
             no_change=no_change+1 if lot['draft']['version']==previous_version else 0
             if no_change>=engine.fixture['policies']['rounds_without_new_terms_before_disagreement']: break
-    lot=engine.records.get('lot',lot_id)
-    lot['status']='preserved_disagreement'
-    declined=declined_by(lot)
-    lot['stop_reason']=(f"{', '.join(declined)} declined version {lot['draft']['version']} and the rounds that followed produced no new terms; no automatic commitment"
-                        if declined else 'No approved feasible pathway after published negotiation rounds')
     with engine.records.transaction():
+        lot=engine.records.get('lot',lot_id)
+        if lot['status']=='committed': return lot
+        lot['status']='preserved_disagreement'
+        declined=declined_by(lot)
+        lot['stop_reason']=(f"{', '.join(declined)} declined version {lot['draft']['version']} and the rounds that followed produced no new terms; no automatic commitment"
+                            if declined else 'No approved feasible pathway after published negotiation rounds')
         engine.records.put('lot',lot_id,lot)
         engine.records.event(lot_id,engine.now,'preserved_disagreement',{'reason':lot['stop_reason']})
     return lot
