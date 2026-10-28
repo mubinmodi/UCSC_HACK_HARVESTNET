@@ -1,0 +1,277 @@
+[
+  {
+    "scenario_id": "condition-doubt",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 0,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 0,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 0,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "llm",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 0,
+        "invalid_commitments": 0
+      }
+    ]
+  },
+  {
+    "scenario_id": "cooler-failure",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 4.0,
+        "committed_to_food_banks_lb": 446.0,
+        "produce_wasted_lb": 450.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 1,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 12.0,
+        "committed_to_food_banks_lb": 688.0,
+        "produce_wasted_lb": 200.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 2,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 12.0,
+        "committed_to_food_banks_lb": 688.0,
+        "produce_wasted_lb": 200.0,
+        "worst_served_coverage": 0.05,
+        "households_reached": 2,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "reason": "0 rules fallback and 2 template fallback decisions alongside 33 LLM decisions; see each run",
+        "collected_by_households_lb": 47.0,
+        "committed_to_food_banks_lb": 35.0,
+        "produce_wasted_lb": 818.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 5,
+        "invalid_commitments": 0
+      }
+    ]
+  },
+  {
+    "scenario_id": "more-households-than-produce",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 19.0,
+        "committed_to_food_banks_lb": 33.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "households_reached": 2,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 19.0,
+        "committed_to_food_banks_lb": 33.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "households_reached": 2,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 28.666666666666664,
+        "committed_to_food_banks_lb": 23.333333333333336,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "reason": "0 rules fallback and 6 template fallback decisions alongside 34 LLM decisions; see each run",
+        "collected_by_households_lb": 38.0,
+        "committed_to_food_banks_lb": 14.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      }
+    ]
+  },
+  {
+    "scenario_id": "more-produce-than-storage",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 12.833333333333332,
+        "committed_to_food_banks_lb": 2.166666666666667,
+        "produce_wasted_lb": 885.0,
+        "worst_served_coverage": 0.2619047619047619,
+        "households_reached": 3,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 17.11111111111111,
+        "committed_to_food_banks_lb": 2.88888888888889,
+        "produce_wasted_lb": 880.0,
+        "worst_served_coverage": 0.2930555555555555,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 17.333333333333336,
+        "committed_to_food_banks_lb": 2.6666666666666665,
+        "produce_wasted_lb": 880.0,
+        "worst_served_coverage": 0.3148809523809524,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "reason": "1 rules fallback and 4 template fallback decisions alongside 50 LLM decisions; see each run",
+        "collected_by_households_lb": 17.333333333333336,
+        "committed_to_food_banks_lb": 2.6666666666666665,
+        "produce_wasted_lb": 880.0,
+        "worst_served_coverage": 0.3148809523809524,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      }
+    ]
+  },
+  {
+    "scenario_id": "normal-afternoon",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 23.0,
+        "committed_to_food_banks_lb": 627.0,
+        "produce_wasted_lb": 250.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "households_reached": 3,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "reason": null,
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "reason": "25 rules fallback and 0 template fallback decisions alongside 3 LLM decisions; see each run",
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "worst_served_coverage": 0.55,
+        "households_reached": 4,
+        "invalid_commitments": 0
+      }
+    ]
+  }
+]

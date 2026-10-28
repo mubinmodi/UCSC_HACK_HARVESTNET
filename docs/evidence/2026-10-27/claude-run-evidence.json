@@ -1,0 +1,439 @@
+[
+  {
+    "scenario_id": "condition-doubt",
+    "policy_label": "LLM negotiators with real core calculators; fallback sources recorded",
+    "synthetic": true,
+    "event_counts": [
+      {
+        "kind": "draft",
+        "count": 1
+      },
+      {
+        "kind": "move",
+        "count": 15
+      },
+      {
+        "kind": "number_check_failure",
+        "count": 5
+      },
+      {
+        "kind": "policy_provenance",
+        "count": 15
+      },
+      {
+        "kind": "preserved_disagreement",
+        "count": 1
+      }
+    ],
+    "rule_checks": {
+      "zero_invalid_commitments": true,
+      "no_double_booking": true,
+      "pounds_conserved": true,
+      "fair_share_respected": true,
+      "versioned_approvals": true,
+      "no_auto_commit": true,
+      "all_pounds_have_pathway": true,
+      "number_check_failures_counted": true
+    },
+    "metrics": {
+      "collected_by_households_lb": 0.0,
+      "committed_to_food_banks_lb": 0.0,
+      "produce_wasted_lb": 900.0,
+      "uncollected_by_scenario_households_lb": 900.0,
+      "worst_served_coverage": 0.05,
+      "coverage_by_food_bank": {
+        "city": 0.05,
+        "rural": 0.35714285714285715,
+        "eastside": 0.14285714285714285
+      },
+      "households_reached": 0,
+      "pickup_window_match": null,
+      "time_to_commitment_minutes": null,
+      "invalid_commitments": 0,
+      "number_check_failures": 5,
+      "run_status": "completed",
+      "model_calls": 21,
+      "llm_decisions": 15,
+      "fallback_decisions": 0,
+      "template_fallbacks": 0
+    }
+  },
+  {
+    "scenario_id": "cooler-failure",
+    "policy_label": "LLM negotiators with real core calculators; fallback sources recorded",
+    "synthetic": true,
+    "event_counts": [
+      {
+        "kind": "amendment",
+        "count": 9
+      },
+      {
+        "kind": "change_decision",
+        "count": 1
+      },
+      {
+        "kind": "change_proposed",
+        "count": 1
+      },
+      {
+        "kind": "change_refused",
+        "count": 1
+      },
+      {
+        "kind": "cold_produce_held_for_human",
+        "count": 1
+      },
+      {
+        "kind": "commitment",
+        "count": 1
+      },
+      {
+        "kind": "cooler_failure",
+        "count": 1
+      },
+      {
+        "kind": "draft",
+        "count": 1
+      },
+      {
+        "kind": "human_decision",
+        "count": 4
+      },
+      {
+        "kind": "move",
+        "count": 27
+      },
+      {
+        "kind": "number_check_failure",
+        "count": 11
+      },
+      {
+        "kind": "owner_hold",
+        "count": 4
+      },
+      {
+        "kind": "pickup_confirmation",
+        "count": 5
+      },
+      {
+        "kind": "pickup_notice",
+        "count": 7
+      },
+      {
+        "kind": "pickup_released",
+        "count": 1
+      },
+      {
+        "kind": "policy_provenance",
+        "count": 33
+      },
+      {
+        "kind": "template_fallback",
+        "count": 2
+      }
+    ],
+    "rule_checks": {
+      "zero_invalid_commitments": true,
+      "no_double_booking": true,
+      "pounds_conserved": true,
+      "fair_share_respected": true,
+      "versioned_approvals": true,
+      "no_auto_commit": true,
+      "all_pounds_have_pathway": true,
+      "number_check_failures_counted": true,
+      "only_cold_dependent_items_move": true,
+      "failed_cooler_holds_nothing_cold": true,
+      "household_pickups_follow_new_version": true
+    },
+    "metrics": {
+      "collected_by_households_lb": 47.0,
+      "committed_to_food_banks_lb": 35.0,
+      "produce_wasted_lb": 818.0,
+      "uncollected_by_scenario_households_lb": 853.0,
+      "worst_served_coverage": 0.55,
+      "coverage_by_food_bank": {
+        "city": 0.55,
+        "rural": 1.0,
+        "eastside": 0.6666666666666666
+      },
+      "households_reached": 5,
+      "pickup_window_match": 1.0,
+      "time_to_commitment_minutes": 15.0,
+      "invalid_commitments": 0,
+      "number_check_failures": 11,
+      "cooler_failure": {
+        "faults": 1,
+        "handling": "mid_run_workflow_4",
+        "changes_committed": 0,
+        "change_statuses": [
+          "awaiting_approvals"
+        ],
+        "change_refusals": [
+          {
+            "organization_id": "eastside",
+            "at": "2026-10-13T15:45:00-07:00",
+            "reason": "the planned trip time has passed; propose a new version"
+          }
+        ],
+        "pounds_moved": 0.0,
+        "pickups_moved": 0,
+        "pickups_released": 0,
+        "held_for_human_lb": 0.0
+      },
+      "run_status": "partial",
+      "model_calls": 53,
+      "llm_decisions": 33,
+      "fallback_decisions": 0,
+      "template_fallbacks": 2
+    }
+  },
+  {
+    "scenario_id": "more-households-than-produce",
+    "policy_label": "LLM negotiators with real core calculators; fallback sources recorded",
+    "synthetic": true,
+    "event_counts": [
+      {
+        "kind": "amendment",
+        "count": 11
+      },
+      {
+        "kind": "commitment",
+        "count": 1
+      },
+      {
+        "kind": "draft",
+        "count": 1
+      },
+      {
+        "kind": "human_decision",
+        "count": 4
+      },
+      {
+        "kind": "move",
+        "count": 27
+      },
+      {
+        "kind": "number_check_failure",
+        "count": 13
+      },
+      {
+        "kind": "owner_hold",
+        "count": 4
+      },
+      {
+        "kind": "pickup_confirmation",
+        "count": 7
+      },
+      {
+        "kind": "pickup_notice",
+        "count": 8
+      },
+      {
+        "kind": "policy_provenance",
+        "count": 34
+      },
+      {
+        "kind": "template_fallback",
+        "count": 6
+      }
+    ],
+    "rule_checks": {
+      "zero_invalid_commitments": true,
+      "no_double_booking": true,
+      "pounds_conserved": true,
+      "fair_share_respected": true,
+      "versioned_approvals": true,
+      "no_auto_commit": true,
+      "all_pounds_have_pathway": true,
+      "number_check_failures_counted": true
+    },
+    "metrics": {
+      "collected_by_households_lb": 38.0,
+      "committed_to_food_banks_lb": 14.0,
+      "produce_wasted_lb": 0.0,
+      "uncollected_by_scenario_households_lb": 14.0,
+      "worst_served_coverage": 0.55,
+      "coverage_by_food_bank": {
+        "city": 0.55,
+        "rural": 0.7790178571428571,
+        "eastside": 0.6666666666666666
+      },
+      "households_reached": 4,
+      "pickup_window_match": 1.0,
+      "time_to_commitment_minutes": 15.0,
+      "invalid_commitments": 0,
+      "number_check_failures": 13,
+      "run_status": "partial",
+      "model_calls": 60,
+      "llm_decisions": 34,
+      "fallback_decisions": 0,
+      "template_fallbacks": 6
+    }
+  },
+  {
+    "scenario_id": "more-produce-than-storage",
+    "policy_label": "LLM negotiators with real core calculators; fallback sources recorded",
+    "synthetic": true,
+    "event_counts": [
+      {
+        "kind": "amendment",
+        "count": 24
+      },
+      {
+        "kind": "commitment",
+        "count": 1
+      },
+      {
+        "kind": "draft",
+        "count": 1
+      },
+      {
+        "kind": "human_decision",
+        "count": 4
+      },
+      {
+        "kind": "move",
+        "count": 46
+      },
+      {
+        "kind": "number_check_failure",
+        "count": 12
+      },
+      {
+        "kind": "owner_hold",
+        "count": 4
+      },
+      {
+        "kind": "pickup_confirmation",
+        "count": 7
+      },
+      {
+        "kind": "pickup_notice",
+        "count": 12
+      },
+      {
+        "kind": "pickup_released",
+        "count": 2
+      },
+      {
+        "kind": "policy_provenance",
+        "count": 51
+      },
+      {
+        "kind": "template_fallback",
+        "count": 4
+      }
+    ],
+    "rule_checks": {
+      "zero_invalid_commitments": true,
+      "no_double_booking": true,
+      "pounds_conserved": true,
+      "fair_share_respected": true,
+      "versioned_approvals": true,
+      "no_auto_commit": true,
+      "all_pounds_have_pathway": true,
+      "number_check_failures_counted": true
+    },
+    "metrics": {
+      "collected_by_households_lb": 17.333333333333336,
+      "committed_to_food_banks_lb": 2.6666666666666665,
+      "produce_wasted_lb": 880.0,
+      "uncollected_by_scenario_households_lb": 882.6666666666666,
+      "worst_served_coverage": 0.3148809523809524,
+      "coverage_by_food_bank": {
+        "city": 0.3148809523809524,
+        "rural": 0.6458333333333334,
+        "eastside": 0.373015873015873
+      },
+      "households_reached": 4,
+      "pickup_window_match": 1.0,
+      "time_to_commitment_minutes": 15.0,
+      "invalid_commitments": 0,
+      "number_check_failures": 12,
+      "run_status": "partial",
+      "model_calls": 74,
+      "llm_decisions": 50,
+      "fallback_decisions": 1,
+      "template_fallbacks": 4
+    }
+  },
+  {
+    "scenario_id": "normal-afternoon",
+    "policy_label": "LLM negotiators with real core calculators; fallback sources recorded",
+    "synthetic": true,
+    "event_counts": [
+      {
+        "kind": "amendment",
+        "count": 12
+      },
+      {
+        "kind": "commitment",
+        "count": 1
+      },
+      {
+        "kind": "draft",
+        "count": 1
+      },
+      {
+        "kind": "human_decision",
+        "count": 4
+      },
+      {
+        "kind": "move",
+        "count": 28
+      },
+      {
+        "kind": "owner_hold",
+        "count": 4
+      },
+      {
+        "kind": "pickup_confirmation",
+        "count": 4
+      },
+      {
+        "kind": "pickup_notice",
+        "count": 6
+      },
+      {
+        "kind": "pickup_released",
+        "count": 1
+      },
+      {
+        "kind": "policy_provenance",
+        "count": 28
+      }
+    ],
+    "rule_checks": {
+      "zero_invalid_commitments": true,
+      "no_double_booking": true,
+      "pounds_conserved": true,
+      "fair_share_respected": true,
+      "versioned_approvals": true,
+      "no_auto_commit": true,
+      "all_pounds_have_pathway": true,
+      "number_check_failures_counted": true
+    },
+    "metrics": {
+      "collected_by_households_lb": 31.0,
+      "committed_to_food_banks_lb": 869.0,
+      "produce_wasted_lb": 0.0,
+      "uncollected_by_scenario_households_lb": 869.0,
+      "worst_served_coverage": 0.55,
+      "coverage_by_food_bank": {
+        "city": 0.55,
+        "rural": 0.75,
+        "eastside": 0.6666666666666666
+      },
+      "households_reached": 4,
+      "pickup_window_match": 1.0,
+      "time_to_commitment_minutes": 15.0,
+      "invalid_commitments": 0,
+      "number_check_failures": 0,
+      "run_status": "partial",
+      "model_calls": 3,
+      "llm_decisions": 3,
+      "fallback_decisions": 25,
+      "template_fallbacks": 0
+    }
+  }
+]

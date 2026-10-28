@@ -1,0 +1,1343 @@
+[
+  {
+    "scenario_id": "condition-doubt",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "measured": true,
+    "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "uncollected_by_scenario_households_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.35714285714285715,
+          "eastside": 0.14285714285714285
+        },
+        "households_reached": 0,
+        "pickup_window_match": null,
+        "time_to_commitment_minutes": null,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 0.0,
+            "committed_to_food_banks_lb": 0.0,
+            "produce_wasted_lb": 900.0,
+            "uncollected_by_scenario_households_lb": 900.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.35714285714285715,
+              "eastside": 0.14285714285714285
+            },
+            "households_reached": 0,
+            "pickup_window_match": null,
+            "time_to_commitment_minutes": null,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 900.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 0,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "uncollected_by_scenario_households_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.35714285714285715,
+          "eastside": 0.14285714285714285
+        },
+        "households_reached": 0,
+        "pickup_window_match": null,
+        "time_to_commitment_minutes": null,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 0.0,
+            "committed_to_food_banks_lb": 0.0,
+            "produce_wasted_lb": 900.0,
+            "uncollected_by_scenario_households_lb": 900.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.35714285714285715,
+              "eastside": 0.14285714285714285
+            },
+            "households_reached": 0,
+            "pickup_window_match": null,
+            "time_to_commitment_minutes": null,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 900.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 0,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "uncollected_by_scenario_households_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.35714285714285715,
+          "eastside": 0.14285714285714285
+        },
+        "households_reached": 0,
+        "pickup_window_match": null,
+        "time_to_commitment_minutes": null,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 0.0,
+            "committed_to_food_banks_lb": 0.0,
+            "produce_wasted_lb": 900.0,
+            "uncollected_by_scenario_households_lb": 900.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.35714285714285715,
+              "eastside": 0.14285714285714285
+            },
+            "households_reached": 0,
+            "pickup_window_match": null,
+            "time_to_commitment_minutes": null,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 900.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 0,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "llm",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 0.0,
+        "committed_to_food_banks_lb": 0.0,
+        "produce_wasted_lb": 900.0,
+        "uncollected_by_scenario_households_lb": 900.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.35714285714285715,
+          "eastside": 0.14285714285714285
+        },
+        "households_reached": 0,
+        "pickup_window_match": null,
+        "time_to_commitment_minutes": null,
+        "invalid_commitments": 0,
+        "number_check_failures": 5,
+        "runs": [
+          {
+            "collected_by_households_lb": 0.0,
+            "committed_to_food_banks_lb": 0.0,
+            "produce_wasted_lb": 900.0,
+            "uncollected_by_scenario_households_lb": 900.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.35714285714285715,
+              "eastside": 0.14285714285714285
+            },
+            "households_reached": 0,
+            "pickup_window_match": null,
+            "time_to_commitment_minutes": null,
+            "invalid_commitments": 0,
+            "number_check_failures": 5,
+            "run_status": "completed",
+            "model_calls": 21,
+            "llm_decisions": 15,
+            "fallback_decisions": 0,
+            "template_fallbacks": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 900.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 0,
+            "stddev": 0.0
+          }
+        },
+        "model_calls": 21,
+        "llm_decisions": 15,
+        "fallback_decisions": 0,
+        "template_fallbacks": 0
+      }
+    ],
+    "headline": [
+      "produce_wasted_lb",
+      "worst_served_coverage"
+    ],
+    "llm_cost_usd": 0.489863,
+    "llm_cap_spent_usd": 0.489863,
+    "llm_cap_usd": 5.0
+  },
+  {
+    "scenario_id": "cooler-failure",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "measured": true,
+    "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result. The cooler failure is not known to any method before its time; Workflow 4 runs when it happens, and cooler_failure reports what it did.",
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 4.0,
+        "committed_to_food_banks_lb": 446.0,
+        "produce_wasted_lb": 450.0,
+        "uncollected_by_scenario_households_lb": 896.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.5,
+          "eastside": 0.14285714285714285
+        },
+        "households_reached": 1,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 10.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "cooler_failure": {
+          "faults": 1,
+          "handling": "mid_run_workflow_4",
+          "changes_committed": 0,
+          "change_statuses": [
+            "awaiting_approvals"
+          ],
+          "change_refusals": [
+            {
+              "organization_id": "eastside",
+              "at": "2026-10-13T15:45:00-07:00",
+              "reason": "the planned trip time has passed; propose a new version"
+            }
+          ],
+          "pounds_moved": 0.0,
+          "pickups_moved": 0,
+          "pickups_released": 0,
+          "held_for_human_lb": 31.0
+        },
+        "runs": [
+          {
+            "collected_by_households_lb": 4.0,
+            "committed_to_food_banks_lb": 446.0,
+            "produce_wasted_lb": 450.0,
+            "uncollected_by_scenario_households_lb": 896.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.5,
+              "eastside": 0.14285714285714285
+            },
+            "households_reached": 1,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 10.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0,
+            "cooler_failure": {
+              "faults": 1,
+              "handling": "mid_run_workflow_4",
+              "changes_committed": 0,
+              "change_statuses": [
+                "awaiting_approvals"
+              ],
+              "change_refusals": [
+                {
+                  "organization_id": "eastside",
+                  "at": "2026-10-13T15:45:00-07:00",
+                  "reason": "the planned trip time has passed; propose a new version"
+                }
+              ],
+              "pounds_moved": 0.0,
+              "pickups_moved": 0,
+              "pickups_released": 0,
+              "held_for_human_lb": 31.0
+            }
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 450.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 1,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 12.0,
+        "committed_to_food_banks_lb": 688.0,
+        "produce_wasted_lb": 200.0,
+        "uncollected_by_scenario_households_lb": 888.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.5,
+          "eastside": 0.3333333333333333
+        },
+        "households_reached": 2,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "cooler_failure": {
+          "faults": 1,
+          "handling": "mid_run_workflow_4",
+          "changes_committed": 0,
+          "change_statuses": [
+            "awaiting_approvals"
+          ],
+          "change_refusals": [
+            {
+              "organization_id": "eastside",
+              "at": "2026-10-13T15:45:00-07:00",
+              "reason": "the planned trip time has passed; propose a new version"
+            }
+          ],
+          "pounds_moved": 0.0,
+          "pickups_moved": 0,
+          "pickups_released": 0,
+          "held_for_human_lb": 31.0
+        },
+        "runs": [
+          {
+            "collected_by_households_lb": 12.0,
+            "committed_to_food_banks_lb": 688.0,
+            "produce_wasted_lb": 200.0,
+            "uncollected_by_scenario_households_lb": 888.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.5,
+              "eastside": 0.3333333333333333
+            },
+            "households_reached": 2,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0,
+            "cooler_failure": {
+              "faults": 1,
+              "handling": "mid_run_workflow_4",
+              "changes_committed": 0,
+              "change_statuses": [
+                "awaiting_approvals"
+              ],
+              "change_refusals": [
+                {
+                  "organization_id": "eastside",
+                  "at": "2026-10-13T15:45:00-07:00",
+                  "reason": "the planned trip time has passed; propose a new version"
+                }
+              ],
+              "pounds_moved": 0.0,
+              "pickups_moved": 0,
+              "pickups_released": 0,
+              "held_for_human_lb": 31.0
+            }
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 200.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 2,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 12.0,
+        "committed_to_food_banks_lb": 688.0,
+        "produce_wasted_lb": 200.0,
+        "uncollected_by_scenario_households_lb": 888.0,
+        "worst_served_coverage": 0.05,
+        "coverage_by_food_bank": {
+          "city": 0.05,
+          "rural": 0.5,
+          "eastside": 0.3333333333333333
+        },
+        "households_reached": 2,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "cooler_failure": {
+          "faults": 1,
+          "handling": "mid_run_workflow_4",
+          "changes_committed": 0,
+          "change_statuses": [
+            "awaiting_approvals"
+          ],
+          "change_refusals": [
+            {
+              "organization_id": "eastside",
+              "at": "2026-10-13T15:45:00-07:00",
+              "reason": "the planned trip time has passed; propose a new version"
+            }
+          ],
+          "pounds_moved": 0.0,
+          "pickups_moved": 0,
+          "pickups_released": 0,
+          "held_for_human_lb": 31.0
+        },
+        "runs": [
+          {
+            "collected_by_households_lb": 12.0,
+            "committed_to_food_banks_lb": 688.0,
+            "produce_wasted_lb": 200.0,
+            "uncollected_by_scenario_households_lb": 888.0,
+            "worst_served_coverage": 0.05,
+            "coverage_by_food_bank": {
+              "city": 0.05,
+              "rural": 0.5,
+              "eastside": 0.3333333333333333
+            },
+            "households_reached": 2,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0,
+            "cooler_failure": {
+              "faults": 1,
+              "handling": "mid_run_workflow_4",
+              "changes_committed": 0,
+              "change_statuses": [
+                "awaiting_approvals"
+              ],
+              "change_refusals": [
+                {
+                  "organization_id": "eastside",
+                  "at": "2026-10-13T15:45:00-07:00",
+                  "reason": "the planned trip time has passed; propose a new version"
+                }
+              ],
+              "pounds_moved": 0.0,
+              "pickups_moved": 0,
+              "pickups_released": 0,
+              "held_for_human_lb": 31.0
+            }
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 200.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.05,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 2,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "collected_by_households_lb": 47.0,
+        "committed_to_food_banks_lb": 35.0,
+        "produce_wasted_lb": 818.0,
+        "uncollected_by_scenario_households_lb": 853.0,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 1.0,
+          "eastside": 0.6666666666666666
+        },
+        "households_reached": 5,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 11,
+        "cooler_failure": {
+          "faults": 1,
+          "handling": "mid_run_workflow_4",
+          "changes_committed": 0,
+          "change_statuses": [
+            "awaiting_approvals"
+          ],
+          "change_refusals": [
+            {
+              "organization_id": "eastside",
+              "at": "2026-10-13T15:45:00-07:00",
+              "reason": "the planned trip time has passed; propose a new version"
+            }
+          ],
+          "pounds_moved": 0.0,
+          "pickups_moved": 0,
+          "pickups_released": 0,
+          "held_for_human_lb": 0.0
+        },
+        "runs": [
+          {
+            "collected_by_households_lb": 47.0,
+            "committed_to_food_banks_lb": 35.0,
+            "produce_wasted_lb": 818.0,
+            "uncollected_by_scenario_households_lb": 853.0,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 1.0,
+              "eastside": 0.6666666666666666
+            },
+            "households_reached": 5,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 11,
+            "cooler_failure": {
+              "faults": 1,
+              "handling": "mid_run_workflow_4",
+              "changes_committed": 0,
+              "change_statuses": [
+                "awaiting_approvals"
+              ],
+              "change_refusals": [
+                {
+                  "organization_id": "eastside",
+                  "at": "2026-10-13T15:45:00-07:00",
+                  "reason": "the planned trip time has passed; propose a new version"
+                }
+              ],
+              "pounds_moved": 0.0,
+              "pickups_moved": 0,
+              "pickups_released": 0,
+              "held_for_human_lb": 0.0
+            },
+            "run_status": "partial",
+            "model_calls": 53,
+            "llm_decisions": 33,
+            "fallback_decisions": 0,
+            "template_fallbacks": 2
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 818.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 5,
+            "stddev": 0.0
+          }
+        },
+        "model_calls": 53,
+        "llm_decisions": 33,
+        "fallback_decisions": 0,
+        "template_fallbacks": 2,
+        "reason": "0 rules fallback and 2 template fallback decisions alongside 33 LLM decisions; see each run"
+      }
+    ],
+    "headline": [
+      "produce_wasted_lb",
+      "worst_served_coverage"
+    ],
+    "llm_cost_usd": 1.1634646,
+    "llm_cap_spent_usd": 1.6533276,
+    "llm_cap_usd": 5.0
+  },
+  {
+    "scenario_id": "more-households-than-produce",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "measured": true,
+    "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 19.0,
+        "committed_to_food_banks_lb": 33.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 33.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.6071428571428572,
+          "eastside": 0.4761904761904762
+        },
+        "households_reached": 2,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 10.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 19.0,
+            "committed_to_food_banks_lb": 33.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 33.0,
+            "worst_served_coverage": 0.4761904761904762,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.6071428571428572,
+              "eastside": 0.4761904761904762
+            },
+            "households_reached": 2,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 10.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.4761904761904762,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 2,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 19.0,
+        "committed_to_food_banks_lb": 33.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 33.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.6071428571428572,
+          "eastside": 0.4761904761904762
+        },
+        "households_reached": 2,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 10.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 19.0,
+            "committed_to_food_banks_lb": 33.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 33.0,
+            "worst_served_coverage": 0.4761904761904762,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.6071428571428572,
+              "eastside": 0.4761904761904762
+            },
+            "households_reached": 2,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 10.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.4761904761904762,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 2,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 28.666666666666664,
+        "committed_to_food_banks_lb": 23.333333333333336,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 23.333333333333332,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.75,
+          "eastside": 0.6111111111111112
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 28.666666666666664,
+            "committed_to_food_banks_lb": 23.333333333333336,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 23.333333333333332,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.75,
+              "eastside": 0.6111111111111112
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "collected_by_households_lb": 38.0,
+        "committed_to_food_banks_lb": 14.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 14.0,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.7790178571428571,
+          "eastside": 0.6666666666666666
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 13,
+        "runs": [
+          {
+            "collected_by_households_lb": 38.0,
+            "committed_to_food_banks_lb": 14.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 14.0,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.7790178571428571,
+              "eastside": 0.6666666666666666
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 13,
+            "run_status": "partial",
+            "model_calls": 60,
+            "llm_decisions": 34,
+            "fallback_decisions": 0,
+            "template_fallbacks": 6
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        },
+        "model_calls": 60,
+        "llm_decisions": 34,
+        "fallback_decisions": 0,
+        "template_fallbacks": 6,
+        "reason": "0 rules fallback and 6 template fallback decisions alongside 34 LLM decisions; see each run"
+      }
+    ],
+    "headline": [
+      "produce_wasted_lb",
+      "worst_served_coverage"
+    ],
+    "llm_cost_usd": 1.2540390000000001,
+    "llm_cap_spent_usd": 2.9073666,
+    "llm_cap_usd": 5.0
+  },
+  {
+    "scenario_id": "more-produce-than-storage",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "measured": true,
+    "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 12.833333333333332,
+        "committed_to_food_banks_lb": 2.166666666666667,
+        "produce_wasted_lb": 885.0,
+        "uncollected_by_scenario_households_lb": 887.1666666666666,
+        "worst_served_coverage": 0.2619047619047619,
+        "coverage_by_food_bank": {
+          "city": 0.27123015873015877,
+          "rural": 0.6319444444444444,
+          "eastside": 0.2619047619047619
+        },
+        "households_reached": 3,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 10.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 12.833333333333332,
+            "committed_to_food_banks_lb": 2.166666666666667,
+            "produce_wasted_lb": 885.0,
+            "uncollected_by_scenario_households_lb": 887.1666666666666,
+            "worst_served_coverage": 0.2619047619047619,
+            "coverage_by_food_bank": {
+              "city": 0.27123015873015877,
+              "rural": 0.6319444444444444,
+              "eastside": 0.2619047619047619
+            },
+            "households_reached": 3,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 10.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 885.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.2619047619047619,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 3,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 17.11111111111111,
+        "committed_to_food_banks_lb": 2.88888888888889,
+        "produce_wasted_lb": 880.0,
+        "uncollected_by_scenario_households_lb": 882.8888888888889,
+        "worst_served_coverage": 0.2930555555555555,
+        "coverage_by_food_bank": {
+          "city": 0.2930555555555555,
+          "rural": 0.6319444444444444,
+          "eastside": 0.3783068783068783
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 17.11111111111111,
+            "committed_to_food_banks_lb": 2.88888888888889,
+            "produce_wasted_lb": 880.0,
+            "uncollected_by_scenario_households_lb": 882.8888888888889,
+            "worst_served_coverage": 0.2930555555555555,
+            "coverage_by_food_bank": {
+              "city": 0.2930555555555555,
+              "rural": 0.6319444444444444,
+              "eastside": 0.3783068783068783
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 880.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.2930555555555555,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 17.333333333333336,
+        "committed_to_food_banks_lb": 2.6666666666666665,
+        "produce_wasted_lb": 880.0,
+        "uncollected_by_scenario_households_lb": 882.6666666666666,
+        "worst_served_coverage": 0.3148809523809524,
+        "coverage_by_food_bank": {
+          "city": 0.3148809523809524,
+          "rural": 0.6458333333333334,
+          "eastside": 0.373015873015873
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 17.333333333333336,
+            "committed_to_food_banks_lb": 2.6666666666666665,
+            "produce_wasted_lb": 880.0,
+            "uncollected_by_scenario_households_lb": 882.6666666666666,
+            "worst_served_coverage": 0.3148809523809524,
+            "coverage_by_food_bank": {
+              "city": 0.3148809523809524,
+              "rural": 0.6458333333333334,
+              "eastside": 0.373015873015873
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 880.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.3148809523809524,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "collected_by_households_lb": 17.333333333333336,
+        "committed_to_food_banks_lb": 2.6666666666666665,
+        "produce_wasted_lb": 880.0,
+        "uncollected_by_scenario_households_lb": 882.6666666666666,
+        "worst_served_coverage": 0.3148809523809524,
+        "coverage_by_food_bank": {
+          "city": 0.3148809523809524,
+          "rural": 0.6458333333333334,
+          "eastside": 0.373015873015873
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 12,
+        "runs": [
+          {
+            "collected_by_households_lb": 17.333333333333336,
+            "committed_to_food_banks_lb": 2.6666666666666665,
+            "produce_wasted_lb": 880.0,
+            "uncollected_by_scenario_households_lb": 882.6666666666666,
+            "worst_served_coverage": 0.3148809523809524,
+            "coverage_by_food_bank": {
+              "city": 0.3148809523809524,
+              "rural": 0.6458333333333334,
+              "eastside": 0.373015873015873
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 12,
+            "run_status": "partial",
+            "model_calls": 74,
+            "llm_decisions": 50,
+            "fallback_decisions": 1,
+            "template_fallbacks": 4
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 880.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.3148809523809524,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        },
+        "model_calls": 74,
+        "llm_decisions": 50,
+        "fallback_decisions": 1,
+        "template_fallbacks": 4,
+        "reason": "1 rules fallback and 4 template fallback decisions alongside 50 LLM decisions; see each run"
+      }
+    ],
+    "headline": [
+      "produce_wasted_lb",
+      "worst_served_coverage"
+    ],
+    "llm_cost_usd": 1.9521846000000003,
+    "llm_cap_spent_usd": 4.8595512,
+    "llm_cap_usd": 5.0
+  },
+  {
+    "scenario_id": "normal-afternoon",
+    "run_mode": "synthetic",
+    "synthetic": true,
+    "measured": true,
+    "note": "Calculated from labeled scripted fixtures. Every offered pound counts once: collected_by_households_lb, else committed_to_food_banks_lb (committed to a food bank whose held storage and pickup hours let it hand the produce out before its usable time), else produce_wasted_lb (no pathway at the scenario end, including a commitment that spoils before it could be handed out). It is not observed spoilage. uncollected_by_scenario_households_lb is the earlier produce_wasted_lb: everything the scripted households did not collect. worst_served_coverage is the lowest food bank average of each chosen household's share of fair share received, zeros included. LLM not_run is not an LLM result.",
+    "methods": [
+      {
+        "method": "first_come_first_served",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 23.0,
+        "committed_to_food_banks_lb": 627.0,
+        "produce_wasted_lb": 250.0,
+        "uncollected_by_scenario_households_lb": 877.0,
+        "worst_served_coverage": 0.4761904761904762,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.75,
+          "eastside": 0.4761904761904762
+        },
+        "households_reached": 3,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 10.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 23.0,
+            "committed_to_food_banks_lb": 627.0,
+            "produce_wasted_lb": 250.0,
+            "uncollected_by_scenario_households_lb": 877.0,
+            "worst_served_coverage": 0.4761904761904762,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.75,
+              "eastside": 0.4761904761904762
+            },
+            "households_reached": 3,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 10.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 250.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.4761904761904762,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 3,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "nearest_food_bank",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 869.0,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.75,
+          "eastside": 0.6666666666666666
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 31.0,
+            "committed_to_food_banks_lb": 869.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 869.0,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.75,
+              "eastside": 0.6666666666666666
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "rules_based",
+        "status": "completed",
+        "measured": true,
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 869.0,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.75,
+          "eastside": 0.6666666666666666
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 31.0,
+            "committed_to_food_banks_lb": 869.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 869.0,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.75,
+              "eastside": 0.6666666666666666
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        }
+      },
+      {
+        "method": "llm",
+        "status": "partial",
+        "measured": true,
+        "collected_by_households_lb": 31.0,
+        "committed_to_food_banks_lb": 869.0,
+        "produce_wasted_lb": 0.0,
+        "uncollected_by_scenario_households_lb": 869.0,
+        "worst_served_coverage": 0.55,
+        "coverage_by_food_bank": {
+          "city": 0.55,
+          "rural": 0.75,
+          "eastside": 0.6666666666666666
+        },
+        "households_reached": 4,
+        "pickup_window_match": 1.0,
+        "time_to_commitment_minutes": 15.0,
+        "invalid_commitments": 0,
+        "number_check_failures": 0,
+        "runs": [
+          {
+            "collected_by_households_lb": 31.0,
+            "committed_to_food_banks_lb": 869.0,
+            "produce_wasted_lb": 0.0,
+            "uncollected_by_scenario_households_lb": 869.0,
+            "worst_served_coverage": 0.55,
+            "coverage_by_food_bank": {
+              "city": 0.55,
+              "rural": 0.75,
+              "eastside": 0.6666666666666666
+            },
+            "households_reached": 4,
+            "pickup_window_match": 1.0,
+            "time_to_commitment_minutes": 15.0,
+            "invalid_commitments": 0,
+            "number_check_failures": 0,
+            "run_status": "partial",
+            "model_calls": 3,
+            "llm_decisions": 3,
+            "fallback_decisions": 25,
+            "template_fallbacks": 0
+          }
+        ],
+        "variation": {
+          "produce_wasted_lb": {
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "worst_served_coverage": {
+            "mean": 0.55,
+            "stddev": 0.0
+          },
+          "households_reached": {
+            "mean": 4,
+            "stddev": 0.0
+          }
+        },
+        "model_calls": 3,
+        "llm_decisions": 3,
+        "fallback_decisions": 25,
+        "template_fallbacks": 0,
+        "reason": "25 rules fallback and 0 template fallback decisions alongside 3 LLM decisions; see each run"
+      }
+    ],
+    "headline": [
+      "produce_wasted_lb",
+      "worst_served_coverage"
+    ],
+    "llm_cost_usd": 0.04871899999999929,
+    "llm_cap_spent_usd": 4.9082702,
+    "llm_cap_usd": 5.0
+  }
+]

@@ -1,0 +1,1272 @@
+{
+ "entries": [
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012351,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:11:52.028800+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037716,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:11:58.324090+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040011,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:05.679637+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010664,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:08.804261+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.035911,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:15.498224+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.030076,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:21.409624+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008228,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:24.533934+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012141,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:12:27.510283+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.003466,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:12:29.221831+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034776,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:34.145083+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034411,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:39.223980+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.035931,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:44.669248+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.029396,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:50.119881+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008118,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:12:53.221262+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012091,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:12:56.808081+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.003604,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:12:58.789580+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034416,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:03.716167+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034051,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:08.747692+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034911,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:14.133788+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.029636,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:19.664774+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007958,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:22.941770+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011456,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:13:26.219674+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038906,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:32.865120+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.00691,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:35.025086+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009561,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:45.860010+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.016268,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:53.717030+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.0138,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:13:58.058142+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039796,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:04.703999+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.014269,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:08.660922+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010342,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:13.281659+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.006214,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:14.985001+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008726,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:18.584302+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036486,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:24.097777+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011972,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:29.604601+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01075,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:35.888029+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011922,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:39.975568+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.025701,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:43.675181+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017693,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:14:48.960913+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.006931,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:14:51.763916+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041761,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:14:57.897801+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039481,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:04.366194+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009975,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:07.331809+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010569,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:10.904514+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037141,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:15.887287+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012438,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:20.015350+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.029636,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:24.533756+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.020643,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:15:31.157963+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041976,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:38.348124+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008862,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:41.655670+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01341,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:48.895761+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040011,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:15:54.830942+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.043846,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:03.857952+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008699,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:06.376305+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010727,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:10.520350+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.018407,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:20.331228+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.027626,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:24.132970+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017688,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:16:29.021236+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040141,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:34.785575+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008881,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:38.252911+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.006539,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:41.893968+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007561,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:45.092916+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040576,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:51.101228+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038991,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:16:57.203149+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.028396,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:01.821228+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017101,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:17:06.761412+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.004627,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:17:08.970667+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041471,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:14.910564+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009297,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:18.153032+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044491,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:26.852377+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044456,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:34.443164+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.027866,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:39.057961+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019186,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:17:44.619699+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040816,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:50.280911+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012468,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:17:54.741757+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011496,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:17:57.230163+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037586,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:03.183673+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.00658,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:05.126486+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008428,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:09.152592+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038686,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:15.216629+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012776,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:19.769848+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.014514,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:26.462714+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012621,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:30.237780+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039151,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:36.798162+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012991,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:40.992640+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.033636,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:18:47.951615+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.018866,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:18:54.049752+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041666,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:00.943833+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01357,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:05.456955+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.045171,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:15.076441+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.015143,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:19.988248+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.016776,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:28.846828+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007568,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:31.586358+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010392,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:36.856993+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036981,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:42.184555+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.013272,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:46.694738+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009805,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:53.831612+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012512,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:19:57.875895+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.033521,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:05.327381+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019378,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:20:11.171529+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040671,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:17.640418+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008867,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:21.268494+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01225,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:27.668774+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044786,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:35.508344+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012519,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:39.731750+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.014427,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:47.684372+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012314,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:51.680695+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037596,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:20:56.587125+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.031151,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:01.633397+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008625,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:05.390911+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010218,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:11.081283+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008565,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:14.926288+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017843,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:21:19.100704+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039486,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:25.038205+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009255,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:28.375329+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011305,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:32.387671+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010428,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:37.290384+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008585,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:40.003087+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.004419,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:41.871856+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009427,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:45.735566+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036626,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:50.426250+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.00929,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:21:54.646139+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038806,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:00.642606+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.027341,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:03.761994+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007399,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:07.474638+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017538,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:22:12.431501+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037506,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:15.809846+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.009134,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:20.276581+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036901,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:23.979296+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012651,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:29.410628+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.043031,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:36.838098+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.027151,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:40.356762+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007221,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:43.596435+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.018653,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:22:49.216093+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.048971,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:22:57.504183+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011425,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:22:59.660676+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037266,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:05.627016+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01198,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:09.355200+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017348,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:17.809484+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.01402,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:21.972325+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037436,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:27.908877+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012982,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:32.106169+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038616,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:38.395074+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012624,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:42.811386+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.034311,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:23:49.120798+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019796,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:23:55.777754+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007193,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:23:58.839954+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041471,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:04.392101+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.013116,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:09.323443+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039241,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:15.720672+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.012905,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:19.855233+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040186,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:25.590547+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011984,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:29.060190+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011067,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:32.399214+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037486,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:40.077154+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.021576,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:24:47.355543+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039631,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:51.792476+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.00838,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:54.421588+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011183,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:24:59.370766+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.048496,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:08.633832+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039906,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:14.334959+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.035086,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:20.843800+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.020406,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:25:26.708163+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.040621,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:31.523920+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010413,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:35.515694+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011425,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:39.521473+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.043756,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:46.712041+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044476,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:25:53.139675+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036241,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:00.516450+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019425,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:26:05.849361+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.045071,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:12.886176+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.048036,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:21.983056+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.014167,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:25.883676+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019235,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:35.721792+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.016022,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:40.366340+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041211,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:46.255788+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.037251,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:26:53.306313+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019966,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:26:58.716644+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.042656,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:04.466895+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.043891,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:12.821217+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.007864,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:15.456404+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010688,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:19.463267+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.013677,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:26.548232+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008274,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:29.076609+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.00561,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:32.003255+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011542,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:36.238470+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.039806,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:41.270589+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010655,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:45.033657+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.033456,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:27:51.655942+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019233,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:27:57.140184+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041156,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:02.523809+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044091,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:10.684191+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.008709,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:13.634674+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.005583,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:16.029311+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.010409,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:19.922696+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.016762,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:28.335589+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.013854,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:35.133745+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.038601,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:40.895355+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.036621,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:48.430227+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019065,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:28:53.673454+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041961,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:28:58.870889+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.041066,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:04.761758+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.044261,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:11.977923+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.032961,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:17.329466+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017621,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:29:22.469821+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.048376,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:30.921355+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.043776,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:38.042439+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.046441,
+   "model": "claude-opus-5-5",
+   "time": "2026-10-28T04:29:47.798830+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019083,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:29:53.790696+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.011496,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:29:56.191627+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.019276,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:30:02.515263+00:00"
+  },
+  {
+   "caller": "evaluation",
+   "cost_usd": 0.017948,
+   "model": "claude-sonnet-5-5",
+   "time": "2026-10-28T04:30:06.871116+00:00"
+  }
+ ],
+ "pending": {},
+ "version": 1
+}
