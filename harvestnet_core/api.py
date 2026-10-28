@@ -134,8 +134,11 @@ def match_route(template, segments):
 
 class API:
     def __init__(self, engine, *, clock=None, staff_tokens=None, extractor=None, voice_rate_limit=VOICE_RATE_LIMIT, monotonic=time.monotonic,
-                 household_page_url=None, approvals_token=None):
+                 household_page_url=None, approvals_token=None, move_provider=None):
         self.engine=engine
+        # Where live moves come from: None runs each owner's rules negotiator in the core; the
+        # server's A2A provider asks each organization's own host (harvestnet_core.move_transport).
+        self.move_provider=move_provider
         self.records=engine.records
         self.clock=clock or (lambda: datetime.now(timezone.utc).isoformat())
         self.tokens=staff_tokens or {}
@@ -194,7 +197,7 @@ class API:
                     self.records.event(lot['draft']['lot_id'],self.engine.now,'deadline_unclaimed',{'reason':lot['stop_reason']})
         reopened=[lot['draft']['lot_id'] for lot in self.records.all('lot') if lot['status']=='awaiting_approvals' and self.engine.protocol.expire_holds(lot['draft']['lot_id'],self.engine.now)]
         for lot_id in reopened:
-            negotiate_pending(self.engine,lot_id)
+            negotiate_pending(self.engine,lot_id,self.move_provider)
         with self.records.transaction():
             for r in self.records.all("request"):
                 if dt(r["expires_at"])>dt(self.engine.now):
@@ -402,6 +405,34 @@ class API:
             return None,f"No suggestion yet: your negotiator could not review this version ({exc})"
         return SUGGESTED.get(move.kind),move.reason
 
+    def moves_with_source(self, lot_id):
+        """Every recorded move on a lot, in order, with the transport that produced it: ``a2a``
+        (the organization's own host), ``in_process_fallback`` (with the reason its host could not
+        answer), ``in_process_template``, ``staff_counter``, or ``in_process`` when the core ran
+        the owner's negotiator itself (and for moves recorded before sources were kept)."""
+        out,source=[],None
+        for e in self.records.events(lot_id):
+            if e['kind']=='move_source':
+                source=e['data']
+            elif e['kind']=='move':
+                m=e['data']
+                s=source if source and source['organization_id']==m['organization_id'] and source['version']==m['version'] else {'move_source':'in_process'}
+                out.append({"organization_id":m['organization_id'],"version":m['version'],"action":m['action'],"move_source":s['move_source'],
+                            **{k:s[k] for k in ('transport','reason') if s.get(k)}})
+                source=None
+        return out
+
+    def move_sources(self, lot_id, owner):
+        """For a dashboard: how many of the lot's moves each transport produced, and the reason for
+        each of this organization's own moves that fell back to the core."""
+        moves=self.moves_with_source(lot_id)
+        counts={}
+        for m in moves:
+            counts[m['move_source']]=counts.get(m['move_source'],0)+1
+        return {"move_sources":counts,
+                "our_fallbacks":[{"version":m['version'],"action":m['action'],"reason":m.get('reason')} for m in moves
+                                 if m['organization_id']==owner and m['move_source']=='in_process_fallback']}
+
     def disagreement_view(self, lot):
         """A preserved disagreement as the involved dashboards show it (design section 8): why the
         rounds stopped, the plans that were on the table, and each organization's last reason.
@@ -421,7 +452,9 @@ class API:
                 continue
             seen.add(key)
             options.append({"version":v['version'],"proposer_id":v['proposer_id'],"reason":v['reason'],"allocations":plan})
-        return {"reason":reason,"options":options,"reasons":[{"organization_id":o,"version":m['version'],"action":m['action'],"reason":m['reason']} for o,m in last.items()]}
+        # Each organization's last move was the last one recorded for it, so its source is too.
+        sources={m['organization_id']:m['move_source'] for m in self.moves_with_source(lot['draft']['lot_id'])}
+        return {"reason":reason,"options":options,"reasons":[{"organization_id":o,"version":m['version'],"action":m['action'],"reason":m['reason'],"move_source":sources.get(o)} for o,m in last.items()]}
 
     def awaiting_decision(self, lot, owner):
         """Whether ``owner`` has an open approval request on this lot: its current version awaits
@@ -644,7 +677,7 @@ class API:
             # This offer's drop-off only; the donor's recorded drop-off stays as it is.
             offer['drop_off']=self.drop_off(body['drop_off'])
         draft=self.engine.create_offer(offer)
-        negotiate_pending(self.engine,offer['lot_id'])
+        negotiate_pending(self.engine,offer['lot_id'],self.move_provider)
         return 201,{"lot_id":offer['lot_id'],"version":1,"status":"offered","items":[{"produce_id":item['produce_id'],"name":calc.profiles.get(item['produce_id']).name,"pounds":item['pounds'],"usable_until":item['usable_until'],"usable_until_basis":basis[item['produce_id']]} for item in draft['items']],"needs_human":[item['produce_id'] for item in draft['items'] if item.get('condition_doubt')],"message":"Nothing is promised until every named organization approves."}
 
     def op_get_lot(self, call):
@@ -656,7 +689,13 @@ class API:
     def op_list_lot_versions(self, call):
         lot_id=call.params['lot_id']
         lot=self.records.get('lot',lot_id)
-        return 200,{"lot_id":lot_id,"versions":[{"version":version['version'],"proposer_id":version['proposer_id'],"move":"counter" if version['version']>1 else "offer","reason":version['reason'],"change":next((event['data']['amendment'] for event in self.records.events(lot_id) if event['kind']=='amendment' and event['data']['draft']['version']==version['version']),None)} for version in lot['versions']],"current_version":lot['draft']['version']}
+        # Public: which transport made each move, without a fallback's error text (the staff
+        # dashboard and the server log carry that).
+        moves=[{k:v for k,v in m.items() if k!='reason'} for m in self.moves_with_source(lot_id)]
+        # The counter that made each version, and which transport produced it (None for the offer
+        # and for a version that was not a move, such as a condition check).
+        made_by={(m['organization_id'],m['version']+1):m['move_source'] for m in moves if m['action']=='counter'}
+        return 200,{"lot_id":lot_id,"versions":[{"version":version['version'],"proposer_id":version['proposer_id'],"move":"counter" if version['version']>1 else "offer","reason":version['reason'],"change":next((event['data']['amendment'] for event in self.records.events(lot_id) if event['kind']=='amendment' and event['data']['draft']['version']==version['version']),None),"move_source":made_by.get((version['proposer_id'],version['version']))} for version in lot['versions']],"current_version":lot['draft']['version'],"moves":moves}
 
     def op_submit_counter(self, call):
         lot_id,body=call.params['lot_id'],call.body
@@ -673,7 +712,7 @@ class API:
             parse_draft(draft).amend(amendment_from_dict(body['amendment']),proposer_id=body['organization_id'],reason=body['reason'])
             move={"organization_id":body['organization_id'],"version":body['version'],"action":"counter","amendment":body['amendment'],"reason":body['reason']}
             self.records.put('queued_move',lot_id+':'+body['organization_id'],{"lot_id":lot_id,**move})
-        negotiate_pending(self.engine,lot_id)
+        negotiate_pending(self.engine,lot_id,self.move_provider)
         return 202,{"lot_id":lot_id,"status":"queued_for_turn","based_on_version":draft['version'],"move":move,"message":"Counter queued for your organization's next turn."}
 
     # Proposed (#1 pending): a condition check, and a food bank's holding and changed version after a disruption.
@@ -683,7 +722,7 @@ class API:
         self.records.get('lot',lot_id)
         self.authorize(body['organization_id'],call.token)
         updated=self.engine.protocol.condition_check(lot_id,body['version'],body['organization_id'],body['produce_id'],body['condition_grade'],body['usable_until'],body['reason'],self.engine.now)
-        negotiate_pending(self.engine,lot_id)
+        negotiate_pending(self.engine,lot_id,self.move_provider)
         return 200,{'lot_id':lot_id,'version':updated['version'],'status':'condition_recorded','committed':False}
 
     def op_get_holding(self, call):
@@ -733,7 +772,7 @@ class API:
         reason=result.get('returned_to_negotiation')
         if reason and self.records.get('lot',body['lot_id'])['status']=='negotiating':
             # A decline or an expired hold: the owners' next turns run (design section 8).
-            negotiate_pending(self.engine,body['lot_id'])
+            negotiate_pending(self.engine,body['lot_id'],self.move_provider)
         return 200,{**receipt,"receipt_id":body.get('receipt_id'),"status":"returned_to_negotiation" if reason else "approval_recorded","committed":result['committed'],"approved_by":result['approved_by'],"awaiting_approval_from":result['waiting_for'],**({"returned_to_negotiation":reason} if reason else {})}
 
     # Food banks
@@ -769,7 +808,7 @@ class API:
             if not allocations: continue
             transport=next((t for t in draft['transports'] if t['food_bank_id']==bank_id),None)
             suggests,why=self.suggestion(lot,bank_id)
-            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":self.awaiting_decision(lot,bank_id),"can_counter":lot['status'] in ('awaiting_approvals','negotiating')})
+            incoming.append({"lot_id":draft['lot_id'],"version":draft['version'],"donor_id":draft['donor_id'],"donor_name":self.engine.names[draft['donor_id']],"for_us":[{"produce_id":a['produce_id'],"name":calc.profiles.get(a['produce_id']).name,"pounds":a['pounds']} for a in allocations],"transport":transport,"agent_suggests":suggests,"agent_reason":why,"needs_your_approval":self.awaiting_decision(lot,bank_id),"can_counter":lot['status'] in ('awaiting_approvals','negotiating'),**self.move_sources(draft['lot_id'],bank_id)})
             if transport: arrivals.append({"lot_id":draft['lot_id'],"version":draft['version'],"arrives_at":transport['arrives_at'],"items":allocations,"status":lot['status']})
             if lot.get('stop_reason') and lot['status']!='preserved_disagreement': disagreements.append({"lot_id":draft['lot_id'],"reason":lot['stop_reason']})
         return 200,{"food_bank_id":bank_id,"name":self.engine.names[bank_id],"capacity":{field:bank.get(field) for field in ('storage','pickup_windows','truck','cooler')},"incoming_offers":incoming,"fair_share_gap":self.engine.demand(bank_id),"disagreements":disagreements,"expected_arrivals":arrivals,"disruptions":changes.summaries(self.records,bank_id)}

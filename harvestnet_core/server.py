@@ -59,11 +59,14 @@ if __name__=='__main__':
     if email_enabled and not page_url:
         raise ValueError('HARVESTNET_HOUSEHOLD_URL is required for email notices')
     from .voice import extractor_from_env
+    from .move_transport import provider_from_env
     # Voice intake: a Claude extractor under a hard spending cap only when a key and a cap are set; else the API answers 503.
     api=API(engine,staff_tokens=json.loads(os.environ.get('HARVESTNET_STAFF_TOKENS','{}')),
             household_page_url=page_url,extractor=extractor_from_env(),
             # The approval bridge's decision-only credential; it is not a staff token.
-            approvals_token=os.environ.get('HARVESTNET_APPROVALS_TOKEN') or None)
+            approvals_token=os.environ.get('HARVESTNET_APPROVALS_TOKEN') or None,
+            # HARVESTNET_MOVE_TRANSPORT=a2a: each organization's move comes from its own host over signed A2A.
+            move_provider=provider_from_env(engine))
     if email_enabled:
         allowed=os.environ.get('SES_TEST_RECIPIENTS','')
         dispatcher=EmailDispatcher(api,pickup_webhook=pickup_webhook,release_webhook=release_webhook,

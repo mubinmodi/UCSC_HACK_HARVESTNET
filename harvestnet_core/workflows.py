@@ -33,6 +33,64 @@ def checked_move(engine,lot_id,org,move,pool,reask,fallback):
     return move
 
 
+def record_provenance(engine,lot_id,org,provider,**extra):
+    """What a move provider reports about the move it just made (``pop_metadata``: where it came
+    from, an LLM's calls and cost), recorded after every call so a re-ask keeps both. Number check
+    failures it reports are added to the lot's count. Returns the metadata, or ``None``."""
+    if not (provider and hasattr(provider,'pop_metadata')):
+        return None
+    metadata=provider.pop_metadata()
+    if metadata:
+        # The host's calculator calls are re-run (replay_calculations), not kept in the records.
+        recorded={k:v for k,v in metadata.items() if k!='calculator_calls'}
+        engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**recorded,**extra})
+        count=metadata.get('number_check_failures',0)
+        if count:
+            engine.records.event(lot_id,engine.now,'number_check_failure',{'count':count,'organization_id':org,'problems':['reported by validated LLM policy']})
+            with engine.records.transaction():
+                current=engine.records.get('lot',lot_id)
+                current['number_check_failures']=current.get('number_check_failures',0)+count
+                engine.records.put('lot',lot_id,current)
+    return metadata
+
+
+def replay_calculations(engine,typed,pool,calls):
+    """Re-run, with the core's own calculators, the calculations a host named for its move
+    (``calculator_calls``, in the LLM negotiators' calculator tool shape), so the outgoing-message
+    number check sees the calculator results it would see in process. The results are the core's,
+    never the host's: each call's numbers and times must already be in the pool (the draft, the
+    facts, the precomputed results or an earlier call), as for a Claude negotiator's own tool calls,
+    and a call that fails that check or the calculator adds nothing."""
+    from types import SimpleNamespace
+    from harvestnet_agents.llm_negotiators import LLMNegotiator,_check_tool_inputs
+    tools=SimpleNamespace(calculators=engine.calc)  # LLMNegotiator._call reads only its calculators
+    for call in calls or ():
+        try:
+            _check_tool_inputs(call['name'],call['args'],pool)
+            result=LLMNegotiator._call(tools,call['name'],call['args'],typed)
+        except (ValueError,KeyError,TypeError,AttributeError):
+            continue
+        pool.add(result)
+
+
+def move_source(org,move,provided,queued):
+    """Which transport produced the move about to be recorded (the ``move_source`` event before
+    each live ``move``): ``a2a`` (the organization's own host), ``in_process_fallback`` (its host
+    could not answer, with the reason), ``in_process_template`` (two failed number checks),
+    ``staff_counter`` (the organization's staff queued it) or ``in_process`` (no provider)."""
+    last=provided[-1] if provided else None
+    if queued:
+        source={'move_source':'staff_counter'}
+    elif move.get('reason')==TEMPLATE_REASON:
+        source={'move_source':'in_process_template'}
+    elif last:
+        source={k:last[k] for k in ('move_source','transport','reason') if last.get(k) is not None}
+        source.setdefault('move_source','provider')
+    else:
+        source={'move_source':'in_process'}
+    return {'organization_id':org,'version':move['version'],'action':move['action'],**source}
+
+
 def declined_by(lot):
     """Organizations whose human declined the lot's current version (approvals reset with each new version)."""
     return sorted(o for o,r in lot['approvals'].items() if r['decision']=='decline')
@@ -88,8 +146,15 @@ def negotiate_pending(engine,lot_id,provider=None):
         from harvestnet_agents.llm_negotiators import NumberPool,precompute
         pool=NumberPool();pool.add(typed);call_start=len(engine.calc.calls)
         pool.add(precompute(role,typed,engine.calc))
+        provided=[]
         def ask():
-            return provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session}) if provider else engine.rules_for(role,org).move(typed).to_dict()
+            if not provider:
+                return engine.rules_for(role,org).move(typed).to_dict()
+            asked=provider(org,{**raw,'turn':org,'turn_context':raw['turn'],'policy_session':engine.policy_session})
+            # Where it came from: the organization's own host over A2A, or the labeled fallback.
+            provided.append(record_provenance(engine,lot_id,org,provider))
+            replay_calculations(engine,typed,pool,(provided[-1] or {}).get('calculator_calls'))
+            return asked
         move=ask()
         for call in engine.calc.calls[call_start:]: pool.add(call.result)
         move=checked_move(engine,lot_id,org,move,pool,ask,lambda:engine.rules_for(role,org).move(typed).to_dict())
@@ -106,6 +171,7 @@ def negotiate_pending(engine,lot_id,provider=None):
             raise ValueError('owner move does not match published turn')
         if org=='advocate' and move['action'] not in ('counter','pass'):
             raise ValueError('advocate cannot vote')
+        engine.records.event(lot_id,engine.now,'move_source',move_source(org,move,provided,queued and queued['version']==d['version']))
         engine.records.event(lot_id,engine.now,'move',move)
         if move['action']=='counter':
             updated=engine.protocol.amend(lot_id,d['version'],org,move['amendment'],move['reason'],engine.now)

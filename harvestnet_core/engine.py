@@ -327,18 +327,10 @@ def run_fixture(fixture, move_provider=None, *, records=None, calculators=None, 
                 move=engine.rules_for(role,org).move(typed).to_dict()
             def record_provenance(**extra):
                 # Runs after every provider call, so a re-ask keeps both calls' cost and counts.
-                if not (move_provider and hasattr(move_provider,'pop_metadata')):
-                    return
-                metadata=move_provider.pop_metadata()
-                if metadata:
-                    engine.records.event(lot_id,engine.now,'policy_provenance',{'organization_id':org,**metadata,**extra})
-                    count=metadata.get('number_check_failures',0)
-                    if count:
-                        engine.records.event(lot_id,engine.now,'number_check_failure',{'count':count,'organization_id':org,'problems':['reported by validated LLM policy']})
-                        with engine.records.transaction():
-                            current=engine.records.get('lot',lot_id)
-                            current['number_check_failures']=current.get('number_check_failures',0)+count
-                            engine.records.put('lot',lot_id,current)
+                # A host's named calculations are re-run with the core's calculators for the number check.
+                from .workflows import record_provenance as record_move_provenance, replay_calculations
+                metadata=record_move_provenance(engine,lot_id,org,move_provider,**extra)
+                replay_calculations(engine,typed,pool,(metadata or {}).get('calculator_calls'))
             record_provenance()
             if queued:
                 with engine.records.transaction():

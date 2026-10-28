@@ -6,6 +6,13 @@
 # anyone else. Generate a local set (never commit it) with
 #   python -m harvestnet_platform.transport_auth --output runtime/transport.env
 # On AWS, deploy/load_secrets.py derives the same variables from the secret's TRANSPORT_KEYS.
+#
+# Each host makes its own organization's moves: the core sends it a signed move request for
+# that organization's turn, and the host signs its reply with its own TRANSPORT_SIGNING_KEY
+# (harvestnet_platform/moves.py). HARVESTNET_ORG_HOST picks the host module, with the same
+# arguments: harvestnet_platform.transport (the default, a small A2A JSON-RPC host) or
+# harvestnet_platform.agntcy_server (the native AGNTCY App SDK host; its image needs the SDK,
+# requirements-agntcy.txt).
 x-agent: &agent
   build:
     context: .
@@ -22,7 +29,7 @@ services:
   # the organization it hosts is `market` (docs/contracts/README.md decision 1).
   donor:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, market, --host, 0.0.0.0]
+    command: [python, -m, '${HARVESTNET_ORG_HOST:-harvestnet_platform.transport}', --organization, market, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://donor:8020
@@ -31,7 +38,7 @@ services:
     volumes: [donor-data:/app/runtime]
   city:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, city, --host, 0.0.0.0]
+    command: [python, -m, '${HARVESTNET_ORG_HOST:-harvestnet_platform.transport}', --organization, city, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://city:8020
@@ -40,7 +47,7 @@ services:
     volumes: [city-data:/app/runtime]
   rural:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, rural, --host, 0.0.0.0]
+    command: [python, -m, '${HARVESTNET_ORG_HOST:-harvestnet_platform.transport}', --organization, rural, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://rural:8020
@@ -49,7 +56,7 @@ services:
     volumes: [rural-data:/app/runtime]
   eastside:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, eastside, --host, 0.0.0.0]
+    command: [python, -m, '${HARVESTNET_ORG_HOST:-harvestnet_platform.transport}', --organization, eastside, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://eastside:8020
@@ -58,7 +65,7 @@ services:
     volumes: [eastside-data:/app/runtime]
   advocate:
     <<: *agent
-    command: [python, -m, harvestnet_platform.transport, --organization, advocate, --host, 0.0.0.0]
+    command: [python, -m, '${HARVESTNET_ORG_HOST:-harvestnet_platform.transport}', --organization, advocate, --host, 0.0.0.0]
     environment:
       <<: *agent-env
       AGENT_PUBLIC_URL: http://advocate:8020

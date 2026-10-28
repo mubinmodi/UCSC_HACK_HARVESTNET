@@ -320,6 +320,12 @@ class AwsDryRun(unittest.TestCase):
         self.assertIn("TRANSPORT_VERIFY_KEYS_RURAL='", content)
         self.assertIn("TRANSPORT_SIGNING_KEY_CORE='SENTINEL-existing-transport-core-key-000000000000'", content)
         self.assertNotIn('TRANSPORT_TOKEN=', content)
+        # The move transport and host module are choices, not free text (a module name is run).
+        self.assertIn("HARVESTNET_ORG_HOST='harvestnet_platform.agntcy_server'",
+                      loader.env_file({**merged, 'HARVESTNET_ORG_HOST': 'harvestnet_platform.agntcy_server'}))
+        for key, bad in (('HARVESTNET_ORG_HOST', 'os'), ('HARVESTNET_MOVE_TRANSPORT', 'sometimes')):
+            with self.assertRaises(ValueError):
+                loader.env_file({**merged, key: bad})
 
     def test_teardown_dry_run_lists_deletes_and_the_public_skeleton_by_default(self):
         result, calls = self.run_script('existing', 'deploy/aws/teardown.sh', '--dry-run')
@@ -368,6 +374,43 @@ class AwsComposeConfig(unittest.TestCase):
         for name, service in services.items():
             if name != 'gateway':
                 self.assertNotIn('ports', service, f'{name} must stay private')
+
+    def config(self, **extra):
+        from deploy_env import compose_env
+        result = subprocess.run(['docker', 'compose', '-p', 'harvestnet', '-f', 'compose.platform.yaml',
+                                 '-f', 'deploy/aws/compose.aws.yaml', 'config', '--format', 'json'],
+                                capture_output=True, text=True, cwd=ROOT, env=compose_env(**extra))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)['services']
+
+    def test_live_moves_come_from_each_organizations_own_host_over_a2a(self):
+        from deploy_env import compose_env
+        env = compose_env()
+        services = self.config()
+        core = services['core']['environment']
+        self.assertEqual(core['HARVESTNET_MOVE_TRANSPORT'], 'a2a')
+        self.assertEqual(json.loads(core['AGENT_ENDPOINTS']),
+                         {'market': 'http://donor:8020', 'city': 'http://city:8020', 'rural': 'http://rural:8020',
+                          'eastside': 'http://eastside:8020', 'advocate': 'http://advocate:8020'})
+        # The core signs as `core` and checks replies with only the keys derived for it.
+        self.assertEqual(core['TRANSPORT_SENDER'], 'core')
+        self.assertEqual(core['TRANSPORT_SIGNING_KEY'], env['TRANSPORT_SIGNING_KEY_CORE'])
+        self.assertEqual(core['TRANSPORT_VERIFY_KEYS'], env['TRANSPORT_VERIFY_KEYS_CORE'])
+        self.assertIn('platform', services['core']['networks'])
+        for host, org in (('donor', 'market'), ('city', 'city'), ('advocate', 'advocate')):
+            self.assertEqual(services[host]['command'], ['python', '-m', 'harvestnet_platform.transport', '--organization', org, '--host', '0.0.0.0'])
+            # Each host signs its own replies with its own key only.
+            self.assertEqual(services[host]['environment']['TRANSPORT_SIGNING_KEY'], env[f'TRANSPORT_SIGNING_KEY_{org.upper()}'])
+        # The secret may choose the native AGNTCY host (same arguments) or in-process moves.
+        native = self.config(HARVESTNET_ORG_HOST='harvestnet_platform.agntcy_server', HARVESTNET_MOVE_TRANSPORT='in_process')
+        self.assertEqual(native['city']['command'][:3], ['python', '-m', 'harvestnet_platform.agntcy_server'])
+        self.assertEqual(native['core']['environment']['HARVESTNET_MOVE_TRANSPORT'], 'in_process')
+        # Without the core's own transport keys the stack does not start.
+        result = subprocess.run(['docker', 'compose', '-p', 'harvestnet', '-f', 'compose.platform.yaml', '-f',
+                                 'deploy/aws/compose.aws.yaml', 'config', '--quiet'], capture_output=True, text=True, cwd=ROOT,
+                                env={k: v for k, v in compose_env().items() if k != 'TRANSPORT_VERIFY_KEYS_CORE'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TRANSPORT_VERIFY_KEYS_CORE', result.stderr)
 
 
 if __name__ == '__main__':

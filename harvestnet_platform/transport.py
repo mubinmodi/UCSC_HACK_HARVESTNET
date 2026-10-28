@@ -11,7 +11,7 @@ import threading
 import uuid
 from pathlib import Path
 from .http import JsonHandler, request_json, seconds, serve
-from .transport_auth import AuthError, Signer, Verifier
+from .transport_auth import TURN_PUBLISHER, AuthError, Signer, Verifier
 
 from .roster import BANKS, ORGANIZATIONS, ROLES  # the one roster; re-exported for callers of this module
 ACTIONS = {'accept', 'counter', 'reject', 'request_hold', 'ask_human', 'pass'}
@@ -20,6 +20,12 @@ AMENDMENTS = {'set_pounds': ('produce_id', 'food_bank_id', 'pounds'),
               'shift_pounds': ('produce_id', 'from_food_bank_id', 'to_food_bank_id', 'pounds'),
               'set_transport': ('food_bank_id', 'mover', 'departs_at', 'arrives_at')}
 HOLD_RESOURCES = {'lot', 'drop_off', 'storage_cold', 'storage_dry', 'truck'}
+# A move request asks one organization, the one whose turn it is, for its own move. Its signed
+# reply is a ``move_reply`` from that organization to the turn publisher (``answer``).
+MOVE_REQUEST, MOVE_REPLY = 'move_request', 'move_reply'
+# What a policy may report about its own move (an LLM policy's source, calls and cost).
+POLICY_METADATA = {'source': str, 'model_calls': int, 'number_check_failures': int, 'cost_usd': (int, float),
+                   'fallback_reason': (str, type(None))}
 
 
 def role_of(organization):
@@ -125,11 +131,44 @@ def load_policy(spec):
     return function, label
 
 
+def known_policy_metadata(metadata):
+    """Only the known fields of a policy's report about its move, each of its expected type."""
+    if not isinstance(metadata, dict):
+        return None
+    return {key: value for key, value in metadata.items()
+            if key in POLICY_METADATA and isinstance(value, POLICY_METADATA[key]) and type(value) is not bool}
+
+
+def policy_metadata(policy):
+    """What the policy reports about its last move (``pop_metadata``), limited to known fields."""
+    pop = getattr(policy, 'pop_metadata', None)
+    return known_policy_metadata(pop() if callable(pop) else None)
+
+
+MAX_CALCULATOR_CALLS = 500
+
+
+def calculator_calls(calls):
+    """A policy's calculator calls for its move, as ``[{name, args}]``, or ``None`` if malformed.
+    They name calculations only; the core re-runs each with its own calculators."""
+    if not isinstance(calls, list) or len(calls) > MAX_CALCULATOR_CALLS or not all(
+            isinstance(c, dict) and set(c) == {'name', 'args'} and isinstance(c['name'], str) and isinstance(c['args'], dict)
+            for c in calls):
+        return None
+    return copy.deepcopy(calls)
+
+
+def policy_calculator_calls(policy):
+    pop = getattr(policy, 'pop_calculator_calls', None)
+    return calculator_calls(pop() if callable(pop) else None)
+
+
 class Receiver:
-    def __init__(self, organization, policy=stand_in, db_path=':memory:'):
+    def __init__(self, organization, policy=stand_in, db_path=':memory:', policy_label=None):
         if organization not in ORGANIZATIONS:
             raise ValueError('Unknown organization')
         self.organization, self.policy = organization, policy
+        self.policy_label = policy_label or ('synthetic_stand_in' if policy is stand_in else 'real_policy_adapter')
         self.lock = threading.RLock()
         if db_path != ':memory:':
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -145,6 +184,11 @@ class Receiver:
         agent_input = envelope.get('input', {})
         if not isinstance(event, str) or not event or len(event) > 100 or type(seq) is not int or seq < 1:
             raise ValueError('Event and positive sequence required')
+        kind = envelope.get('kind')
+        if kind not in (None, MOVE_REQUEST):
+            raise ValueError('Unknown organization message kind')
+        if kind == MOVE_REQUEST and (actor != self.organization or seq != 1):
+            raise ValueError('A move request goes only to the organization whose turn it is, as its own event')
         if not isinstance(agent_input, dict) or actor not in ORGANIZATIONS or turn_organization(agent_input) != actor:
             raise ValueError('Published turn must identify an organization')
         if 'role' in agent_input and agent_input['role'] != role_of(actor):
@@ -168,10 +212,13 @@ class Receiver:
             latest = self.db.execute('SELECT COALESCE(MAX(sequence),0) FROM receipts WHERE event=?', (event,)).fetchone()[0]
             if seq != latest + 1:
                 raise ValueError('Out-of-order message; retry missing sequence first')
-            move = None
+            move = metadata = calls = None
             if actor == self.organization:
                 move = validate_move(self.policy(self.organization, copy.deepcopy(agent_input)), self.organization, draft['version'])
+                metadata, calls = policy_metadata(self.policy), policy_calculator_calls(self.policy)
             response = {'organization_id': self.organization, 'event_id': event, 'sequence': seq, 'move': move}
+            if kind == MOVE_REQUEST:
+                response.update(policy=self.policy_label, policy_metadata=metadata, calculator_calls=calls)
             self.db.execute('INSERT INTO receipts VALUES (?,?,?,?)', (event,seq,received,canonical(response)))
             self.db.commit()
             return response
@@ -207,10 +254,34 @@ def rpc_result(request, result):
         'parts': [{'kind': 'data', 'data': result}]}}
 
 
-def handler_for(receiver, verifier, endpoint):
-    """The organization host. ``verifier`` checks each envelope's sender signature (transport_auth)."""
+def answer(receiver, envelope, signer=None, transport='a2a_jsonrpc'):
+    """What a host returns for an authenticated envelope.
+
+    A broadcast turn gets the receiver's receipt, as before. A move request gets a reply signed
+    with this organization's own key for the turn publisher: its own move, the request it
+    answers, and which host and policy produced it. The core checks that signature, so a
+    reply from another host, or an unsigned one, is refused."""
+    if envelope.get('kind') == MOVE_REQUEST and (not isinstance(signer, Signer) or signer.sender != receiver.organization):
+        raise ValueError('This host has no signing key of its own, so it cannot answer a move request')
+    result = receiver.receive(envelope)
+    if envelope.get('kind') != MOVE_REQUEST:
+        return result
+    reply = {'kind': MOVE_REPLY, 'event_id': f"{receiver.organization}:{envelope['event_id']}", 'sequence': 1,
+             'turn': receiver.organization, 'in_reply_to': envelope['event_id'], 'move': result['move'],
+             'host': {'organization_id': receiver.organization, 'transport': transport,
+                      'policy': result['policy'], 'policy_metadata': result['policy_metadata'],
+                      'calculator_calls': result['calculator_calls']}}
+    # A retry returns the saved move, signed again with a new nonce.
+    return signer.sign(reply, TURN_PUBLISHER)
+
+
+def handler_for(receiver, verifier, endpoint, signer=None):
+    """The organization host. ``verifier`` checks each envelope's sender signature (transport_auth);
+    ``signer``, this organization's own key, signs its replies to move requests."""
     if not isinstance(verifier, Verifier) or verifier.recipient != receiver.organization:
         raise ValueError("A host needs a verifier for its own organization's messages")
+    if signer is not None and (not isinstance(signer, Signer) or signer.sender != receiver.organization):
+        raise ValueError("A host signs its replies with its own organization's key")
 
     class Handler(JsonHandler):
         def do_GET(self):
@@ -239,7 +310,7 @@ def handler_for(receiver, verifier, endpoint):
                     envelope = verifier.verify(parts[0].get('data'))
                 except AuthError as exc:
                     return self.send_json(401, {'error': f'Authenticated organization message required: {exc}'})
-                result = receiver.receive(envelope)
+                result = answer(receiver, envelope, signer)
                 self.send_json(200, rpc_result(request, result))
             except (ValueError, KeyError, TypeError) as exc:
                 self.send_json(200, {'jsonrpc': '2.0', 'id': request.get('id'),
@@ -289,19 +360,47 @@ class A2ATransport:
             return receipts
 
 
+def host_arguments(description, default_host='127.0.0.1', argv=None):
+    """The command line every organization host takes, whichever transport it runs, so a
+    deployment can swap the host module and keep its arguments. ``ORGANIZATION_ID`` and
+    ``PORT`` stand in for ``--organization`` and ``--port``."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('--organization', choices=ORGANIZATIONS, default=os.getenv('ORGANIZATION_ID'),
+                        required=not os.getenv('ORGANIZATION_ID'))
+    parser.add_argument('--port', type=int, default=int(os.getenv('PORT', '8020')))
+    parser.add_argument('--host', default=default_host)
+    args = parser.parse_args(argv)
+    if args.organization not in ORGANIZATIONS:  # argparse does not check a default against choices
+        parser.error(f'unknown organization {args.organization!r}')
+    return args
+
+
+def own_signer(organization):
+    """This host's own signing key, for its replies to move requests; ``None`` when unset."""
+    if not os.getenv('TRANSPORT_SIGNING_KEY'):
+        print('Move requests: refused, no TRANSPORT_SIGNING_KEY for this organization', flush=True)
+        return None
+    return Signer.from_env(organization)
+
+
+def start_cooler_watch(organization):
+    """A food bank's own agent watches its own cooler and proposes the change (#23), with
+    ``COOLER_WATCH=1``. Only the AWS image carries harvestnet_core, so this stays off unless asked for."""
+    if os.getenv('COOLER_WATCH') == '1':
+        from harvestnet_core.cooler_watch import start_from_env
+        start_from_env(organization)
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--organization', choices=ORGANIZATIONS, required=True)
-    parser.add_argument('--port', type=int, default=8020)
-    parser.add_argument('--host', default='127.0.0.1')
-    args = parser.parse_args()
+    args = host_arguments('An organization host: A2A JSON-RPC, per-sender signed')
     policy, label = load_policy(os.getenv('AGENT_POLICY'))
     receipts_db = os.getenv('RECEIPTS_DB', ':memory:')
-    receiver = Receiver(args.organization, policy, receipts_db)
+    receiver = Receiver(args.organization, policy, receipts_db, label)
     # Refuse to start without this host's own verification keys: there is no shared-token fallback.
     verifier = Verifier.from_env(args.organization, receipts_db)
     endpoint = os.getenv('AGENT_PUBLIC_URL', f'http://127.0.0.1:{args.port}')
     print(f'Policy: {label}; transport: A2A JSON-RPC, per-sender signed; approvals disabled', flush=True)
+    signer = own_signer(args.organization)
     address = os.getenv('AGNTCY_DIRECTORY_ADDRESS')
     if address:
         # Register this organization's own card and capabilities, and keep them current.
@@ -312,12 +411,8 @@ def main():
         print(f'Directory: AGNTCY Directory at {address}, refreshed every {interval:g}s', flush=True)
     else:
         print('Directory: none configured; searches use the labeled local registry fallback', flush=True)
-    if os.getenv('COOLER_WATCH') == '1':
-        # A food bank's own agent watches its own cooler and proposes the change (#23).
-        # Only the AWS image carries harvestnet_core, so this stays off unless asked for.
-        from harvestnet_core.cooler_watch import start_from_env
-        start_from_env(args.organization)
-    serve(handler_for(receiver, verifier, endpoint), args.port, args.host)
+    start_cooler_watch(args.organization)
+    serve(handler_for(receiver, verifier, endpoint, signer), args.port, args.host)
 
 
 if __name__ == '__main__':

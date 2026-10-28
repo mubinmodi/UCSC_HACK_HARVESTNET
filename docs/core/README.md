@@ -39,7 +39,10 @@ $PY -m harvestnet_core.demo_replay --check       # is the offline demo recording
 | `HARVESTNET_FIXTURE` | Scenario the server seeds from. Seeding adds missing records only; a restart never resets household balances. |
 | `HARVESTNET_STAFF_TOKENS` | JSON map of organization ID to its own secret. Each token authenticates that one organization. Keep it out of Git and out of household pages. Only the core holds the whole map; each deployed food bank host gets only its own entry. |
 | `HARVESTNET_APPROVALS_TOKEN` | Optional. The approval bridge's own credential (at least 16 characters, different from every staff token). Accepted only on `POST /approvals`, with a `receipt_id`, for a named organization, and still subject to every version, terms-hash and deadline check; refused for every other operation. Proposed (platform isolation). |
-| `TRANSPORT_SIGNING_KEY` | Optional. The turn publisher's (`core`) own transport key, for signing turns sent to the organization hosts (`docs/platform/TRANSPORT.md`). Unused until the core publishes turns over A2A. |
+| `HARVESTNET_MOVE_TRANSPORT` | Where live moves come from (`move_transport.py`). `in_process` (default): the core runs each owner's rules negotiator. `a2a`: the core asks the organization whose turn it is for its move, as a signed A2A move request to that organization's own host, and checks the signed reply; a turn the host cannot answer is made in process and recorded as `in_process_fallback` with the reason (`docs/platform/TRANSPORT.md`, "Move requests"). AWS sets `a2a`. |
+| `AGENT_ENDPOINTS` | With `a2a`: a JSON map of every organization to its host URL. |
+| `TRANSPORT_SIGNING_KEY`, `TRANSPORT_VERIFY_KEYS` | With `a2a`: the turn publisher's (`core`) own transport key, which signs each move request, and the keys the organizations derived for `core` (`TRANSPORT_VERIFY_KEYS_CORE`), which check their replies. |
+| `AGENT_TURN_TIMEOUT_SECONDS` (60), `MOVE_HOST_RETRY_SECONDS` (30) | With `a2a`: how long a move request waits, and how long an organization's turns fall back (labeled) after its host failed before it is asked again. |
 | `HARVESTNET_ALLOWED_ORIGIN` | CORS origin (default `http://127.0.0.1:8040`). |
 | `ANTHROPIC_API_KEY`, `CLAUDE_RUN_CAP_USD`, `CLAUDE_TOTAL_CAP_USD`, `CLAUDE_SPEND_LEDGER` | Voice intake is on only when the key is set and both caps are above zero (the total defaults to the run cap). Otherwise `voice_intake` answers 503 and households use the text form. The run cap is per process; the total cap is checked against the spend ledger file (default `runtime/claude-spend.json`; `/app/budget/claude-spend.json` on AWS), so a restart does not reset it. |
 | `HARVESTNET_HOUSEHOLD_URL`, `N8N_PICKUP_WEBHOOK_URL`, `N8N_RELEASE_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN`, `SES_TEST_RECIPIENTS` | Household email. Setting either webhook requires all of these, or the server refuses to start. `GET /health` answers 503 if the email worker thread has died. |
@@ -53,7 +56,8 @@ SQLite is the labeled single-host option. PostgreSQL takes an advisory transacti
 | `records.py` | Transactional JSON records and the append-only event log. Events never contain an email address. |
 | `protocol.py` | The rules for holds, versions, approvals and commitment. |
 | `engine.py` | The scripted harness (`run_fixture`): a seeded clock, owner-by-owner turns, scripted humans, pickups and household replies. |
-| `workflows.py` | Negotiation for live offers (`negotiate_pending`) without scripted humans, and the outgoing-message number check. |
+| `workflows.py` | Negotiation for live offers (`negotiate_pending`) without scripted humans, the outgoing-message number check (with a host's named calculations re-run by the core's calculators, `replay_calculations`), and the `move_source` and `policy_provenance` events that say where each live move came from. |
+| `move_transport.py` | The live server's move provider: in process, or each organization's own host over signed A2A (`harvestnet_platform.moves`), with the labeled in-process fallback and the own-facts check. |
 | `checks.py` | Audit checks recomputed from stored evidence (approvals, holds, conservation, fair share over the household's whole week), never a constant. Booking uses each owner's real capacity (`Engine.audit_capacities`). |
 | `calculators.py` | The agreed calculators plus capacity, gap-after-plan and arrival helpers (`docs/contracts/calculators.md`). |
 | `api.py` | The public API. `OPERATIONS` is the route table (`GET /` lists it) and each operation has an `op_<name>` handler. |
@@ -63,7 +67,7 @@ SQLite is the labeled single-host option. PostgreSQL takes an advisory transacti
 | `evaluation.py`, `live_evaluation.py` | Methods, metrics, replay, and the capped LLM provider. |
 | `voice.py` | `CappedExtractor`: a hard spending cap (run cap plus the total cap in the spend ledger) around Lane B's Claude extractor. |
 | `notices.py`, `contact.py`, `email_delivery.py` | Household pickup emails: the facts, address checking and the release link, and the outbox that delivers to n8n. |
-| `join.py`, `join_adapter.py` | Lane A and Lane B joined in one process; the policy and harness the platform's A2A hosts run (`AGENT_POLICY=harvestnet_core.join_adapter:policy`). |
+| `join.py`, `join_adapter.py` | Lane A and Lane B joined in one process; the policies and harness the platform's A2A hosts run (`AGENT_POLICY=harvestnet_core.join_adapter:policy`, the rules negotiator, or `:llm_policy`, the organization's own Claude negotiator under the host's own cap). |
 | `demo_replay.py` | The recorded demo. |
 
 ## The lot lifecycle
@@ -71,7 +75,7 @@ SQLite is the labeled single-host option. PostgreSQL takes an advisory transacti
 A Surplus lot moves through **negotiating, awaiting approvals, committed**, with two other endings: **unclaimed** and **preserved disagreement**.
 
 - **Versions.** Every counter creates a new version and clears all approvals and holds. Approvals and holds name one version and one terms hash (`sha256:<hex>`); a stale one is refused (409).
-- **Turns.** Each organization's own negotiator moves in published turn order (`turn_order` in the fixture). A move must come from the organization whose turn it is, name the current version, and carry a reason. The advocate may only counter or pass. Each owner's negotiator persists across turns, in the harness, the public scheduler, the baselines and the evaluation provider.
+- **Turns.** Each organization's own negotiator moves in published turn order (`turn_order` in the fixture). A move must come from the organization whose turn it is, name the current version, and carry a reason. The advocate may only counter or pass. Each owner's negotiator persists across turns, in the harness, the public scheduler, the baselines and the evaluation provider. On the live server with `HARVESTNET_MOVE_TRANSPORT=a2a`, each live turn's move comes from that organization's own host over signed A2A, which keeps its own negotiator per core session; the harness and the evaluation always run in process.
 - **Holds.** Only a resource's owner places a hold on it. Overlapping holds are checked against capacity at every boundary, so two non-concurrent holds do not block each other, and a double booking is refused. A hold that is already over is a refused move (`hold_refused`), not a crash.
 - **Awaiting approvals.** A lot reaches it when it has allocations and every named organization holds its resources, and no human has declined this version.
 - **Commitment.** When every named organization has approved the exact version, and every hold is still valid, the core validates the plan against its own records and commits. No missing reply and no deadline commits anything. Fixture humans are scripted and labeled so.

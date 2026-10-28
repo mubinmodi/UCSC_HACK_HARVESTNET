@@ -1,6 +1,6 @@
 # Joining the real agents to the transport
 
-The join proves that the real negotiators and the real core give the same outcome whether their moves travel in process or over the five organization hosts ([`TRANSPORT.md`](TRANSPORT.md)). It is a comparison. It never creates holds, approves or commits anything.
+The join proves that the real negotiators and the real core give the same outcome whether their moves travel in process or over the five organization hosts ([`TRANSPORT.md`](TRANSPORT.md)). It is a comparison. It never creates holds, approves or commits anything. The live core's own path, one signed move request to the acting organization's host per turn, is described in [`TRANSPORT.md`](TRANSPORT.md), "Move requests", and tested by `core_tests/test_a2a_moves.py`.
 
 ```sh
 python -m harvestnet_platform.join --fixture core_fixtures/normal-afternoon.json \

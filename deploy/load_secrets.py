@@ -25,7 +25,11 @@ ALLOWED = {'API_EVENTS_TOKEN','DEMO_SWITCH_TOKEN','TRANSPORT_KEYS','HARVESTNET_A
            'HARVESTNET_STAFF_TOKENS','HARVESTNET_ALLOWED_ORIGIN','HARVESTNET_HOUSEHOLD_URL',
            'ELEVENLABS_API_KEY','N8N_APPROVAL_WEBHOOK_URL','N8N_PICKUP_WEBHOOK_URL',
            'N8N_RELEASE_WEBHOOK_URL','APPROVER_EMAILS_JSON','SES_SENDER_EMAIL',
-           'SES_TEST_RECIPIENTS'}
+           'SES_TEST_RECIPIENTS',
+           # Where live moves come from, and which organization host module runs (compose.platform.yaml).
+           'HARVESTNET_MOVE_TRANSPORT','HARVESTNET_ORG_HOST'}
+CHOICES = {'HARVESTNET_MOVE_TRANSPORT': ('a2a', 'in_process'),
+           'HARVESTNET_ORG_HOST': ('harvestnet_platform.transport', 'harvestnet_platform.agntcy_server')}
 # Retired settings an older secret may still hold: accepted, never written out.
 # TRANSPORT_TOKEN was the one shared transport token; REPLY_BINDING_KEY, POSTGRES_PASSWORD and
 # CORE_API_IMAGE belonged to the removed compose.deployment.yaml.
@@ -59,6 +63,9 @@ def env_file(values):
     if not isinstance(values,dict) or set(values)-ALLOWED-RETIRED:
         raise ValueError('Secret contains unknown configuration keys')
     values = {key: value for key, value in values.items() if key not in RETIRED}
+    for key, allowed in CHOICES.items():
+        if key in values and values[key] not in allowed:
+            raise ValueError(f'{key} must be one of: {", ".join(allowed)}')
     lines = []
     for key,value in {**values, **derived(values)}.items():
         if not isinstance(value,str) or any(c in value for c in '\r\n\x00'):

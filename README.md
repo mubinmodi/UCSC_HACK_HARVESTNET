@@ -12,7 +12,7 @@ Farms, grocers and farmers markets throw away good produce at closing time while
 
 1. **A household asks** on a phone-friendly web page (English or Spanish, no name, address or income) and picks the food banks it can reach. Its weekly **fair share** comes from a published table by household size, like a SNAP benefit.
 2. **A donor reports a surplus lot**, such as apples, romaine and potatoes that must be gone by 3 pm.
-3. **Each organization's negotiator bids, counters and explains**, item by item, using only its own facts and calculator results. An advocate pushes produce toward the households furthest below their fair share, but it can't vote. Every change is a new numbered version with a reason.
+3. **Each organization's negotiator bids, counters and explains**, item by item, using only its own facts and calculator results. An advocate pushes produce toward the households furthest below their fair share, but it can't vote. Every change is a new numbered version with a reason. Each negotiator runs on its own organization's host: the core requests every move over signed A2A and records which transport produced it, including any turn it had to make in process because a host could not answer.
 4. **A staff approver at each organization approves the exact version**, from an email link or the dashboard. Nothing commits automatically. If no version wins every approval, the disagreement is kept and shown, not decided for them.
 5. **Households get a pickup email** with their code and a "Can't make it" link that passes the produce to the next family.
 6. **When a food bank's cooler fails** (Level 2), its own agent works out which produce must stay cold, finds food banks with cold space through the AGNTCY Directory, writes a reason card for every candidate, and proposes a new version that needs fresh approvals.
@@ -75,7 +75,7 @@ cd frontend/household && npm ci && npm test
 
 ## Built with
 
-Cisco AGNTCY (A2A and the Directory), Claude (negotiators and the voice front desk), n8n Cloud and Amazon SES (approval and pickup emails), ElevenLabs (voice line, being set up), Beeceptor (mock organization systems, with recorded copies as the fallback), AWS.
+Cisco AGNTCY (moves are requested over signed A2A from each organization's own host; the AGNTCY Directory for discovery), Claude (negotiators and the voice front desk), n8n Cloud and Amazon SES (approval and pickup emails), ElevenLabs (voice line, being set up), Beeceptor (mock organization systems, with recorded copies as the fallback), AWS.
 
 ## Team
 
