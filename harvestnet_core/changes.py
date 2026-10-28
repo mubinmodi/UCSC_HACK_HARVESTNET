@@ -25,8 +25,13 @@ def _key(lot_id, version):
     return f'{lot_id}:{version}'
 
 
-def latest_version(lot):
-    return max(lot['draft']['version'], lot.get('change_version', 0))
+def latest_version(records, lot):
+    """The lot's newest version number: its draft, or any recorded change, committed or declined.
+
+    Version numbers are never reused, so a declined change keeps its own record and the next
+    proposal is numbered after it."""
+    recorded = [c['version'] for c in changes_for(records, lot['draft']['lot_id'])]
+    return max([lot['draft']['version'], lot.get('change_version', 0), *recorded])
 
 
 def find(records, lot_id, version):
@@ -77,7 +82,7 @@ def holding(engine, lot_id, food_bank_id):
     if not upcoming:
         raise Conflict('this food bank has no pickup hours left for its households')
     tonight = min(upcoming, key=lambda w: dt(w['start']))
-    return {'event_id': lot_id, 'lot_id': lot_id, 'current_version': latest_version(lot),
+    return {'event_id': lot_id, 'lot_id': lot_id, 'current_version': latest_version(records, lot),
             'food_bank_id': food_bank_id, 'food_bank_name': engine.names[food_bank_id],
             'timezone': engine.fixture['timezone'],
             'items': [{'produce_id': p, 'pounds': lb} for p, lb in held.items()],
@@ -112,9 +117,9 @@ def propose(engine, lot_id, body, owner):
             raise ValueError('only cooler-failure changes are supported')
         if (records.get('bank', owner).get('cooler') or {}).get('status') != 'failed':
             raise Conflict("record the failed cooler reading in this food bank's status first")
-        latest = latest_version(lot)
+        latest = latest_version(records, lot)
         if terms.get('based_on_version') != latest or terms.get('version') != latest + 1:
-            raise Conflict('stale version: a change builds on the latest committed version')
+            raise Conflict('stale version: a change builds on the latest version, and a declined version number is never reused')
         if any(c['status'] == 'awaiting_approvals' for c in changes_for(records, lot_id)):
             raise Conflict('another change of this lot is awaiting approvals')
         moves, fallback, staying, human = _parts(terms)

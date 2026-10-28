@@ -185,6 +185,10 @@ class Protocol:
                 raise Conflict("stale version or changed terms")
             if owner not in named(draft) or dt(now) >= dt(draft["deadline"]):
                 raise Conflict("unnamed organization or deadline passed")
+            # A recorded decline is final for its version, as on a change (changes.approve).
+            declined = sorted(o for o, r in lot["approvals"].items() if r["decision"] == "decline")
+            if declined:
+                raise Conflict(f"{', '.join(declined)} declined version {draft['version']}; a decision needs a new version")
             if receipt["decision"] == "approve" and self._expire_holds(lot, now):
                 self.records.put("lot", lot_id, lot)
                 result = {"lot_id": lot_id, "version": draft["version"], "decision_recorded": False, "returned_to_negotiation": "hold_expired",

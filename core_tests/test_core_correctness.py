@@ -11,7 +11,7 @@ from pathlib import Path
 
 from harvestnet_core.api import API
 from harvestnet_core.engine import Engine, run_fixture
-from harvestnet_core.protocol import dt
+from harvestnet_core.protocol import Conflict, dt, named, terms_hash
 from harvestnet_core.records import Records
 
 
@@ -136,6 +136,51 @@ class ReadsInsideTransactions(unittest.TestCase):
         race(first.records, 'op_confirm_pickup', lambda: self.assertEqual(second.call('POST', '/pickup-confirmations', body, token='staff')[0], 200))
         self.assertEqual(first.call('POST', '/pickup-confirmations', body, token='staff')[0], 409)
         self.assertEqual(first.records.get('request', 'K7P4')['received_this_week_lb'], self.received + pickup['pounds'])
+
+
+class DeclinesAreFinal(unittest.TestCase):
+    """A recorded decline is final for its version, on a lot and on a change of a committed lot."""
+
+    def test_a_declined_lot_version_never_flips_to_approved(self):
+        from test_core import fixture
+        f = fixture()
+        engine = Engine(f)
+        api = API(engine, clock=lambda: '2026-10-13T12:00:00-07:00', staff_tokens={'market': 'donor-test', 'city': 'city-test'})
+        lot_id = api.call('POST', '/surplus-offers', copy.deepcopy(f['surplus_offers'][0]), token='donor-test')[1]['lot_id']
+        lot = engine.records.get('lot', lot_id)
+        self.assertEqual(lot['status'], 'awaiting_approvals')
+        draft, holds = lot['draft'], lot['holds']
+        decide = lambda owner, decision: {'lot_id': lot_id, 'version': draft['version'], 'organization_id': owner,
+                                          'terms_hash': terms_hash(draft), 'decision': decision}
+        engine.protocol.approve(decide('city', 'decline'), 'city', engine.now, engine.validate)
+        # Suppose the owners hold the same terms again: the decline still stands for this version.
+        for owner in named(draft):
+            engine.protocol.hold(lot_id, draft['version'], owner, holds[owner], engine.now, engine.capacities(owner, draft))
+        for owner in ('market', 'city'):
+            with self.subTest(owner=owner), self.assertRaises(Conflict):
+                engine.protocol.approve(decide(owner, 'approve'), owner, engine.now, engine.validate)
+        lot = engine.records.get('lot', lot_id)
+        self.assertNotEqual(lot['status'], 'committed')
+        self.assertEqual(lot['approvals']['city']['decision'], 'decline')
+
+    def test_a_declined_change_is_kept_when_the_next_change_is_proposed(self):
+        from harvestnet_core import changes
+        from test_cooler_checks import run
+        engine, lot_id, _ = run(answer_within_trip=False)
+        declined = changes.changes_for(engine.records, lot_id)[-1]
+        engine.now = '2026-10-13T15:31:00-07:00'  # inside the planned trip time
+        receipt = {'lot_id': lot_id, 'version': declined['version'], 'organization_id': 'eastside',
+                   'terms_hash': declined['terms_hash'], 'decision': 'decline'}
+        self.assertEqual(changes.approve(engine, receipt, 'eastside')['status'], 'declined')
+        self.assertEqual(changes.holding(engine, lot_id, 'city')['current_version'], declined['version'])
+        # The same version number again would replace the declined record: refused.
+        with self.assertRaises(Conflict):
+            changes.propose(engine, lot_id, {'terms': declined['terms'], 'organizations': declined['organizations']}, 'city')
+        terms = {**declined['terms'], 'version': declined['version'] + 1, 'based_on_version': declined['version']}
+        proposed = changes.propose(engine, lot_id, {'terms': terms, 'organizations': declined['organizations']}, 'city')
+        self.assertEqual(proposed['version'], declined['version'] + 1)
+        kept = {c['version']: c['status'] for c in changes.changes_for(engine.records, lot_id)}
+        self.assertEqual(kept, {declined['version']: 'declined', proposed['version']: 'awaiting_approvals'})
 
 
 if __name__ == '__main__':
