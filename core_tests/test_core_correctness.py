@@ -255,5 +255,43 @@ class ServerErrors(unittest.TestCase):
         self.assertEqual(self.api.call('POST', '/requests', {'household_size': 2, 'consent': True, 'pickup_windows': 'tuesday'})[0], 400)
 
 
+class Purge(unittest.TestCase):
+    """Purge runs on changes and when something is due, and expiry keeps the counts results use."""
+
+    def setUp(self):
+        self.f = load('normal-afternoon')
+        self.records = Records()
+        run_fixture(copy.deepcopy(self.f), records=self.records)
+        self.clock = {'now': '2026-10-14T21:00:00-07:00'}
+        self.api = API(Engine(self.f, self.records), clock=lambda: self.clock['now'])
+        self.lot_id = self.f['surplus_offers'][0]['lot_id']
+
+    def test_reads_do_not_rescan_and_rewrite_when_nothing_is_due(self):
+        self.api.call('GET', '/food-banks')  # the first call purges and learns when the next work is due
+        with mock.patch.object(API, 'purge', autospec=True, side_effect=API.purge) as purge:
+            for _ in range(3):
+                self.assertEqual(self.api.call('GET', '/lots/' + self.lot_id)[0], 200)
+            self.assertEqual(purge.call_count, 0)
+            self.api.call('POST', '/requests/preview', {'household_size': 2})
+            self.assertEqual(purge.call_count, 1)
+            self.clock['now'] = '2026-10-21T21:00:00-07:00'  # every request has expired: due
+            self.assertEqual(self.api.call('GET', '/requests/K7P4')[0], 404)
+            self.assertEqual(purge.call_count, 2)
+
+    def test_expiry_keeps_households_reached_and_collected_pounds(self):
+        from harvestnet_core.evaluation import produce_split
+        def counts():
+            items = self.api.call('GET', '/lots/' + self.lot_id)[1]['items']
+            return {i['produce_id']: i['households_reached'] for i in items}, produce_split(self.records)
+        before = counts()
+        self.assertTrue(any(before[0].values()))
+        codes = {r['request_code'] for r in self.records.all('request')}
+        self.clock['now'] = '2026-10-21T21:00:00-07:00'
+        self.assertEqual(counts(), before)
+        self.assertEqual(self.records.all('request'), [])
+        kept = self.records.all('pickup')
+        self.assertTrue(kept and all(p['status'] == 'collected' and p['window'] is None and p['request_code'] not in codes for p in kept))
+
+
 if __name__ == '__main__':
     unittest.main()

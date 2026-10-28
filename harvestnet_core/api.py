@@ -83,6 +83,9 @@ CONTRACT_VERSION = "contract-v0.2"
 
 log = logging.getLogger(__name__)
 
+# The longest a read waits before purge runs again, for records another API process added.
+PURGE_INTERVAL = timedelta(minutes=1)
+
 # Voice intake calls per process in a sliding window (#22). Each call can cost a model call.
 VOICE_RATE_LIMIT = (20, 60.0)
 
@@ -158,6 +161,7 @@ class API:
         self.voice_calls=deque()
         self.household_page_url=household_page_url
         self.email_dispatcher_thread=None
+        self.next_purge=None
         if household_page_url:
             self.records.enable_email_outbox()
 
@@ -191,28 +195,53 @@ class API:
         reopened=[lot['draft']['lot_id'] for lot in self.records.all('lot') if lot['status']=='awaiting_approvals' and self.engine.protocol.expire_holds(lot['draft']['lot_id'],self.engine.now)]
         for lot_id in reopened:
             negotiate_pending(self.engine,lot_id)
-        expired=[r for r in self.records.all("request") if dt(r["expires_at"])<=dt(self.engine.now)]
-        if expired:
-            with self.records.transaction():
-                for r in expired:
-                    code=r["request_code"]
-                    self.records.delete("request",code)
-                    self.records.delete("email",code)
-                    self.records.delete("phone",code)  # retired with contract-v0.2; kept so old records still go
-                    for p in self.records.all("pickup"):
-                        if p["request_code"]==code:
-                            self.records.delete("pickup",p["pickup_id"])
-                    # Design section 12: results keep only counts. Pickup notices keep the
-                    # pounds and food bank; the request code and household window go.
-                    for e in self.records.events_of_kind("pickup_notice"):
-                        if e["data"].get("request_code")==code:
-                            self.records.replace_event_data(e["sequence"],{**e["data"],"request_code":None,"window":None,"anonymized":"request expired"})
+        with self.records.transaction():
+            for r in self.records.all("request"):
+                if dt(r["expires_at"])>dt(self.engine.now):
+                    continue
+                code=r["request_code"]
+                self.records.delete("request",code)
+                self.records.delete("email",code)
+                self.records.delete("phone",code)  # retired with contract-v0.2; kept so old records still go
+                # Design section 12: results keep only counts. A collected pickup stays as a count
+                # (pounds, items, food bank, lot) under a fresh random household reference, so
+                # households reached and collected pounds do not shrink later; its request code and
+                # window go. Every other pickup of the request is deleted, as before.
+                household="expired-"+secrets.token_hex(8)
+                for p in self.records.all("pickup"):
+                    if p["request_code"]!=code:
+                        continue
+                    if p["status"]=="collected":
+                        self.records.put("pickup",p["pickup_id"],{**p,"request_code":household,"window":None,"anonymized":"request expired"})
+                    else:
+                        self.records.delete("pickup",p["pickup_id"])
+                # Pickup notices keep the pounds and food bank; the request code and household window go.
+                for e in self.records.events_of_kind("pickup_notice"):
+                    if e["data"].get("request_code")==code:
+                        self.records.replace_event_data(e["sequence"],{**e["data"],"request_code":None,"window":None,"anonymized":"request expired"})
+        self.next_purge=self.purge_due()
+
+    def purge_due(self):
+        """When purge next has work: the earliest open lot's deadline, hold end of a lot awaiting
+        approvals, or request expiry. Never later than ``PURGE_INTERVAL`` from now, since another
+        API process may add records this one has not seen."""
+        due=[dt(self.engine.now)+PURGE_INTERVAL]
+        for lot in self.records.all('lot'):
+            if lot['status'] not in ('committed','unclaimed','preserved_disagreement'):
+                due.append(dt(lot['draft']['deadline']))
+            if lot['status']=='awaiting_approvals':
+                due+=[dt(h['end']) for hs in lot['holds'].values() for h in hs]
+        due+=[dt(r['expires_at']) for r in self.records.all('request')]
+        return min(due)
 
     def call(self, method, target, body=None, token=None):
         # Reads and mutations share one lock; never leak database exception contents.
         with self.records.lock:
             self.engine.now=self.clock()
-            self.purge()
+            # Every change runs purge; a read runs it only when something is due (or the interval
+            # passed), so reads do not rescan and rewrite every record.
+            if method!='GET' or self.next_purge is None or dt(self.engine.now)>=self.next_purge:
+                self.purge()
             try:
                 status,data=self.dispatch(method,target,caller_input(body or {}),token)
                 return status,{"mode":self.engine.fixture["mode"],"synthetic":self.engine.fixture["synthetic"],**data}
