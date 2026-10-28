@@ -98,7 +98,7 @@ a:focus-visible, input:focus-visible { outline: 2px solid var(--leaf); outline-o
     <div class="person">
       <ul class="checks">
         <li><input type="checkbox" id="c1"><div class="item"><label for="c1">Keep the sender inbox ready</label>
-          <p>All demo emails come from <code>calebdburnham@gmail.com</code> through n8n Cloud and Amazon SES. You also get the donor ("market") approval emails. Check spam once and mark HarvestNet "not spam".</p></div></li>
+          <p>All demo emails come from the <code>SES_SENDER_EMAIL</code> address through n8n Cloud and Amazon SES. You also get the donor ("market") approval emails. Check spam once and mark HarvestNet "not spam".</p></div></li>
         <li><input type="checkbox" id="c2"><div class="item"><label for="c2">Don't switch on the old n8n drafts</label>
           <p>Only these three workflows should be active in n8n: "email human review requests", "email committed pickup and verified Market Match tip", "email the thank-you after Can't make it". The older Twilio/SMS drafts stay off (see <code>docs/platform/HANDOFF.md</code>).</p></div></li>
         <li><input type="checkbox" id="c3"><div class="item"><label for="c3">Play Operator in the rehearsal</label>
@@ -174,10 +174,10 @@ deploy/aws/teardown.sh              # delete</pre></div></li>
     <div class="table"><table>
       <thead><tr><th>Organization</th><th>Approval emails go to</th></tr></thead>
       <tbody>
-        <tr><td>market (donor)</td><td><code>calebdburnham@gmail.com</code></td></tr>
-        <tr><td>city (food bank)</td><td><code>mubinmodi@gmail.com</code></td></tr>
-        <tr><td>rural (food bank)</td><td><code>ylwzry36@gmail.com</code></td></tr>
-        <tr><td>eastside (food bank)</td><td><code>Girththegreat2@gmail.com</code></td></tr>
+        <tr><td>market (donor)</td><td><code>APPROVER_EMAILS_JSON["market"]</code></td></tr>
+        <tr><td>city (food bank)</td><td><code>APPROVER_EMAILS_JSON["city"]</code></td></tr>
+        <tr><td>rural (food bank)</td><td><code>APPROVER_EMAILS_JSON["rural"]</code></td></tr>
+        <tr><td>eastside (food bank)</td><td><code>APPROVER_EMAILS_JSON["eastside"]</code></td></tr>
       </tbody>
     </table></div>
   </section>

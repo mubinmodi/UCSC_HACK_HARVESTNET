@@ -124,7 +124,7 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
       <li><input type="checkbox" id="c1"><label for="c1"><a href="https://18-217-110-223.sslip.io/api/health" target="_blank" rel="noopener">/api/health</a> says <code>"status": "ok"</code> and <code>"mode": "synthetic"</code>.</label></li>
       <li><input type="checkbox" id="c2"><label for="c2"><a href="https://18-217-110-223.sslip.io/platform/health" target="_blank" rel="noopener">/platform/health</a> answers. This is the approvals service; if it's down, review links and emails won't work.</label></li>
       <li><input type="checkbox" id="c3"><label for="c3">The results strip shows numbers, each labeled <b>Synthetic</b>.</label></li>
-      <li><input type="checkbox" id="c4"><label for="c4">Every approver can open their inbox (see "Who gets which email"). Check spam once for <code>calebdburnham@gmail.com</code>.</label></li>
+      <li><input type="checkbox" id="c4"><label for="c4">Every approver can open their inbox (see "Who gets which email"). Check spam once for the <code>SES_SENDER_EMAIL</code> address.</label></li>
       <li><input type="checkbox" id="c5"><label for="c5">The cooler switch is back on "working" (reset command in moment 5), the scenario is fresh, and <code>$DEMO_SWITCH_TOKEN</code> is set in the Operator's terminal.</label></li>
       <li><input type="checkbox" id="c6"><label for="c6">The replay is current: <code>python -m harvestnet_core.demo_replay --check</code> prints "recording matches the code".</label></li>
       <li><input type="checkbox" id="c7"><label for="c7">The phone for the Spanish voice call is charged. If the voice line isn't live yet, the Caller uses the household page instead.</label></li>
@@ -227,14 +227,14 @@ pre { margin: 0; padding: 12px 14px; background: var(--panel); border: 1px solid
 
   <section>
     <h2>Who gets which email</h2>
-    <p>Emails come from <code>calebdburnham@gmail.com</code> through n8n and Amazon SES. SES is in test mode, so only these verified addresses receive mail. Add a new address only after AWS has verified it.</p>
+    <p>Emails come from the <code>SES_SENDER_EMAIL</code> address through n8n and Amazon SES. SES is in test mode, so only these verified addresses receive mail. Add a new address only after AWS has verified it.</p>
     <div class="table"><table>
       <thead><tr><th>Organization</th><th>Role</th><th>Approval emails go to</th></tr></thead>
       <tbody>
-        <tr><td>market</td><td>Donor</td><td class="mono">calebdburnham@gmail.com</td></tr>
-        <tr><td>city</td><td>Food bank</td><td class="mono">mubinmodi@gmail.com</td></tr>
-        <tr><td>rural</td><td>Food bank</td><td class="mono">ylwzry36@gmail.com</td></tr>
-        <tr><td>eastside</td><td>Food bank</td><td class="mono">Girththegreat2@gmail.com</td></tr>
+        <tr><td>market</td><td>Donor</td><td class="mono">APPROVER_EMAILS_JSON["market"]</td></tr>
+        <tr><td>city</td><td>Food bank</td><td class="mono">APPROVER_EMAILS_JSON["city"]</td></tr>
+        <tr><td>rural</td><td>Food bank</td><td class="mono">APPROVER_EMAILS_JSON["rural"]</td></tr>
+        <tr><td>eastside</td><td>Food bank</td><td class="mono">APPROVER_EMAILS_JSON["eastside"]</td></tr>
         <tr><td>advocate</td><td>Advocate</td><td>None; it proposes but never approves</td></tr>
       </tbody>
     </table></div>
