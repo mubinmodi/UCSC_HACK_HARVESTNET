@@ -368,5 +368,17 @@ class FairBaselines(unittest.TestCase):
         self.assertTrue(self.waiting(self.baseline('eastside', self.wire(second, 'eastside'))))
 
 
+class OneDoubleBookingCheck(unittest.TestCase):
+    """Lots and changes share ``protocol.overbooked``: holds that never overlap in time both fit."""
+
+    def test_overbooked_sweeps_each_boundary(self):
+        from harvestnet_core import changes, protocol
+        hold = lambda start, end, lb: {'resource': 'cold', 'pounds': lb, 'start': f'2026-10-13T{start}:00-07:00', 'end': f'2026-10-13T{end}:00-07:00'}
+        morning, evening, noon = hold('08:00', '12:00', 60), hold('12:00', '18:00', 60), hold('10:00', '14:00', 60)
+        self.assertFalse(protocol.overbooked(evening, [morning, evening], 100))
+        self.assertTrue(protocol.overbooked(noon, [morning, evening, noon], 100))
+        self.assertIs(changes.overbooked, protocol.overbooked)
+
+
 if __name__ == '__main__':
     unittest.main()

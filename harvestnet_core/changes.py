@@ -18,7 +18,7 @@ from collections import defaultdict
 from harvestnet_agents.negotiation import parse_facts
 from harvestnet_agents.profiles import STORAGE_COLD
 from harvestnet_agents.terms import terms_hash
-from .protocol import Conflict, dt, named, number
+from .protocol import Conflict, dt, named, number, overbooked
 
 
 def _key(lot_id, version):
@@ -231,11 +231,8 @@ def _check_free(records, owner, hold, capacity):
     start, end = dt(hold['start']), dt(hold['end'])
     if start >= end:
         raise Conflict('hold has an empty interval')
-    overlapping = [x for x in _owner_holds(records, owner, hold['resource']) + [hold] if dt(x['start']) < end and start < dt(x['end'])]
-    for at in {start} | {dt(x['start']) for x in overlapping if start <= dt(x['start']) < end}:
-        total = sum(number(x.get('pounds') or 0) for x in overlapping if dt(x['start']) <= at < dt(x['end']))
-        if total > max(0.0, capacity) + 1e-8:
-            raise Conflict(f"{owner}'s {hold['resource']} would be double booked")
+    if overbooked(hold, _owner_holds(records, owner, hold['resource']) + [hold], max(0.0, capacity)):
+        raise Conflict(f"{owner}'s {hold['resource']} would be double booked")
 
 
 def _commit(engine, change):
