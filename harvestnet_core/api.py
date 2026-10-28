@@ -3,6 +3,7 @@ from collections import deque
 import copy
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import logging
 import secrets
 import time
 from urllib.parse import urlsplit, parse_qs
@@ -20,6 +21,33 @@ from .workflows import negotiate_pending
 
 class Unauthorized(ValueError):
     pass
+
+
+class MissingField(ValueError, KeyError):
+    """A field the caller's body or query left out: bad input (400), unlike a missing record key."""
+
+    def __str__(self):
+        return f"missing field {self.args[0]!r}"
+
+
+class Body(dict):
+    """The caller's JSON. Only a missing field here is the caller's error; a ``KeyError`` from
+    anywhere else is a server bug and answers 500."""
+
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            raise MissingField(key) from None
+
+
+def caller_input(value):
+    """JSON from the caller, with every object a ``Body``."""
+    if isinstance(value, dict):
+        return Body({k: caller_input(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [caller_input(v) for v in value]
+    return value
 
 
 # Every operation this API serves, for GET /. The first block is the agreed contract
@@ -52,6 +80,8 @@ OPERATIONS = (
 
 # The public API contract this serves. v0.2: households give an optional email, not a phone.
 CONTRACT_VERSION = "contract-v0.2"
+
+log = logging.getLogger(__name__)
 
 # Voice intake calls per process in a sliding window (#22). Each call can cost a model call.
 VOICE_RATE_LIMIT = (20, 60.0)
@@ -184,7 +214,7 @@ class API:
             self.engine.now=self.clock()
             self.purge()
             try:
-                status,data=self.dispatch(method,target,body or {},token)
+                status,data=self.dispatch(method,target,caller_input(body or {}),token)
                 return status,{"mode":self.engine.fixture["mode"],"synthetic":self.engine.fixture["synthetic"],**data}
             except Unauthorized as exc:
                 return 401,{"error":{"code":"unauthorized","message":str(exc)}}
@@ -192,11 +222,13 @@ class API:
                 return 404,{"error":{"code":"not_found","message":"Record not found"}}
             except Conflict as exc:
                 return 409,{"error":{"code":"conflict","message":str(exc)}}
-            except KeyError as exc:
-                # A missing field, or an unknown produce or organization in the body: bad input.
-                return 400,{"error":{"code":"bad_request","message":f"missing or unknown field {exc}"}}
-            except (ValueError,TypeError,AttributeError) as exc:
+            except ValueError as exc:
+                # Validation: a missing field (MissingField) or a value the rules refuse.
                 return 400,{"error":{"code":"bad_request","message":str(exc)}}
+            except Exception:
+                # Anything else is a server bug: logged here, never shown to the caller.
+                log.exception("unexpected error in %s /%s", method, urlsplit(target).path.strip('/').split('/')[0])
+                return 500,{"error":{"code":"internal_error","message":"Something went wrong on our side"}}
 
     def preview(self, draft):
         return {"saved":False,"draft_request":draft.to_dict(),"complete":draft.is_complete,"fair_share_lb":self.engine.calc.fair_share(draft.household_size).pounds if draft.household_size else None,"read_back":desk.read_back(draft),"missing_questions":list(desk.missing_questions(draft)),"consent_question":desk.consent_wording(draft) if draft.is_complete else None}
@@ -403,7 +435,7 @@ class API:
         route table, ``op_<operation>`` the handler). Anything else is a 404."""
         url=urlsplit(target)
         segments=url.path.strip('/').split('/')
-        query={name:values[0] for name,values in parse_qs(url.query).items()}
+        query=Body({name:values[0] for name,values in parse_qs(url.query).items()})
         if method=='GET' and segments==['']:
             return self.op_index()
         for operation,route_method,template,_ in OPERATIONS:

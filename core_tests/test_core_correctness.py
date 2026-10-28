@@ -6,6 +6,7 @@ import inspect
 import json
 import tempfile
 import unittest
+from unittest import mock
 from datetime import timedelta, timezone
 from pathlib import Path
 
@@ -228,6 +229,30 @@ class AuditChecks(unittest.TestCase):
         self.assertEqual(metrics(f, run, records)['invalid_commitments'], 0)
         run['lot_rule_checks']['lot-market-1013']['zero_invalid_commitments'] = False
         self.assertEqual(metrics(f, run, records)['invalid_commitments'], 1)
+
+
+class ServerErrors(unittest.TestCase):
+    """Only the caller's bad input is a 400. A server bug is a logged 500 that shows no detail."""
+
+    def setUp(self):
+        from test_core import fixture
+        self.api = API(Engine(fixture()), clock=lambda: '2026-10-13T12:00:00-07:00', staff_tokens={'market': 'donor-test'})
+
+    def test_a_bug_inside_a_handler_is_a_500_without_its_detail(self):
+        for bug in (KeyError('secret_detail_key'), TypeError('secret_detail type'), AttributeError('secret_detail attribute')):
+            with self.subTest(bug=type(bug).__name__), mock.patch.object(API, 'op_list_food_banks', side_effect=bug), \
+                    self.assertLogs('harvestnet_core.api', 'ERROR') as logged:
+                status, body = self.api.call('GET', '/food-banks')
+                self.assertEqual(status, 500)
+                self.assertNotIn('secret_detail', json.dumps(body))
+                self.assertIn('secret_detail', '\n'.join(logged.output))
+
+    def test_a_missing_body_or_query_field_is_still_a_400(self):
+        status, body = self.api.call('POST', '/surplus-offers', {'donor_id': 'market'}, token='donor-test')
+        self.assertEqual(status, 400)
+        self.assertIn('missing field', body['error']['message'])
+        self.assertEqual(self.api.call('GET', '/results')[0], 400)
+        self.assertEqual(self.api.call('POST', '/requests', {'household_size': 2, 'consent': True, 'pickup_windows': 'tuesday'})[0], 400)
 
 
 if __name__ == '__main__':

@@ -14,6 +14,8 @@ class Conflict(ValueError):
 
 
 def dt(value):
+    if not isinstance(value, str):
+        raise ValueError("timestamps must be ISO 8601 text with a UTC offset")
     result = datetime.fromisoformat(value)
     if result.tzinfo is None:
         raise ValueError("timestamps must include a UTC offset")
